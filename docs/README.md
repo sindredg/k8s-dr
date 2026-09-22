@@ -1,13 +1,14 @@
 # Project documentation
 
-The [project plan](../plan.md) defines milestone scope and validation gates. These documents record implementation evidence and recovery procedures. All milestones remain pending until their gates pass.
+The [project plan](../plan.md) defines milestone scope and validation gates. These documents record implementation evidence and recovery procedures. Milestones remain pending or in progress until their gates pass.
 
 | Document | Purpose |
 | --- | --- |
 | [Primary infrastructure worklog](worklogs/01-primary-infrastructure.md) | Record milestone 1 changes and validation. |
 | [Kubernetes bootstrap worklog](worklogs/02-kubernetes-bootstrap.md) | Record milestone 2 changes and validation. |
 | [Use kubeadm](decisions/0001-use-kubeadm.md) | Explain the cluster bootstrap choice and its trade-offs. |
-| [Worker join failure](troubleshooting/001-worker-join-failure.md) | Diagnose a worker that cannot join or become Ready. This is a guide, not an incident report. |
+| [Recovery contract](decisions/0002-recovery-contract.md) | Define recovery targets, checks, architecture, and alternatives. |
+| [Worker join failure](troubleshooting/01-worker-join-failure.md) | Diagnose a worker that cannot join or become Ready. This is a guide, not an incident report. |
 | [Regional recovery](runbooks/regional-recovery.md) | Execute and measure a cold recovery drill after prerequisites are implemented. |
 
 Record completed work and the commands and results that validate it in the corresponding worklog. Keep credentials, kubeconfigs, Terraform state, database dumps, and unsanitized command output out of this repository.
