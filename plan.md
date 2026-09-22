@@ -4,7 +4,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
-| 0. Recovery contract | Scope and measurements defined | Pending |
+| 0. Recovery contract | Scope and measurements defined | In progress |
 | 1. Primary infrastructure | Reproducible VMs and network | Pending |
 | 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Pending |
 | 3. Service deployment | Gitea survives pod restarts | Pending |
@@ -15,7 +15,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 ## 0. Recovery contract
 
-- [ ] Select two regions and a maximum acceptable cloud spend.
+- [ ] Select two regions and a monthly project spend alert.
 - [ ] Set a provisional RTO of a few hours and an RPO based on backup frequency.
 - [ ] Define service recovery: login, known commit and issue present, new push succeeds.
 - [ ] Define the failure drill, timer start and stop, and data-loss measurement.
