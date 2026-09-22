@@ -25,6 +25,19 @@ Build a self-managed Kubernetes service on VMs and prove it can be restored in a
 | Recovery access | `git-dr.sindrg.com` is available during restore tests and drills |
 | Cutover | Change Cloudflare DNS for `git.sindrg.com` to the recovery endpoint using a runbook |
 
+## Choices and alternatives
+
+| Decision | Selected | Good alternative | Why we chose it |
+| --- | --- | --- | --- |
+| Cluster bootstrap | [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) | [K3s](https://docs.k3s.io/quick-start) | kubeadm exposes the upstream installation and recovery steps we want to practice. K3s is quicker for a smaller lab. |
+| Pod networking | [Calico](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart) | [Cilium](https://docs.cilium.io/en/stable/installation/k8s-install-kubeadm/) | Both support a self-managed cluster. Calico meets the policy requirement with fewer networking choices to settle. Cilium is a strong option if eBPF observability becomes a goal. |
+| HTTP routing | [Traefik with Gateway API](https://doc.traefik.io/traefik/reference/install-configuration/providers/kubernetes/kubernetes-gateway/) | [Envoy Gateway](https://gateway.envoyproxy.io/docs/tasks/quickstart/) | Both implement Gateway API. Traefik keeps the single-service lab small; Envoy Gateway is worth considering for richer gateway policy. |
+| Persistent volumes | [Local Path Provisioner](https://github.com/rancher/local-path-provisioner) on a dedicated disk | [Longhorn](https://longhorn.io/docs/) | Local storage is enough for pod restart tests and makes offsite restore the DR mechanism. Longhorn adds distributed storage, which is useful with more storage nodes. |
+| Application backup | [Gitea files](https://docs.gitea.com/administration/backup-and-restore/) plus [PostgreSQL dump](https://www.postgresql.org/docs/current/backup-dump.html), encrypted with [restic](https://restic.readthedocs.io/en/stable/) | [Velero with backup hooks](https://velero.io/docs/main/backup-hooks/) and [file system backup](https://velero.io/docs/main/file-system-backup/) | The selected method makes the database and repository consistency steps explicit. Velero can also protect Kubernetes objects and volumes, but still needs application-aware coordination. |
+| DNS cutover | [Manual Cloudflare record change](https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/) in the runbook | [Cloudflare DNS API](https://developers.cloudflare.com/dns/manage-dns-records/reference/dns-record-types/) automation | Manual cutover is adequate for the provisional four-hour RTO. Automate after a drill shows this step is a meaningful delay. |
+
+These alternatives are deferred, not rejected for all environments. Revisit them if the measured recovery or project scope changes.
+
 ## Dependencies and boundaries
 
 - Keep Terraform state, encrypted backups, and recovery credentials accessible when Finland is unavailable. Store state and backups outside Finland.
