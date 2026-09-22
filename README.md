@@ -39,4 +39,4 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 4. Restore a verified, consistent application backup and route traffic to the recovered service.
 5. Confirm login, the commit and issue, and a new push. Record actual RTO, RPO, manual steps, and cost.
 
-See [plan.md](plan.md) for milestones and validation gates. The project does not depend on Gitea to store its own recovery configuration.
+See [plan.md](plan.md) for milestones and validation gates, and [docs](docs/README.md) for worklogs, decisions, troubleshooting, and the recovery runbook. The project does not depend on Gitea to store its own recovery configuration.
