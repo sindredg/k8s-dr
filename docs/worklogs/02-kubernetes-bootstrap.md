@@ -30,4 +30,4 @@ Do not mark this milestone complete until evidence shows that:
 
 ## Failures and remaining work
 
-All milestone 2 plan steps remain open. For join failures, use the [worker join guide](../troubleshooting/001-worker-join-failure.md) and record the observed symptom, confirmed cause, fix, and verification here. Do not paste kubeconfigs, join tokens, or unsanitized command output.
+All milestone 2 plan steps remain open. For join failures, use the [worker join guide](../troubleshooting/01-worker-join-failure.md) and record the observed symptom, confirmed cause, fix, and verification here. Do not paste kubeconfigs, join tokens, or unsanitized command output.
