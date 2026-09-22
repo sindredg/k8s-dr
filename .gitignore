@@ -1,0 +1,49 @@
+# Terraform working files and state
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+*.tfvars
+*.auto.tfvars
+!*.tfvars.example
+!*.auto.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local credentials and cluster access
+.env
+.env.*
+!.env.example
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.sops.yaml.dec
+secrets.local.*
+
+# Generated inventories, backups, and logs
+inventory/generated/
+*.retry
+backups/
+restore-work/
+*.dump
+*.sql
+*.tar
+*.tar.gz
+*.zip
+*.log
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*~
