@@ -19,8 +19,8 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 4. Run the versioned Ansible and kubeadm bootstrap procedure. Join the worker, install the CNI and required ingress and storage components, and confirm both nodes are `Ready` with `kubectl get nodes -o wide`.
 5. Reconnect Flux to the external GitHub repository and confirm the expected resources reconcile. Restore PostgreSQL and Gitea data from the same backup set using the validated restore procedure.
 6. Test the recovery endpoint before changing public routing: log in, find the known commit and issue, and push a new commit. Investigate any failure before proceeding.
-7. Route traffic to the recovery endpoint. Confirm the external probe reports a healthy service and repeat the login, fixture, and push checks through the routed endpoint. Record the first successful time.
-8. Compute RTO as the time from the external outage start to the first successful service check. Report the potential data-loss window as the time from the selected backup's recovery point to the outage start. Compare the restored fixtures with writes made after that recovery point to record confirmed data loss. Record timestamps, calculations, failures, manual steps, and cost in the drill worklog created for milestone 6.
+7. Change the Cloudflare DNS target for `git.sindrg.com` to the recovery endpoint. Confirm the external probe reports a healthy service and repeat the login, fixture, and authenticated push checks through `git.sindrg.com`. Record the time when all checks pass.
+8. Compute RTO from the first failed external probe to the time all checks pass through `git.sindrg.com`. Compute observed RPO from the last acknowledged primary test write to the newest test write recovered. Also report the potential data-loss window from the backup recovery point to outage start. Record timestamps, calculations, failures, manual steps, and cost in the drill worklog created for milestone 6.
 
 ## Stop conditions and follow-up
 
