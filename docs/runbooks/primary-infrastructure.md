@@ -134,7 +134,7 @@ Prices vary by billing currency, discounts, and traffic. Use the [Google Cloud p
 | --- | --- |
 | Compute Engine | Finland `europe-north1`, 2 `e2-custom-2-4096` VMs, Linux/Ubuntu, 730 hours/month, on-demand, no committed-use discount |
 | Persistent Disk | Finland, Balanced, 2 boot disks at 30 GiB and 1 worker data disk at 50 GiB, 730 hours/month |
-| Cloud NAT | Finland, 1 public NAT gateway serving 2 VMs, 1 ephemeral NAT IP, 730 hours/month, assume 10 GiB processed/month |
+| Cloud NAT | Finland, 1 public NAT gateway serving 2 VMs, 1 ephemeral NAT IP, 730 hours/month, assume 40 GiB processed/month (20 GiB outbound and 20 GiB inbound) |
 | Internet data transfer | Assume 20 GiB/month from Finland to the internet; replace with expected workload traffic |
 | Cloud Storage state | Belgium `europe-west1`, Standard, 1 GiB including object versions |
 | Cloud Storage backups | Belgium `europe-west1`, Standard, 20 GiB including object versions; no backup objects exist yet |
