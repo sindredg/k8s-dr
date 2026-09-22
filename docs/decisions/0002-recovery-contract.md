@@ -1,6 +1,7 @@
 # 0002: Recovery contract and target design
 
-Status: Proposed for review  
+Status: Accepted. The written milestone 0 gate is met; infrastructure validation is pending.
+
 Date: 2026-09-22
 
 ## Goal

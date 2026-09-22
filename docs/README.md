@@ -8,6 +8,8 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Kubernetes bootstrap worklog](worklogs/02-kubernetes-bootstrap.md) | Record milestone 2 changes and validation. |
 | [Use kubeadm](decisions/0001-use-kubeadm.md) | Explain the cluster bootstrap choice and its trade-offs. |
 | [Recovery contract](decisions/0002-recovery-contract.md) | Define recovery targets, checks, architecture, and alternatives. |
+| [Regional infrastructure and state](decisions/0003-regional-infrastructure-and-state.md) | Explain the reusable module and offsite state decisions. |
+| [Primary infrastructure procedure](runbooks/primary-infrastructure.md) | Bootstrap state, apply the primary root, and check the milestone 1 gate. |
 | [Worker join failure](troubleshooting/01-worker-join-failure.md) | Diagnose a worker that cannot join or become Ready. This is a guide, not an incident report. |
 | [Regional recovery](runbooks/regional-recovery.md) | Execute and measure a cold recovery drill after prerequisites are implemented. |
 

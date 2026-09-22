@@ -1,6 +1,6 @@
 # Milestone 1: Primary infrastructure
 
-Status: Pending. No infrastructure or validation is recorded yet.
+Status: In progress. Terraform and operator documentation are written; cloud validation is pending.
 
 ## Scope
 
@@ -8,7 +8,10 @@ Provision a primary control-plane VM and worker VM, their private network, restr
 
 ## Work completed
 
-None recorded.
+- Added a bootstrap Terraform root for a Belgium GCS state bucket with versioning, public-access prevention, bucket IAM, and an explicit local-state migration procedure.
+- Added the primary Terraform root, including a Finland regional cluster module, private VMs, IAP SSH, Cloud NAT, a dedicated worker disk, a separate Belgium backup bucket, IAM access, and a project-scoped monthly budget.
+- Added placeholder configuration, local-file ignore rules, a cost calculator input table, and the [operator procedure](../runbooks/primary-infrastructure.md).
+- Recorded the architecture and its trade-offs in [decision 0003](../decisions/0003-regional-infrastructure-and-state.md). No Terraform, gcloud, deployment, or validation command has been run by the implementer.
 
 ## Validation gate
 

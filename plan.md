@@ -4,8 +4,8 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
-| 0. Recovery contract | Scope and measurements defined | In progress |
-| 1. Primary infrastructure | Reproducible VMs and network | Pending |
+| 0. Recovery contract | Scope and measurements defined | Complete |
+| 1. Primary infrastructure | Reproducible VMs and network | In progress |
 | 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Pending |
 | 3. Service deployment | Gitea survives pod restarts | Pending |
 | 4. Consistent backups | Offsite data restores successfully | Pending |
@@ -15,10 +15,10 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 ## 0. Recovery contract
 
-- [ ] Select two regions and a monthly project spend alert.
-- [ ] Set a provisional RTO of a few hours and an RPO based on backup frequency.
-- [ ] Define service recovery: login, known commit and issue present, new push succeeds.
-- [ ] Define the failure drill, timer start and stop, and data-loss measurement.
+- [x] Select two regions and a monthly project spend alert.
+- [x] Set a provisional RTO of a few hours and an RPO based on backup frequency.
+- [x] Define service recovery: login, known commit and issue present, new push succeeds.
+- [x] Define the failure drill, timer start and stop, and data-loss measurement.
 
 **Gate:** The success checks and measurement method are written before provisioning.
 
