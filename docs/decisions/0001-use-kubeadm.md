@@ -14,9 +14,9 @@ Use kubeadm to initialize the control plane and join workers. Use Ansible to con
 
 | Option | Trade-off |
 | --- | --- |
-| kubeadm on VMs | Exposes the control-plane and node recovery steps the lab needs to measure, but requires maintaining the OS, runtime, networking, upgrades, and certificates. |
-| Managed Kubernetes | Reduces cluster operations, but delegates much of the bootstrap and regional rebuild behavior this lab is intended to test. |
-| Lightweight distribution | Could shorten setup, but changes the bootstrap and maintenance model under test. |
+| [kubeadm on VMs](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) | Exposes the control-plane and node recovery steps the lab needs to measure, but requires maintaining the OS, runtime, networking, upgrades, and certificates. |
+| [Managed Kubernetes (GKE)](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview) | Reduces cluster operations, but delegates much of the bootstrap and regional rebuild behavior this lab is intended to test. |
+| [K3s](https://docs.k3s.io/quick-start) | Could shorten setup, but changes the bootstrap and maintenance model under test. |
 
 ## Consequences
 
