@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: In progress. Automation is implemented and passes local checks. No live cluster validation is recorded yet.
+Status: In progress. Automation is implemented and passes local checks. Gate check 1 (both nodes `Ready`) passed on 2026-09-23. Gate checks 2 to 4 are not run. See [Resume here](#resume-here).
 
 ## Scope
 
@@ -8,7 +8,7 @@ Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible. Initial
 
 ## Work completed
 
-Implemented on 2026-09-23 on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../superpowers/plans/2026-09-23-kubernetes-bootstrap.md). None of it has run against the live VMs.
+Implemented on 2026-09-23 on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../superpowers/plans/2026-09-23-kubernetes-bootstrap.md). The bootstrap needed six fixes during live runs. See [Failures and remaining work](#failures-and-remaining-work).
 
 | Area | Files | Summary |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ Do not mark this milestone complete until evidence shows that:
 
 | Date | Check and command | Result and sanitized evidence |
 | --- | --- | --- |
-| Pending | `kubectl get nodes -o wide` | Not run |
+| 2026-09-23 | `bootstrap.yml` through `scripts/run_with_iap.py`, then `validate.yml -v` (runs `kubectl get nodes -o wide`), run by the operator | Passed. Bootstrap recap: control plane `ok=57 changed=9 unreachable=0 failed=0`, worker `ok=52 changed=0 unreachable=0 failed=0`. `k8sdr-primary-control-plane` (`control-plane`) and `k8sdr-primary-worker` (`worker`) are `Ready`, `v1.36.2`, Ubuntu 24.04.5 LTS, `containerd://2.2.1`. All pods in `calico-system`, `kube-system`, `tigera-operator`, `traefik`, and `local-path-storage` are `Running`; all six deployments are fully available. `validate.yml` then stopped at `Read Gateway conditions` with `namespaces "milestone2-test" not found`, as expected before the test application is deployed. |
 | Pending | Deploy and reach a disposable app | Not run |
 | Pending | Restart worker, then check node status | Not run |
 | Pending | Rebuild from fresh VMs | Not run |
@@ -72,6 +72,36 @@ Do not mark this milestone complete until evidence shows that:
 - **Confirmed cause:** `node_prepare` applied `/etc/sysctl.d/99-kubernetes.conf` only through a handler. Handlers run at the end of a play and are skipped when a task fails. The first run wrote the file and then failed at containerd, so the handler never ran. Later runs reported the file task as `ok`, so it never notified the handler again. The file was correct, but the kernel values were never applied.
 - **Same cause, not yet observed:** `container_runtime` restarted containerd only through a handler. On the second run, `Configure containerd for Kubernetes` reported `changed`, and the play then failed at package installation. containerd therefore kept running with its package defaults instead of the systemd cgroup configuration. This is inferred from the task sequence, not observed on the node.
 - **Fix:** Removed both handlers. `node_prepare` now reads the three sysctls on every run, runs `sysctl --system` when any is not `1`, and fails if they are still not `1`. `container_runtime` validates the configuration, then restarts containerd when its `ActiveEnterTimestamp` is older than the configuration file's modification time. Contract tests pin both behaviors.
-- **Verification:** Local tests, yamllint, ansible-lint, and syntax checks pass. A local probe of the restart condition returns `True` for a stale or missing start time and `False` for a start after the change. The live bootstrap rerun is pending.
+- **Verification:** Local tests, yamllint, ansible-lint, and syntax checks pass. A local probe of the restart condition returns `True` for a stale or missing start time and `False` for a start after the change. On the fifth live run, the control plane initialized, the worker joined (`ok=58 failed=0`), and the run continued to the next failure below.
+
+### Worker label used the inventory name instead of the node name
+
+- **Symptom:** On the fifth live `bootstrap.yml` run, task `cluster_addons : Label the worker node for workload placement` failed with `Error from server (NotFound): nodes "worker" not found`. Recap: control plane `ok=36 changed=4 failed=1`, worker `ok=58 changed=4 failed=0`.
+- **Confirmed cause:** The task labeled `{{ groups['kube_workers'] | first }}`, which is the Ansible inventory hostname `worker`. `kubeadm init` and `kubeadm join` register nodes by `gcp_instance_name` (`nodeRegistration.name` and `--node-name`), so the Kubernetes node is `k8sdr-primary-worker`. The Local Path Provisioner `nodePathMap` used the same wrong name. That would not fail the play, but the provisioner would treat the worker as unlisted and leave its PVCs Pending. The contract test pinned the wrong expression, so local checks passed.
+- **Fix:** Both references now use `{{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}`. The contract tests pin the new expression for the label task and the `nodePathMap`.
+- **Verification:** Local unit tests (53), yamllint, and ansible-lint pass. Resolving the expression locally against the generated inventory returns `k8sdr-primary-worker`. On the sixth live run, the label task reported `changed`, and the run continued to the next failure below.
+
+### Calico rollout check raced the Tigera operator
+
+- **Symptom:** On the sixth live `bootstrap.yml` run, task `cluster_addons : Wait for Calico on every node` failed after 0.1 seconds with `Error from server (NotFound): namespaces "calico-system" not found`. Recap: control plane `ok=38 changed=5 failed=1`, worker `failed=0`.
+- **Confirmed cause:** The Tigera operator creates the `calico-system` namespace and the `calico-node` DaemonSet asynchronously after it reconciles the `Installation`. `kubectl rollout status` fails immediately when the object does not exist, and the earlier operator rollout check returned before reconciliation. Immediately after the failure, `kubectl get ns` showed `calico-system` created about 16 seconds after `tigera-operator`, and `kubectl get tigerastatus` later reported `calico` as `Available=True`. Calico itself was healthy.
+- **Fix:** Added `Wait for the operator to create the Calico node DaemonSet`, which retries `kubectl get daemonset/calico-node -n calico-system` every 5 seconds for up to 5 minutes before the rollout check. A contract test pins the task and its order.
+- **Verification:** Local unit tests (54), yamllint, and ansible-lint pass. The seventh live run, `python3 scripts/run_with_iap.py ... bootstrap.yml`, run by Claude at the operator's request, exited `0`. Recap: control plane `ok=57 changed=15 unreachable=0 failed=0`, worker `ok=52 changed=0 unreachable=0 failed=0`. Calico already existed on that run, so the retry path passed on its first attempt; the race itself is exercised only on a fresh cluster (see [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms)).
+- **Follow-up validation:** `validate.yml -v` listed `k8sdr-primary-control-plane` (`control-plane`) and `k8sdr-primary-worker` (`worker`), both `Ready` on `v1.36.2` with `containerd://2.2.1`. All pods in `calico-system`, `kube-system`, `tigera-operator`, `traefik`, and `local-path-storage` were `Running`. The run stopped at `Read Gateway conditions` (`failed=1`), which the runbook expects before the test application is deployed.
+- **Observed, not blocking:** `tigerastatus/tiers` reports `Degraded` with `Waiting for Tigera API server to be ready`. The `Installation` does not request the Calico API server, and `calico`, `ippools`, and every Calico pod are healthy. Hypothesis: this status is expected without an `APIServer` resource. It is not investigated further in this milestone.
+
+## Resume here
+
+State on 2026-09-23: the primary cluster is bootstrapped and running. The test application is not deployed. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
+
+1. [Validate the disposable application](../runbooks/kubernetes-bootstrap.md#validate-the-disposable-application): run `deploy_test_app.yml`, then `validate.yml -v`, then the port forward and `curl` checks, then the pod replacement check.
+2. [Restart the worker](../runbooks/kubernetes-bootstrap.md#restart-the-worker).
+3. [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms). This is the first run that exercises the Calico DaemonSet wait against a real race.
+
+Known limitations to keep in mind:
+
+- `validate.yml` fails at `Read Gateway conditions` until the test application is deployed. This is expected, but a failed recap does not by itself mean the cluster is unhealthy. Splitting cluster and application checks is a possible follow-up.
+- `tigerastatus/tiers` is `Degraded` (see the Calico entry above). Not investigated.
+- Ansible prints `INJECT_FACTS_AS_VARS` deprecation warnings for `ansible_*` facts in `node_prepare`. They do not affect results before ansible-core 2.24.
 
 All milestone 2 plan steps remain open. For join failures, use the [worker join guide](../troubleshooting/01-worker-join-failure.md) and record the observed symptom, confirmed cause, fix, and verification here. Do not paste kubeconfigs, join tokens, or unsanitized command output.
