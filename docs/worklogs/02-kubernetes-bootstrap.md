@@ -64,6 +64,14 @@ Do not mark this milestone complete until evidence shows that:
 - **Confirmed cause:** util-linux `mountpoint` returns `32` when the directory is not a mount point and `1` for errors such as a missing path. The role treated `1` as "not mounted" and failed on `32`. Confirmed with `man mountpoint` for util-linux 2.39.3, the version on Ubuntu 24.04, and locally: an unmounted directory returns `32`, and a missing path returns `1`.
 - **State before the fix:** Earlier tasks in the same run formatted the blank data disk as ext4 and wrote its UUID entry to `/etc/fstab`. A rerun detects `ext4`, skips `mkfs`, and continues to the mount.
 - **Fix:** Accept `0` and `32`, and mount only on `32`. Added a contract test that pins both expressions.
-- **Verification:** Local tests pass. The live bootstrap rerun is pending.
+- **Verification:** On the next live run, the worker play finished with `failed=0` (`ok=43`).
+
+### Handlers lost after failed runs
+
+- **Symptom:** On the fourth live `bootstrap.yml` run, `control_plane : Initialize the control plane` failed at kubeadm preflight with `[ERROR FileContent--proc-sys-net-ipv4-ip_forward]: /proc/sys/net/ipv4/ip_forward contents are not set to 1`. Preflight runs before kubeadm writes any state.
+- **Confirmed cause:** `node_prepare` applied `/etc/sysctl.d/99-kubernetes.conf` only through a handler. Handlers run at the end of a play and are skipped when a task fails. The first run wrote the file and then failed at containerd, so the handler never ran. Later runs reported the file task as `ok`, so it never notified the handler again. The file was correct, but the kernel values were never applied.
+- **Same cause, not yet observed:** `container_runtime` restarted containerd only through a handler. On the second run, `Configure containerd for Kubernetes` reported `changed`, and the play then failed at package installation. containerd therefore kept running with its package defaults instead of the systemd cgroup configuration. This is inferred from the task sequence, not observed on the node.
+- **Fix:** Removed both handlers. `node_prepare` now reads the three sysctls on every run, runs `sysctl --system` when any is not `1`, and fails if they are still not `1`. `container_runtime` validates the configuration, then restarts containerd when its `ActiveEnterTimestamp` is older than the configuration file's modification time. Contract tests pin both behaviors.
+- **Verification:** Local tests, yamllint, ansible-lint, and syntax checks pass. A local probe of the restart condition returns `True` for a stale or missing start time and `False` for a start after the change. The live bootstrap rerun is pending.
 
 All milestone 2 plan steps remain open. For join failures, use the [worker join guide](../troubleshooting/01-worker-join-failure.md) and record the observed symptom, confirmed cause, fix, and verification here. Do not paste kubeconfigs, join tokens, or unsanitized command output.

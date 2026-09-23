@@ -24,10 +24,36 @@ class AnsibleContractTests(unittest.TestCase):
         self.assertIn("SystemdCgroup = true", config)
         self.assertNotIn('disabled_plugins = ["cri"]', config)
 
+    def test_containerd_restarts_when_running_config_is_stale(self):
+        # A handler is lost when a later task fails, so compare the service start
+        # time with the config file on every run instead.
+        tasks = yaml.safe_load(
+            Path("ansible/roles/container_runtime/tasks/main.yml").read_text()
+        )
+        by_name = {task["name"]: task for task in tasks}
+        self.assertNotIn("notify", by_name["Configure containerd for Kubernetes"])
+        self.assertIn("config dump", by_name["Validate containerd configuration"]["ansible.builtin.command"])
+        restart = by_name["Restart containerd with the current configuration"]
+        self.assertEqual(restart["ansible.builtin.service"]["state"], "restarted")
+        self.assertIn("container_runtime_config.stat.mtime", restart["when"])
+        self.assertFalse(Path("ansible/roles/container_runtime/handlers/main.yml").exists())
+
     def test_node_role_does_not_use_fixed_sleeps(self):
         role_text = Path("ansible/roles/node_prepare/tasks/main.yml").read_text()
         self.assertNotIn("pause:", role_text)
         self.assertNotIn("sleep ", role_text)
+
+    def test_node_role_applies_and_verifies_runtime_sysctls(self):
+        # A handler is skipped when a later task fails, and never fires again once
+        # the file exists, so the role must check the live kernel values each run.
+        tasks = yaml.safe_load(Path("ansible/roles/node_prepare/tasks/main.yml").read_text())
+        by_name = {task["name"]: task for task in tasks}
+        self.assertNotIn("notify", by_name["Configure Kubernetes networking sysctls"])
+        apply = by_name["Apply Kubernetes networking sysctls"]
+        self.assertEqual(apply["ansible.builtin.command"], "sysctl --system")
+        verify = by_name["Verify Kubernetes networking sysctls"]
+        self.assertIn("net.ipv4.ip_forward", verify["ansible.builtin.command"])
+        self.assertFalse(Path("ansible/roles/node_prepare/handlers/main.yml").exists())
 
     def test_bootstrap_applies_common_roles_in_dependency_order(self):
         plays = yaml.safe_load(Path("ansible/playbooks/bootstrap.yml").read_text())

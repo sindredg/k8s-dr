@@ -1,4 +1,0 @@
----
-- name: Reload system settings
-  ansible.builtin.command: sysctl --system
-  changed_when: true
