@@ -41,8 +41,9 @@ spec:
             - sh
             - -c
             - >-
-              test -f /data/index.html ||
-              echo 'milestone2 persistent marker' > /data/index.html
+              chmod 0755 /data &&
+              (test -f /data/index.html ||
+              echo 'milestone2 persistent marker' > /data/index.html)
           volumeMounts:
             - name: content
               mountPath: /data

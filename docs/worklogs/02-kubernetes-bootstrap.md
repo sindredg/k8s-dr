@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: In progress. Automation is implemented and passed the recorded local checks. Gate check 1 (both nodes `Ready`) passed on 2026-09-23. Gate checks 2 to 4 are not run. See [Resume here](#resume-here).
+Status: In progress. Gate checks 1 and 2 passed: both nodes are `Ready`, and the disposable app is reachable with persistent content. The worker restart and fresh rebuild checks remain open. See [Resume here](#resume-here).
 
 ## Scope
 
@@ -38,11 +38,18 @@ Do not mark this milestone complete until evidence shows that:
 | Date | Check and command | Result and sanitized evidence |
 | --- | --- | --- |
 | 2026-09-23 | `bootstrap.yml` through `scripts/run_with_iap.py`, then `validate.yml -v` (runs `kubectl get nodes -o wide`), run by the operator | Passed. Bootstrap recap: control plane `ok=57 changed=9 unreachable=0 failed=0`, worker `ok=52 changed=0 unreachable=0 failed=0`. `k8sdr-primary-control-plane` (`control-plane`) and `k8sdr-primary-worker` (`worker`) are `Ready`, `v1.36.2`, Ubuntu 24.04.5 LTS, `containerd://2.2.1`. All pods in `calico-system`, `kube-system`, `tigera-operator`, `traefik`, and `local-path-storage` are `Running`; all six deployments are fully available. `validate.yml` then stopped at `Read Gateway conditions` with `namespaces "milestone2-test" not found`, as expected before the test application is deployed. |
-| Pending | Deploy and reach a disposable app | Not run |
+| 2026-09-24 | `deploy_test_app.yml`, `validate.yml -v`, pod deletion and rollout, then `validate.yml`, run through `scripts/run_with_iap.py` by the assistant at the operator's request | Passed after the permission fix below. Deployment recap: `ok=6 changed=2 failed=0`. Validation recap before and after pod replacement: `ok=10 changed=0 failed=0`. Both nodes were `Ready`; the app pod was `Running` on the worker; the PVC remained `Bound` to the same PV. Gateway `Programmed=True` and HTTPRoute `Accepted=True`. The routed request returned `200` with `milestone2 persistent marker`; the request without the test host returned `404`. The replacement pod had a new name, and the mounted directory mode was `0755`. |
 | Pending | Restart worker, then check node status | Not run |
 | Pending | Rebuild from fresh VMs | Not run |
 
 ## Failures and remaining work
+
+### Test app returned 403 through the Gateway route
+
+- **Symptom:** On the operator's first `validate.yml` attempt, `Request the application through the Gateway route` returned `403 Forbidden` from nginx. The route reached the app, but nginx could not serve `index.html`.
+- **Confirmed cause:** Live nginx logs reported `index.html is forbidden (13: Permission denied)`. The PVC mount was `0770 root:root`; the marker file existed as `0644 root:root`; nginx workers ran as UID and GID `101`. The workers could not traverse the mounted directory.
+- **Fix:** The disposable app's init container now sets the mounted directory to `0755` before preserving or creating the marker. This exposes only the test content already served by nginx. A regression test runs the manifest's init command against a `0770` directory and checks its resulting mode and existing marker.
+- **Verification:** The regression test failed before the change and passed after it. `deploy_test_app.yml` exited `0`, and `validate.yml -v` exited `0` with the routed `200` response and marker, plus `404` without the host. After deleting the pod and waiting for the replacement, `validate.yml` again exited `0`; the PVC stayed bound to the same PV and the marker remained readable. The worker restart and fresh rebuild are still untested.
 
 ### Undefined shared variables on the first bootstrap run
 
@@ -99,13 +106,12 @@ Do not mark this milestone complete until evidence shows that:
 
 ## Resume here
 
-State on 2026-09-23: the primary cluster is bootstrapped and running. The operator reached the port-forward step, so the test application is probably deployed, but no deploy or validation output is recorded. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
+State after the 2026-09-24 app check: the primary cluster and disposable app are running. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
 
-1. [Validate the disposable application](../runbooks/kubernetes-bootstrap.md#validate-the-disposable-application): rerun `deploy_test_app.yml` (safe to repeat), then `validate.yml -v`, which now includes the reachability requests. Then run the pod replacement check.
-2. [Restart the worker](../runbooks/kubernetes-bootstrap.md#restart-the-worker).
-3. [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms). This is the first run that exercises the Calico DaemonSet wait against a real race.
+1. [Restart the worker](../runbooks/kubernetes-bootstrap.md#restart-the-worker). Confirm the worker becomes `Ready`, the PVC stays bound, and the marker remains reachable, then clean up the disposable app.
+2. [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms). This is the first run that exercises the Calico DaemonSet wait against a real race.
 
-Closure handoff prepared on 2026-09-24: the runbook now places `validate.yml` after test-app deployment, since it requires that namespace, and calls out which statuses to inspect manually. This documentation change supplies no new live gate evidence. After the operator provides sanitized results for checks 2 to 4, record each command, exit code, and observed result in the validation table, then update the Milestone 2 status and checkboxes in `plan.md` only if all four gate conditions pass.
+Closure handoff prepared on 2026-09-24: the runbook places `validate.yml` after test-app deployment, since it requires that namespace, and calls out which statuses to inspect manually. Record operator-supplied sanitized results for checks 3 and 4, then update the Milestone 2 status and checkboxes in `plan.md` only if all four gate conditions pass.
 
 Known limitations to keep in mind:
 

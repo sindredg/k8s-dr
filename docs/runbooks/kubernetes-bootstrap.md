@@ -1,6 +1,6 @@
 # Kubernetes bootstrap: operator procedure
 
-Status: Partially validated. Both nodes were `Ready` on 2026-09-23. The application, worker restart, and fresh rebuild checks are pending, so the Milestone 2 gate remains open. See the [worklog](../worklogs/02-kubernetes-bootstrap.md) for recorded evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
+Status: Partially validated. Both nodes were `Ready` on 2026-09-23; the application and persistent marker passed live validation on 2026-09-24. The worker restart and fresh rebuild checks are pending, so the Milestone 2 gate remains open. See the [worklog](../worklogs/02-kubernetes-bootstrap.md) for recorded evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
 
 Run every command from the repository root on the external operator machine unless a step says otherwise. Both VMs stay private. Ansible reaches them only through IAP and OS Login.
 

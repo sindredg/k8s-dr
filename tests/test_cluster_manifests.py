@@ -1,4 +1,7 @@
 from pathlib import Path
+import stat
+import subprocess
+import tempfile
 import unittest
 
 import yaml
@@ -35,6 +38,27 @@ class ClusterManifestTests(unittest.TestCase):
         self.assertIn("busybox:1.37.0", text)
         self.assertIn("node-role.kubernetes.io/worker", text)
         self.assertNotIn(":latest", text)
+
+    def test_disposable_app_makes_existing_volume_readable_by_nginx(self):
+        documents = list(
+            yaml.safe_load_all(Path("ansible/manifests/milestone2-app.yml").read_text())
+        )
+        deployment = next(doc for doc in documents if doc["kind"] == "Deployment")
+        init_command = deployment["spec"]["template"]["spec"]["initContainers"][0][
+            "command"
+        ][2]
+        with tempfile.TemporaryDirectory() as directory:
+            volume = Path(directory)
+            volume.chmod(0o770)
+            marker = volume / "index.html"
+            marker.write_text("existing persistent marker\n")
+            subprocess.run(
+                ["sh", "-c", init_command.replace("/data", str(volume))],
+                check=True,
+            )
+            self.assertTrue(volume.stat().st_mode & stat.S_IROTH)
+            self.assertTrue(volume.stat().st_mode & stat.S_IXOTH)
+            self.assertEqual(marker.read_text(), "existing persistent marker\n")
 
     def test_calico_rollout_waits_for_operator_created_daemonset(self):
         tasks = yaml.safe_load(
