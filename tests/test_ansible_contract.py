@@ -71,6 +71,24 @@ class AnsibleContractTests(unittest.TestCase):
         if "worker_join" in roles:
             self.assertLess(roles.index("worker_storage"), roles.index("worker_join"))
 
+    def test_kubeadm_lifecycle_is_guarded_and_tokens_are_redacted(self):
+        control = Path("ansible/roles/control_plane/tasks/main.yml").read_text()
+        worker = Path("ansible/roles/worker_join/tasks/main.yml").read_text()
+        self.assertIn("/etc/kubernetes/admin.conf", control)
+        self.assertIn("kubeadm init --config", control)
+        self.assertIn("/etc/kubernetes/kubelet.conf", worker)
+        self.assertIn("kubeadm token create --ttl 15m --print-join-command", worker)
+        self.assertGreaterEqual(worker.count("no_log: true"), 2)
+        self.assertNotIn("kubeadm reset", control + worker)
+
+    def test_kubeadm_template_uses_private_network_and_systemd(self):
+        text = Path("ansible/roles/control_plane/templates/kubeadm-init.yml.j2").read_text()
+        self.assertIn("apiVersion: kubeadm.k8s.io/v1beta4", text)
+        self.assertIn("advertiseAddress: {{ node_internal_ip }}", text)
+        self.assertIn("podSubnet: {{ pod_cidr }}", text)
+        self.assertIn("serviceSubnet: {{ service_cidr }}", text)
+        self.assertIn("cgroupDriver: systemd", text)
+
 
 if __name__ == "__main__":
     unittest.main()

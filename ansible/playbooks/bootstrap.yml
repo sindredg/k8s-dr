@@ -14,3 +14,17 @@
   become: true
   roles:
     - worker_storage
+
+- name: Initialize the Kubernetes control plane
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  roles:
+    - control_plane
+
+- name: Join Kubernetes workers
+  hosts: kube_workers
+  gather_facts: false
+  become: true
+  roles:
+    - worker_join
