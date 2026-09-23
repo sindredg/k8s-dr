@@ -1,6 +1,6 @@
 # 0005: Kubernetes bootstrap architecture
 
-Status: Proposed. The design direction was approved in chat; the written design is awaiting review.
+Status: Accepted. Implementation and validation are pending.
 
 Date: 2026-09-23
 
