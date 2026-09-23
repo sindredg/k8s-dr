@@ -28,7 +28,13 @@ Do not mark this milestone complete until evidence shows that:
 | Pending | Reprovision primary VMs | Not run |
 | Pending | Verify node connectivity | Not run |
 | Pending | Verify independent access to state, storage, and credentials | Not run |
+| 2026-09-23 | `terraform apply` in `infra/primary` | Failed during configuration evaluation: `Call to unknown function` for `round()` at `main.tf:101`. Output supplied by operator; post-fix verification pending. |
 
 ## Failures and remaining work
 
-All milestone 1 plan steps remain open. Record failed checks and follow-up work here as they occur. Do not paste credentials, Terraform state, or raw command output.
+All milestone 1 plan steps remain open. Do not paste credentials, Terraform state, or raw command output.
+
+- Symptom: Primary `terraform apply` stopped on `Call to unknown function` at `main.tf:101`.
+- Confirmed cause: Terraform does not provide `round()`; the budget nanos expression called it.
+- Fix written: Use supported `floor()` to turn the fractional billing-currency amount into whole nanos.
+- Verification: Pending operator rerun of `terraform validate` and `terraform plan`. No post-fix result has been supplied.
