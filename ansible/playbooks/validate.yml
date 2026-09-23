@@ -1,0 +1,54 @@
+---
+- name: Collect read-only milestone validation evidence
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  tasks:
+    - name: List cluster nodes
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes --output=wide
+      changed_when: false
+
+    - name: List system pods
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get pods --all-namespaces --output=wide
+      changed_when: false
+
+    - name: List cluster deployments
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get deployments --all-namespaces
+      changed_when: false
+
+    - name: Read Gateway conditions
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get gateway milestone2-gateway
+        --namespace milestone2-test --output=yaml
+      changed_when: false
+
+    - name: Read HTTPRoute conditions
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get httproute milestone2-route
+        --namespace milestone2-test --output=yaml
+      changed_when: false
+
+    - name: Read the application PVC
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get persistentvolumeclaims --namespace milestone2-test --output=wide
+      changed_when: false
+
+    - name: Read cluster persistent volumes
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get persistentvolumes --output=wide
+      changed_when: false
+
+    - name: Read application pod placement
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get pods --namespace milestone2-test --output=wide
+      changed_when: false

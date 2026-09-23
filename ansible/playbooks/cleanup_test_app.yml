@@ -1,0 +1,17 @@
+---
+- name: Remove the disposable milestone application
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Delete the disposable application namespace
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        delete namespace milestone2-test --ignore-not-found=true
+      register: cleanup_test_app_namespace
+      changed_when: cleanup_test_app_namespace.stdout | length > 0
+
+    - name: Remove the copied application manifest
+      ansible.builtin.file:
+        path: /etc/kubernetes/milestone2-app.yml
+        state: absent
