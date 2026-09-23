@@ -1,6 +1,6 @@
 # 0003: Regional infrastructure and offsite state
 
-Status: Accepted for milestone 1 implementation; cloud validation is pending.
+Status: Accepted. Milestone 1 cloud validation passed on 2026-09-23.
 
 Date: 2026-09-23
 

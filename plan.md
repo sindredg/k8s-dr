@@ -5,7 +5,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | Milestone | Outcome | Status |
 | --- | --- | --- |
 | 0. Recovery contract | Scope and measurements defined | Complete |
-| 1. Primary infrastructure | Reproducible VMs and network | In progress |
+| 1. Primary infrastructure | Reproducible VMs and network | Complete |
 | 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Pending |
 | 3. Service deployment | Gitea survives pod restarts | Pending |
 | 4. Consistent backups | Offsite data restores successfully | Pending |
@@ -24,9 +24,9 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 ## 1. Primary infrastructure
 
-- [ ] Provision a primary control-plane VM, worker VM, private network, and restricted administration with Terraform.
-- [ ] Provision offsite backup storage and remote Terraform state outside the primary region.
-- [ ] Make recovery credentials available without relying on the primary VMs.
+- [x] Provision a primary control-plane VM, worker VM, private network, and restricted administration with Terraform.
+- [x] Provision offsite backup storage and remote Terraform state outside the primary region.
+- [x] Make recovery credentials available without relying on the primary VMs.
 
 **Gate:** Terraform can reproduce the primary VMs; the nodes can communicate; state, backup storage, and credentials remain accessible independently.
 

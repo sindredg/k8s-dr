@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implementation written; partial operator resource checks recorded. The milestone gate is open. Run these steps for milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 
