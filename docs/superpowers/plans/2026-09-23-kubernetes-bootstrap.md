@@ -39,7 +39,7 @@
 | --- | --- |
 | `ansible/requirements.txt` | Pin controller-side Python packages. |
 | `ansible.cfg` | Keep inventory, retry files, output, and SSH behavior project-local. |
-| `ansible/group_vars/all.yml` | Hold cluster CIDRs and exact component versions. |
+| `ansible/playbooks/group_vars/all.yml` | Hold cluster CIDRs and exact component versions. |
 | `ansible/playbooks/bootstrap.yml` | Run roles in dependency order. |
 | `ansible/playbooks/validate.yml` | Gather non-destructive cluster and add-on evidence. |
 | `ansible/playbooks/deploy_test_app.yml` | Deploy and wait for the disposable Gateway API application. |
@@ -424,7 +424,7 @@ git commit -m "feat: run Ansible through managed IAP tunnels"
 ### Task 4: Prepare Ubuntu, containerd, and Kubernetes packages
 
 **Files:**
-- Create: `ansible/group_vars/all.yml`
+- Create: `ansible/playbooks/group_vars/all.yml`
 - Create: `ansible/roles/node_prepare/tasks/main.yml`
 - Create: `ansible/roles/node_prepare/handlers/main.yml`
 - Create: `ansible/roles/container_runtime/tasks/main.yml`
@@ -444,7 +444,7 @@ Parse YAML with `yaml.safe_load` and inspect the containerd template as text. As
 
 ```python
 def test_component_versions_are_exact(self):
-    values = yaml.safe_load(Path("ansible/group_vars/all.yml").read_text())
+    values = yaml.safe_load(Path("ansible/playbooks/group_vars/all.yml").read_text())
     self.assertEqual(values["kubernetes_version"], "1.36.2")
     self.assertEqual(values["kubernetes_deb_version"], "1.36.2-1.1")
     self.assertEqual(values["containerd_deb_version"], "2.2.1-0ubuntu1~24.04.3")

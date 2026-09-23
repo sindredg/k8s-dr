@@ -44,4 +44,11 @@ Do not mark this milestone complete until evidence shows that:
 
 ## Failures and remaining work
 
+### Undefined shared variables on the first bootstrap run
+
+- **Symptom:** On the first live `bootstrap.yml` run, task `container_runtime : Install the pinned containerd package` failed with `'containerd_deb_version' is undefined`.
+- **Confirmed cause:** Ansible loads `group_vars/` only from the inventory file's directory and the playbook's directory. The shared variables were in `ansible/group_vars/all.yml`, next to neither `ansible/inventory/generated/hosts.json` nor `ansible/playbooks/`, so every pinned version and path was undefined. Reproduced locally with `ansible-inventory --playbook-dir ansible/playbooks --host <node>`, which returned no variables. The local checks missed it because syntax checks and file-reading tests do not resolve variables.
+- **Fix:** Moved the file to `ansible/playbooks/group_vars/all.yml`, which Ansible loads for every playbook in that directory. Added `tests/test_ansible_variable_loading.py`, which resolves each shared variable through `ansible-inventory` for an inventory outside `ansible/`.
+- **Verification:** The new test passes locally, and a local probe playbook prints `containerd_deb_version` from a generated-style inventory. The live bootstrap rerun is pending.
+
 All milestone 2 plan steps remain open. For join failures, use the [worker join guide](../troubleshooting/01-worker-join-failure.md) and record the observed symptom, confirmed cause, fix, and verification here. Do not paste kubeconfigs, join tokens, or unsanitized command output.
