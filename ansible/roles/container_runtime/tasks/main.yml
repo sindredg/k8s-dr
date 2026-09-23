@@ -1,0 +1,30 @@
+---
+- name: Install the pinned containerd package
+  ansible.builtin.apt:
+    name: "containerd={{ containerd_deb_version }}"
+    state: present
+    allow_downgrade: true
+    update_cache: true
+
+- name: Create the containerd configuration directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure containerd for Kubernetes
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: /etc/containerd/config.toml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart containerd
+
+- name: Enable and start containerd
+  ansible.builtin.service:
+    name: containerd
+    enabled: true
+    state: started

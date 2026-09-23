@@ -3,9 +3,7 @@
   hosts: kube_cluster
   gather_facts: true
   become: true
-  tasks:
-    - name: Confirm supported operating system
-      ansible.builtin.assert:
-        that:
-          - ansible_distribution == "Ubuntu"
-          - ansible_distribution_version is version("24.04", ">=")
+  roles:
+    - node_prepare
+    - container_runtime
+    - kubernetes_packages
