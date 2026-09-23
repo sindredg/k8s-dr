@@ -43,6 +43,34 @@ class AnsibleContractTests(unittest.TestCase):
         self.assertNotIn("ignore_errors:", role_text)
         self.assertIn("selection: hold", role_text)
 
+    def test_storage_role_guards_destructive_operations(self):
+        text = Path("ansible/roles/worker_storage/tasks/main.yml").read_text()
+        for required in (
+            "readlink -f {{ worker_data_device }}",
+            "findmnt -n -o SOURCE /",
+            "lsblk -n -o PKNAME",
+            "blkid -o value -s TYPE",
+            "unexpected filesystem",
+            "mkfs.ext4",
+            "mountpoint -q {{ worker_data_mount }}",
+        ):
+            self.assertIn(required, text)
+        self.assertNotIn("wipefs", text)
+        self.assertNotIn("force: true", text)
+
+    def test_storage_role_runs_only_on_workers_and_before_join(self):
+        plays = yaml.safe_load(Path("ansible/playbooks/bootstrap.yml").read_text())
+        role_plays = [
+            (play["hosts"], role)
+            for play in plays
+            for role in play.get("roles", [])
+        ]
+        self.assertIn(("kube_workers", "worker_storage"), role_plays)
+        self.assertNotIn(("kube_cluster", "worker_storage"), role_plays)
+        roles = [role for _, role in role_plays]
+        if "worker_join" in roles:
+            self.assertLess(roles.index("worker_storage"), roles.index("worker_join"))
+
 
 if __name__ == "__main__":
     unittest.main()

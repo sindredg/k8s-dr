@@ -1,0 +1,151 @@
+---
+- name: Inspect the stable worker data device link
+  ansible.builtin.stat:
+    path: "{{ worker_data_device }}"
+    follow: false
+  register: worker_storage_data_link
+
+- name: Require the stable worker data device link
+  ansible.builtin.assert:
+    that:
+      - worker_storage_data_link.stat.exists
+      - worker_storage_data_link.stat.islnk
+    fail_msg: "Dedicated worker data device is missing: {{ worker_data_device }}"
+
+- name: Resolve the worker data device
+  ansible.builtin.command: "readlink -f {{ worker_data_device }}"
+  register: worker_storage_data_resolved
+  changed_when: false
+
+- name: Save the resolved worker data device
+  ansible.builtin.set_fact:
+    worker_storage_resolved_device: "{{ worker_storage_data_resolved.stdout }}"
+
+- name: Inspect the resolved worker data device
+  ansible.builtin.stat:
+    path: "{{ worker_storage_resolved_device }}"
+  register: worker_storage_resolved_device_stat
+
+- name: Require a block device target
+  ansible.builtin.assert:
+    that:
+      - worker_storage_resolved_device | length > 0
+      - worker_storage_resolved_device_stat.stat.exists
+      - worker_storage_resolved_device_stat.stat.isblk
+    fail_msg: The dedicated worker data link must resolve to a block device.
+
+- name: Find the root filesystem source
+  ansible.builtin.command: findmnt -n -o SOURCE /
+  register: worker_storage_root_source
+  changed_when: false
+
+- name: Resolve the root filesystem source
+  ansible.builtin.command: "readlink -f {{ worker_storage_root_source.stdout }}"
+  register: worker_storage_root_resolved
+  changed_when: false
+
+- name: Find the root filesystem parent device
+  ansible.builtin.command: >-
+    lsblk -n -o PKNAME {{ worker_storage_root_resolved.stdout }}
+  register: worker_storage_root_parent
+  changed_when: false
+
+- name: Save the root block device
+  ansible.builtin.set_fact:
+    worker_storage_root_device: >-
+      {{ ('/dev/' ~ worker_storage_root_parent.stdout)
+         if worker_storage_root_parent.stdout
+         else worker_storage_root_resolved.stdout }}
+
+- name: Refuse the boot device
+  ansible.builtin.assert:
+    that:
+      - worker_storage_resolved_device != worker_storage_root_resolved.stdout
+      - worker_storage_resolved_device != worker_storage_root_device
+    fail_msg: The worker data device resolves to the root filesystem source.
+
+- name: Detect an existing filesystem signature
+  ansible.builtin.command: >-
+    blkid -o value -s TYPE {{ worker_storage_resolved_device }}
+  register: worker_storage_filesystem
+  changed_when: false
+  failed_when: worker_storage_filesystem.rc not in [0, 2]
+
+- name: Refuse an unexpected filesystem
+  ansible.builtin.assert:
+    that:
+      - worker_storage_filesystem.stdout in ["", "ext4"]
+    fail_msg: >-
+      Refusing unexpected filesystem '{{ worker_storage_filesystem.stdout }}'
+      on {{ worker_storage_resolved_device }}.
+
+- name: Create ext4 only on a blank worker data device
+  ansible.builtin.command: >-
+    mkfs.ext4 -F -L k8sdr-data {{ worker_storage_resolved_device }}
+  when: worker_storage_filesystem.stdout == ""
+  changed_when: true
+
+- name: Read the worker data filesystem UUID
+  ansible.builtin.command: >-
+    blkid -o value -s UUID {{ worker_storage_resolved_device }}
+  register: worker_storage_uuid
+  changed_when: false
+
+- name: Require the worker data filesystem UUID
+  ansible.builtin.assert:
+    that:
+      - worker_storage_uuid.stdout | length > 0
+    fail_msg: The worker data filesystem does not have a UUID.
+
+- name: Create the worker data mount point
+  ansible.builtin.file:
+    path: "{{ worker_data_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Persist the worker data mount
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^[^#]\\S+\\s+{{ worker_data_mount | regex_escape }}\\s+"
+    line: >-
+      UUID={{ worker_storage_uuid.stdout }} {{ worker_data_mount }}
+      ext4 defaults,nofail 0 2
+    state: present
+
+- name: Check whether worker data is mounted
+  ansible.builtin.command: "mountpoint -q {{ worker_data_mount }}"
+  register: worker_storage_mountpoint
+  changed_when: false
+  failed_when: worker_storage_mountpoint.rc not in [0, 1]
+
+- name: Mount worker data
+  ansible.builtin.command: "mount {{ worker_data_mount }}"  # noqa command-instead-of-module
+  when: worker_storage_mountpoint.rc == 1
+  changed_when: true
+
+- name: Read the mounted worker data source
+  ansible.builtin.command: >-
+    findmnt --target {{ worker_data_mount }} --noheadings --output SOURCE
+  register: worker_storage_mounted_source
+  changed_when: false
+
+- name: Resolve the mounted worker data source
+  ansible.builtin.command: "readlink -f {{ worker_storage_mounted_source.stdout }}"
+  register: worker_storage_mounted_resolved
+  changed_when: false
+
+- name: Verify the expected worker data device is mounted
+  ansible.builtin.assert:
+    that:
+      - worker_storage_mounted_resolved.stdout == worker_storage_resolved_device
+    fail_msg: The worker data mount does not resolve to the dedicated device.
+
+- name: Create the local path provisioner root
+  ansible.builtin.file:
+    path: "{{ local_path_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0770"

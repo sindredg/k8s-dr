@@ -7,3 +7,10 @@
     - node_prepare
     - container_runtime
     - kubernetes_packages
+
+- name: Prepare dedicated worker storage
+  hosts: kube_workers
+  gather_facts: false
+  become: true
+  roles:
+    - worker_storage
