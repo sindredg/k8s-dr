@@ -41,5 +41,3 @@ The milestone is complete because the validation record shows that:
 ## Gate conclusion
 
 The refreshed Terraform plan, live resource queries, private node ping, and external credential checks satisfy all three milestone 1 gate conditions. The checks prove convergence of the current deployment, not a destructive clean rebuild. They also prove access from an operator machine while the primary VMs are running, not access during a simulated Finland outage. Milestones 5 and 6 cover cold rebuild and regional-loss testing.
-
-The ignored local `infra/primary/terraform.tfvars` still contains an obsolete `billing_account_id` entry, so Terraform reports an undeclared-variable warning. The tracked configuration no longer uses this value, and the warning did not affect validation or the zero-change plan. Remove the local entry before the next operator run. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the historical failures and their disposition. Do not paste credentials, Terraform state, or raw command output.
