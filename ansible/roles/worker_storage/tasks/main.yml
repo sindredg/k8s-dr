@@ -118,11 +118,11 @@
   ansible.builtin.command: "mountpoint -q {{ worker_data_mount }}"
   register: worker_storage_mountpoint
   changed_when: false
-  failed_when: worker_storage_mountpoint.rc not in [0, 1]
+  failed_when: worker_storage_mountpoint.rc not in [0, 32]
 
 - name: Mount worker data
   ansible.builtin.command: "mount {{ worker_data_mount }}"  # noqa command-instead-of-module
-  when: worker_storage_mountpoint.rc == 1
+  when: worker_storage_mountpoint.rc == 32
   changed_when: true
 
 - name: Read the mounted worker data source

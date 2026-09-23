@@ -58,6 +58,19 @@ class AnsibleContractTests(unittest.TestCase):
         self.assertNotIn("wipefs", text)
         self.assertNotIn("force: true", text)
 
+    def test_storage_role_uses_util_linux_mountpoint_exit_codes(self):
+        # util-linux mountpoint returns 32 for "not a mountpoint" and 1 for errors.
+        tasks = yaml.safe_load(
+            Path("ansible/roles/worker_storage/tasks/main.yml").read_text()
+        )
+        by_name = {task["name"]: task for task in tasks}
+        check = by_name["Check whether worker data is mounted"]
+        mount = by_name["Mount worker data"]
+        self.assertEqual(
+            check["failed_when"], "worker_storage_mountpoint.rc not in [0, 32]"
+        )
+        self.assertEqual(mount["when"], "worker_storage_mountpoint.rc == 32")
+
     def test_storage_role_runs_only_on_workers_and_before_join(self):
         plays = yaml.safe_load(Path("ansible/playbooks/bootstrap.yml").read_text())
         role_plays = [
