@@ -29,6 +29,7 @@ Do not mark this milestone complete until evidence shows that:
 | Pending | Verify node connectivity | Not run |
 | Pending | Verify independent access to state, storage, and credentials | Not run |
 | 2026-09-23 | `terraform apply` in `infra/primary` | Failed during configuration evaluation: `Call to unknown function` for `round()` at `main.tf:101`. Output supplied by operator; post-fix verification pending. |
+| 2026-09-23 | `terraform apply` in `infra/primary` | Failed provider validation: `all_updates_rule` required a Monitoring notification channel or Pub/Sub topic. Output supplied by operator; post-fix verification pending. |
 
 ## Failures and remaining work
 
@@ -37,4 +38,9 @@ All milestone 1 plan steps remain open. Do not paste credentials, Terraform stat
 - Symptom: Primary `terraform apply` stopped on `Call to unknown function` at `main.tf:101`.
 - Confirmed cause: Terraform does not provide `round()`; the budget nanos expression called it.
 - Fix written: Use supported `floor()` to turn the fractional billing-currency amount into whole nanos.
+- Verification: The next apply advanced past this expression to provider validation; a successful plan and apply are still pending.
+
+- Symptom: The next primary `terraform apply` reported missing `monitoring_notification_channels` and `pubsub_topic` in `all_updates_rule`.
+- Confirmed cause: The configured `all_updates_rule` set only `enable_project_level_recipients`, while the selected Google provider requires a Monitoring channel or Pub/Sub topic when that block is present.
+- Fix written: Remove the optional block and use default email delivery to Billing Account Administrators and Billing Account Users. Confirm an intended recipient has one of these roles.
 - Verification: Pending operator rerun of `terraform validate` and `terraform plan`. No post-fix result has been supplied.

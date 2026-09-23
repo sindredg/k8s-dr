@@ -122,7 +122,7 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
    Expected: state resources list through GCS, both Belgium buckets respond, and the configured recovery reader identity can authenticate without using either primary VM. An empty backup bucket is expected. It cannot prove restore readiness; milestone 4 supplies backups and a restore test. Do not record this gate as passed until you send sanitized evidence for all three checks.
 
-9. Check the budget in Cloud Billing, Budgets & alerts. Confirm the displayed project, month, currency, amount, thresholds (50%, 90%, 100%), and recipients. Budget creation does not send a test alert and does not stop billing.
+9. Check the budget in Cloud Billing, Budgets & alerts. Confirm the displayed project, month, currency, amount, thresholds (50%, 90%, 100%), and recipients. With no custom notification rule, budget emails go to Billing Account Administrators and Billing Account Users. Confirm the person who must act on the alert has one of those roles. Budget creation does not send a test alert and does not stop billing.
 
 If a check fails, send the failing command, its exit code, the relevant error text with IDs and addresses redacted, the expected and observed result, and the sanitized `terraform plan` resource summary. Do not send `terraform.tfstate`, plan files, credentials, kubeconfigs, or full IAM policy output. Validation results belong in the [milestone 1 worklog](../worklogs/01-primary-infrastructure.md) only after they are observed.
 

@@ -113,8 +113,4 @@ resource "google_billing_budget" "project_monthly" {
   threshold_rules {
     threshold_percent = 1.0
   }
-
-  all_updates_rule {
-    enable_project_level_recipients = true
-  }
 }
