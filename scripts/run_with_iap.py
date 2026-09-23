@@ -116,19 +116,26 @@ def wait_for_tunnel(process, port: int, timeout: float = 30.0) -> None:
     raise RuntimeError(f"IAP tunnel on local port {port} did not become ready")
 
 
-def write_known_hosts(targets: list[Target], path: Path) -> None:
-    """Scan the live tunnel endpoints and create a private known_hosts file."""
-    keys = []
-    for target in targets:
+def scan_host_key(target: Target, timeout: float = 30.0) -> str:
+    """Wait for SSH behind a ready IAP listener and return its host key."""
+    deadline = time.monotonic() + timeout
+    while True:
         completed = subprocess.run(
-            ["ssh-keyscan", "-p", str(target.local_port), "127.0.0.1"],
+            ["ssh-keyscan", "-T", "3", "-p", str(target.local_port), "127.0.0.1"],
             check=False,
             capture_output=True,
             text=True,
         )
-        if completed.returncode != 0 or not completed.stdout.strip():
+        if completed.returncode == 0 and completed.stdout.strip():
+            return completed.stdout.rstrip()
+        if time.monotonic() >= deadline:
             raise RuntimeError(f"host key scan failed for {target.role}")
-        keys.append(completed.stdout.rstrip())
+        time.sleep(1)
+
+
+def write_known_hosts(targets: list[Target], path: Path) -> None:
+    """Scan the live tunnel endpoints and create a private known_hosts file."""
+    keys = [scan_host_key(target) for target in targets]
 
     path = Path(path)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)

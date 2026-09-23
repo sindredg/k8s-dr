@@ -107,7 +107,7 @@ class ClusterManifestTests(unittest.TestCase):
             if "ansible.builtin.command" in task
         ]
         for command in commands:
-            self.assertRegex(command, r"^kubectl .*\bget\b")
+            self.assertRegex(command, r"^kubectl .*\b(get|wait|rollout status)\b")
         requests = [task["ansible.builtin.uri"] for task in tasks if "ansible.builtin.uri" in task]
         self.assertEqual(len(commands) + len(requests), len(tasks))
         self.assertTrue(all(request["method"] == "GET" for request in requests))
@@ -126,6 +126,27 @@ class ClusterManifestTests(unittest.TestCase):
             self.assertIn("{{ traefik_http_node_port }}", request["url"])
         self.assertEqual(requests[0]["headers"], {"Host": "milestone2.local"})
         self.assertNotIn("headers", requests[1])
+
+    def test_validation_waits_for_workloads_after_worker_restart(self):
+        plays = yaml.safe_load(Path("ansible/playbooks/validate.yml").read_text())
+        tasks = plays[0]["tasks"]
+        names = [task["name"] for task in tasks]
+        self.assertIn("Wait for both Kubernetes nodes to be Ready", names)
+        wait = tasks[names.index("Wait for both Kubernetes nodes to be Ready")]
+        self.assertIn("wait --for=condition=Ready nodes --all", wait["ansible.builtin.command"])
+        rollouts = tasks[names.index("Wait for worker workloads after restart")]
+        self.assertIn("rollout status", rollouts["ansible.builtin.command"])
+        self.assertEqual(
+            {(item["namespace"], item["resource"]) for item in rollouts["loop"]},
+            {
+                ("calico-system", "daemonset/calico-node"),
+                ("kube-system", "deployment/coredns"),
+                ("local-path-storage", "deployment/local-path-provisioner"),
+                ("traefik", "deployment/traefik"),
+                ("milestone2-test", "deployment/milestone2-app"),
+            },
+        )
+        self.assertLess(names.index("Wait for worker workloads after restart"), names.index("List system pods"))
 
 
 if __name__ == "__main__":

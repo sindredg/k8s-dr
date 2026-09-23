@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: In progress. Gate checks 1 and 2 passed: both nodes are `Ready`, and the disposable app is reachable with persistent content. The worker restart and fresh rebuild checks remain open. See [Resume here](#resume-here).
+Status: In progress. Gate checks 1 to 3 passed: both nodes are `Ready`, the disposable app is reachable with persistent content, and the worker recovered after restart. The fresh rebuild check remains open. See [Resume here](#resume-here).
 
 ## Scope
 
@@ -39,10 +39,17 @@ Do not mark this milestone complete until evidence shows that:
 | --- | --- | --- |
 | 2026-09-23 | `bootstrap.yml` through `scripts/run_with_iap.py`, then `validate.yml -v` (runs `kubectl get nodes -o wide`), run by the operator | Passed. Bootstrap recap: control plane `ok=57 changed=9 unreachable=0 failed=0`, worker `ok=52 changed=0 unreachable=0 failed=0`. `k8sdr-primary-control-plane` (`control-plane`) and `k8sdr-primary-worker` (`worker`) are `Ready`, `v1.36.2`, Ubuntu 24.04.5 LTS, `containerd://2.2.1`. All pods in `calico-system`, `kube-system`, `tigera-operator`, `traefik`, and `local-path-storage` are `Running`; all six deployments are fully available. `validate.yml` then stopped at `Read Gateway conditions` with `namespaces "milestone2-test" not found`, as expected before the test application is deployed. |
 | 2026-09-24 | `deploy_test_app.yml`, `validate.yml -v`, pod deletion and rollout, then `validate.yml`, run through `scripts/run_with_iap.py` by the assistant at the operator's request | Passed after the permission fix below. Deployment recap: `ok=6 changed=2 failed=0`. Validation recap before and after pod replacement: `ok=10 changed=0 failed=0`. Both nodes were `Ready`; the app pod was `Running` on the worker; the PVC remained `Bound` to the same PV. Gateway `Programmed=True` and HTTPRoute `Accepted=True`. The routed request returned `200` with `milestone2 persistent marker`; the request without the test host returned `404`. The replacement pod had a new name, and the mounted directory mode was `0755`. |
-| Pending | Restart worker, then check node status | Not run |
+| 2026-09-24 | Operator ran `gcloud compute ssh ... --command='sudo systemctl reboot'` and `findmnt /var/lib/k8s-dr`; assistant then ran `validate.yml -v` through `scripts/run_with_iap.py` | Passed after recovery. `findmnt` showed the worker data disk mounted as `ext4`. The operator's first IAP validation attempt failed scanning the worker SSH host key; a second attempt reached the cluster while several worker pods were `Unknown` and the HTTP check returned connection refused. Follow-up `kubectl get pods --all-namespaces` showed all pods `Running`; `validate.yml -v` then exited `0` with both nodes `Ready`, the PVC bound to the same PV, and HTTP `200` with the same marker plus `404` without the test host. The updated `validate.yml` with readiness waits exited `0` (`ok=12 changed=0 failed=0`). |
 | Pending | Rebuild from fresh VMs | Not run |
 
 ## Failures and remaining work
+
+### Validation raced worker recovery after reboot
+
+- **Symptom:** Immediately after `findmnt` succeeded on the rebooted worker, the first `scripts/run_with_iap.py` attempt failed with `host key scan failed for worker`. The next attempt reached the control plane while several worker pods were `Unknown` or unready, and the Gateway request failed with connection refused.
+- **Confirmed cause:** `kubectl get nodes` reported the worker `Ready` before its workloads had recovered. Pod and event output showed worker containers restarting and temporary readiness probe failures. A later `kubectl get pods --all-namespaces` showed all pods `Running`, and the same HTTP check passed. The exact cause of the one failed SSH key scan is unconfirmed; a transient SSH service or IAP tunnel response during reboot is the current hypothesis.
+- **Fix:** `scripts/run_with_iap.py` now retries `ssh-keyscan` for up to 30 seconds after the IAP listener opens. `validate.yml` waits for both nodes and the Calico, CoreDNS, Local Path Provisioner, Traefik, and test-app rollouts before collecting status and requesting HTTP. Both waits are read-only.
+- **Verification:** A unit test reproduces a failed first key scan followed by a successful second scan. The updated `validate.yml` ran against the recovered cluster with `ok=12 changed=0 failed=0`; all five rollout waits passed, the marker request returned `200`, and the request without the test host returned `404`. The retry path itself was tested locally, not during another reboot.
 
 ### Test app returned 403 through the Gateway route
 
@@ -106,12 +113,12 @@ Do not mark this milestone complete until evidence shows that:
 
 ## Resume here
 
-State after the 2026-09-24 app check: the primary cluster and disposable app are running. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
+State after the 2026-09-24 restart check: the primary cluster and disposable app are running. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
 
-1. [Restart the worker](../runbooks/kubernetes-bootstrap.md#restart-the-worker). Confirm the worker becomes `Ready`, the PVC stays bound, and the marker remains reachable, then clean up the disposable app.
+1. Run the [cleanup step](../runbooks/kubernetes-bootstrap.md#restart-the-worker) to remove the disposable app.
 2. [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms). This is the first run that exercises the Calico DaemonSet wait against a real race.
 
-Closure handoff prepared on 2026-09-24: the runbook places `validate.yml` after test-app deployment, since it requires that namespace, and calls out which statuses to inspect manually. Record operator-supplied sanitized results for checks 3 and 4, then update the Milestone 2 status and checkboxes in `plan.md` only if all four gate conditions pass.
+Closure handoff prepared on 2026-09-24: the runbook places `validate.yml` after test-app deployment, since it requires that namespace, and calls out which statuses to inspect manually. Record operator-supplied sanitized results for the fresh rebuild, then update the Milestone 2 status and checkboxes in `plan.md` only if all four gate conditions pass.
 
 Known limitations to keep in mind:
 

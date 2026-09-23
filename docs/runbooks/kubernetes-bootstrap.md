@@ -1,6 +1,6 @@
 # Kubernetes bootstrap: operator procedure
 
-Status: Partially validated. Both nodes were `Ready` on 2026-09-23; the application and persistent marker passed live validation on 2026-09-24. The worker restart and fresh rebuild checks are pending, so the Milestone 2 gate remains open. See the [worklog](../worklogs/02-kubernetes-bootstrap.md) for recorded evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
+Status: Partially validated. Both nodes were `Ready` on 2026-09-23; the application, persistent marker, and worker restart passed live validation on 2026-09-24. The fresh rebuild check is pending, so the Milestone 2 gate remains open. See the [worklog](../worklogs/02-kubernetes-bootstrap.md) for recorded evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
 
 Run every command from the repository root on the external operator machine unless a step says otherwise. Both VMs stay private. Ansible reaches them only through IAP and OS Login.
 
@@ -134,7 +134,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='findmnt /var/lib/k8s-dr'
    ```
 
-   Expected: the reboot command may exit nonzero when the connection drops. Retry the second command until it succeeds. It shows an `ext4` filesystem mounted at `/var/lib/k8s-dr`, restored from the UUID entry in `/etc/fstab`.
+   Expected: the reboot command may exit nonzero when the connection drops. Retry the second command until it succeeds. It shows an `ext4` filesystem mounted at `/var/lib/k8s-dr`, restored from the UUID entry in `/etc/fstab`. SSH and the disk may recover before Kubernetes workloads do.
 
 2. Rerun validation.
 
@@ -142,7 +142,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: validation ends with `failed=0`. Inspect the node and pod output to confirm the worker is `Ready` again without a new join. Compare the PVC-to-PV binding with the output before the restart, and confirm the application request returns the same marker. If the worker is still `NotReady`, wait for recovery and rerun validation before recording the check.
+   Expected: validation waits up to five minutes for both nodes and the Calico, CoreDNS, Local Path Provisioner, Traefik, and test-app rollouts. The IAP runner also retries a temporary SSH host-key scan failure for up to 30 seconds. Validation then ends with `failed=0`. Inspect the node and pod output to confirm the worker is `Ready` again without a new join. Compare the PVC-to-PV binding with the output before the restart, and confirm the application request returns the same marker. If a wait times out, inspect the named workload and its events before retrying.
 
 3. Remove the disposable application.
 

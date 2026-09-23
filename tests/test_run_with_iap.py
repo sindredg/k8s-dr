@@ -80,10 +80,11 @@ class RunWithIapTests(unittest.TestCase):
         popen.side_effect = processes
         run.return_value = subprocess.CompletedProcess([], 1, "", "scan failed")
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(RuntimeError, "host key"):
-                module.run_with_tunnels(
-                    self.targets, ["true"], known_hosts_path=Path(directory) / "known_hosts"
-                )
+            with mock.patch("scripts.run_with_iap.time.monotonic", side_effect=[0, 31]):
+                with self.assertRaisesRegex(RuntimeError, "host key"):
+                    module.run_with_tunnels(
+                        self.targets, ["true"], known_hosts_path=Path(directory) / "known_hosts"
+                    )
         for process in processes:
             process.terminate.assert_called_once()
 
@@ -155,6 +156,23 @@ class RunWithIapTests(unittest.TestCase):
             with mock.patch("scripts.run_with_iap.subprocess.run", return_value=completed):
                 module.write_known_hosts([self.targets[0]], path)
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    @mock.patch("scripts.run_with_iap.time.sleep")
+    @mock.patch("scripts.run_with_iap.subprocess.run")
+    def test_host_key_scan_retries_after_temporary_ssh_failure(self, run, sleep):
+        run.side_effect = [
+            subprocess.CompletedProcess([], 1, "", "connection closed"),
+            subprocess.CompletedProcess([], 0, "[127.0.0.1]:2201 ssh-ed25519 AAAA\n", ""),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "known_hosts"
+            try:
+                module.write_known_hosts([self.targets[0]], path)
+            except RuntimeError as error:
+                self.fail(f"temporary SSH failure was not retried: {error}")
+            self.assertIn("ssh-ed25519", path.read_text())
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once()
 
     def test_load_targets_rejects_non_json_inventory(self):
         with tempfile.TemporaryDirectory() as directory:
