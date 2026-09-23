@@ -9,7 +9,7 @@ data:
     {
       "nodePathMap": [
         {
-          "node": "{{ groups['kube_workers'] | first }}",
+          "node": "{{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}",
           "paths": ["{{ local_path_root }}"]
         },
         {

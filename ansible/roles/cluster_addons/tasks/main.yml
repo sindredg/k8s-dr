@@ -12,7 +12,7 @@
 - name: Label the worker node for workload placement
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf
-    label node {{ groups['kube_workers'] | first }}
+    label node {{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}
     node-role.kubernetes.io/worker= --overwrite
   changed_when: true
 

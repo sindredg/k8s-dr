@@ -36,11 +36,25 @@ class ClusterManifestTests(unittest.TestCase):
         self.assertIn("node-role.kubernetes.io/worker", text)
         self.assertNotIn(":latest", text)
 
+    def test_worker_label_targets_the_kubernetes_node_name(self):
+        tasks = yaml.safe_load(
+            Path("ansible/roles/cluster_addons/tasks/main.yml").read_text()
+        )
+        label = next(t for t in tasks if t["name"].startswith("Label the worker node"))
+        self.assertIn(
+            "label node {{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}",
+            label["ansible.builtin.command"],
+        )
+
     def test_local_path_rejects_unlisted_nodes(self):
         config = Path(
             "ansible/roles/cluster_addons/templates/local-path-config.yml.j2"
         ).read_text()
-        self.assertIn('"node": "{{ groups[\'kube_workers\'] | first }}"', config)
+        # Kubernetes registers nodes by GCP instance name, not inventory name.
+        self.assertIn(
+            '"node": "{{ hostvars[groups[\'kube_workers\'] | first].gcp_instance_name }}"',
+            config,
+        )
         self.assertIn('"node": "DEFAULT_PATH_FOR_NON_LISTED_NODES"', config)
         self.assertIn('"paths": []', config)
         self.assertIn("{{ local_path_root }}", config)
