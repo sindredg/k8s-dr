@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: In progress. Automation is implemented and passes local checks. Gate check 1 (both nodes `Ready`) passed on 2026-09-23. Gate checks 2 to 4 are not run. See [Resume here](#resume-here).
+Status: In progress. Automation is implemented and passed the recorded local checks. Gate check 1 (both nodes `Ready`) passed on 2026-09-23. Gate checks 2 to 4 are not run. See [Resume here](#resume-here).
 
 ## Scope
 
@@ -104,6 +104,8 @@ State on 2026-09-23: the primary cluster is bootstrapped and running. The operat
 1. [Validate the disposable application](../runbooks/kubernetes-bootstrap.md#validate-the-disposable-application): rerun `deploy_test_app.yml` (safe to repeat), then `validate.yml -v`, which now includes the reachability requests. Then run the pod replacement check.
 2. [Restart the worker](../runbooks/kubernetes-bootstrap.md#restart-the-worker).
 3. [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms). This is the first run that exercises the Calico DaemonSet wait against a real race.
+
+Closure handoff prepared on 2026-09-24: the runbook now places `validate.yml` after test-app deployment, since it requires that namespace, and calls out which statuses to inspect manually. This documentation change supplies no new live gate evidence. After the operator provides sanitized results for checks 2 to 4, record each command, exit code, and observed result in the validation table, then update the Milestone 2 status and checkboxes in `plan.md` only if all four gate conditions pass.
 
 Known limitations to keep in mind:
 

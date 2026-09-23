@@ -1,6 +1,6 @@
 # Kubernetes bootstrap: operator procedure
 
-Status: Implemented, not validated. The Milestone 2 gate is open. Run these steps to bootstrap the primary cluster and collect gate evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
+Status: Partially validated. Both nodes were `Ready` on 2026-09-23. The application, worker restart, and fresh rebuild checks are pending, so the Milestone 2 gate remains open. See the [worklog](../worklogs/02-kubernetes-bootstrap.md) for recorded evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
 
 Run every command from the repository root on the external operator machine unless a step says otherwise. Both VMs stay private. Ansible reaches them only through IAP and OS Login.
 
@@ -10,7 +10,7 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
 
 | Gate condition | Evidence step |
 | --- | --- |
-| Both nodes report `Ready` | [Bootstrap the cluster](#bootstrap-the-cluster) |
+| Both nodes report `Ready` | [Validate the disposable application](#validate-the-disposable-application), `validate.yml` node output |
 | A disposable app schedules and is reachable | [Validate the disposable application](#validate-the-disposable-application) |
 | The worker rejoins after a restart | [Restart the worker](#restart-the-worker) |
 | A fresh rebuild follows the same steps | [Rebuild from fresh VMs](#rebuild-from-fresh-vms) |
@@ -26,11 +26,10 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
 
    Expected: pip installs the exact versions in `ansible/requirements.txt` without errors.
 
-2. Confirm Terraform has no pending changes, then export the node identifiers into your shell.
+2. Export the node identifiers from Terraform state into your shell.
 
    ```bash
    cd infra/primary
-   terraform plan -detailed-exitcode
    export PROJECT_ID="$(terraform output -raw project_id)"
    export PRIMARY_ZONE="$(terraform output -raw primary_zone)"
    export CONTROL_PLANE_NAME="$(terraform output -json instance_names | python3 -c 'import json,sys; print(json.load(sys.stdin)["control-plane"])')"
@@ -38,7 +37,7 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
    export OS_LOGIN_USER="$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')"
    ```
 
-   Expected: the plan exits `0` (no changes). All five variables are nonempty. If the plan exits `2`, resolve the drift before you continue.
+   Expected: all five variables are nonempty. The no-change Terraform plan comes after the exact boot image is pinned, because an image family may resolve to a newer image before that pin.
 
 3. Confirm IAP and OS Login access to both nodes.
 
@@ -99,13 +98,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
 
    Expected: `failed=0` and `unreachable=0` again. kubeadm does not initialize or join again, and the worker disk is not formatted. Some add-on tasks, such as `kubectl apply` and `helm upgrade --install`, always report `changed`. That is expected and is not a failure.
 
-3. Collect node and system evidence.
-
-   ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
-   ```
-
-   Expected: `get nodes` lists both nodes as `Ready` with Kubernetes `v1.36.2`. The Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods are `Running`. The Gateway, HTTPRoute, and application tasks fail until you deploy the test application. Report the node table first.
+3. Deploy the disposable application before running `validate.yml`. That playbook includes application resources and exits nonzero when the test namespace does not exist.
 
 ## Validate the disposable application
 
@@ -116,7 +109,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Validation shows the PVC `Bound` with StorageClass `local-path`, a matching PV, the application pod `Running` on the worker, the Gateway `Programmed=True`, and the HTTPRoute `Accepted=True`. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
+   Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Inspect its output: both nodes must be `Ready` on Kubernetes `v1.36.2`; the Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods must be `Running`; the PVC must be `Bound` with StorageClass `local-path`, with a matching PV; and the application pod must be `Running` on the worker. The Gateway must show `Programmed=True` and the HTTPRoute `Accepted=True`. The playbook lists these resources but does not assert their status. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
 
    - `Request the application through the Gateway route` returns `200` with body `milestone2 persistent marker`.
    - `Confirm the route rejects requests without the application host` returns `404`, which confirms that the route matches the hostname.
@@ -130,7 +123,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: the rollout completes, the application pod has a new name, and validation ends with `failed=0` with the same marker. The replacement pod read the file that the first pod wrote to the persistent volume.
+   Expected: the rollout completes, the application pod has a new name in the second validation output, and validation ends with `failed=0` with the same marker. Compare pod names and the PVC-to-PV binding in the validation output before and after deletion. The replacement pod read the file that the first pod wrote to the persistent volume.
 
 ## Restart the worker
 
@@ -149,7 +142,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: validation ends with `failed=0`. The worker is `Ready` again without a new join, the PVC is still `Bound` to the same PV, and the application request returns the same marker.
+   Expected: validation ends with `failed=0`. Inspect the node and pod output to confirm the worker is `Ready` again without a new join. Compare the PVC-to-PV binding with the output before the restart, and confirm the application request returns the same marker. If the worker is still `NotReady`, wait for recovery and rerun validation before recording the check.
 
 3. Remove the disposable application.
 
