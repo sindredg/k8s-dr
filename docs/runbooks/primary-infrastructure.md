@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implementation written; no cloud validation recorded. Run these steps for milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implementation written; partial operator resource checks recorded. The milestone gate is open. Run these steps for milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 

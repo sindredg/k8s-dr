@@ -1,6 +1,6 @@
 # Milestone 1: Primary infrastructure
 
-Status: In progress. Terraform and operator documentation are written; cloud validation is pending.
+Status: In progress. Operator resource checks are recorded; the milestone gate remains open.
 
 ## Scope
 
@@ -33,7 +33,9 @@ Do not mark this milestone complete until evidence shows that:
 | 2026-09-23 | `terraform apply` in `infra/primary` | Failed during configuration evaluation: `Call to unknown function` for `round()` at `main.tf:101`. Output supplied by operator; post-fix verification pending. |
 | 2026-09-23 | `terraform apply` in `infra/primary` | Failed provider validation: `all_updates_rule` required a Monitoring notification channel or Pub/Sub topic. Output supplied by operator; post-fix verification pending. |
 | 2026-09-23 | `terraform apply` in `infra/primary` | Partial apply: operator output showed the Finland VMs, network and NAT, worker data disk, backup bucket, and IAM resources created. Budget creation failed with HTTP 403 because local ADC had no quota project. Post-fix verification pending. |
+| 2026-09-23 | `terraform output instance_names`, `terraform output internal_ips`, `terraform output backup_bucket_name`, and `gcloud compute instances list` | Operator output showed two running VMs in Finland with internal addresses and no external NAT addresses; the backup bucket output returned a name. This does not establish node connectivity or independent storage access. |
+| 2026-09-23 | `gcloud compute disks describe "$(terraform output -raw worker_data_disk_name)" --project="$PROJECT_ID" --zone=europe-north1-a` | Operator output showed a 50 GiB balanced disk in READY state, attached to the worker VM. A separate `--format=...` shell line failed with `command not found`; the disk describe itself succeeded. |
 
 ## Failures and remaining work
 
-All milestone 1 plan steps remain open. The latest supplied apply output showed the infrastructure created and the budget failing. The operator later reported that Terraform still prompted for a number after deleting a local value, but did not provide new command output. The budget has now been removed from configuration; a fresh plan and the milestone gate remain unverified. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the historical symptoms and current disposition. Do not paste credentials, Terraform state, or raw command output.
+All milestone 1 plan steps remain open. An earlier apply output showed the infrastructure created and the budget failing. The operator later reported that Terraform still prompted for a number after deleting a local value, but did not provide new command output. The budget has now been removed from configuration. The VM and disk checks above are partial evidence; a fresh no-change plan, node connectivity, and independent state, backup, and credential access remain unverified. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the historical symptoms and current disposition. Do not paste credentials, Terraform state, or raw command output.
