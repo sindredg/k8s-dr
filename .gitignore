@@ -36,7 +36,12 @@ kubeconfig.*
 secrets.local.*
 
 # Generated inventories, backups, and logs
+.venv/
+__pycache__/
+*.py[cod]
+ansible/.cache/
 inventory/generated/
+ansible/inventory/generated/
 *.retry
 backups/
 restore-work/
