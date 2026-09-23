@@ -182,7 +182,7 @@ The operator procedure will provide commands, expected results, and evidence req
 8. Review a Terraform plan that replaces only the two VM boot disks and their attachment relationship while preserving the worker data disk, network, buckets, and state.
 9. Apply the reviewed replacement, rerun the same bootstrap playbook, and repeat the node, add-on, ingress, and storage checks.
 
-Only operator-supplied results are added to the Milestone 2 worklog. The plan remains pending until all four gate conditions have evidence.
+Record sanitized validation results in the Milestone 2 worklog. The plan remains pending until all four gate conditions have evidence.
 
 ## Trade-offs and limitations
 

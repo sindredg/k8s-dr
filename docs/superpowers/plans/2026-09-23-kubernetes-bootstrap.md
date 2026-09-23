@@ -21,7 +21,7 @@
 - Never reformat a nonblank disk, reset kubeadm automatically, log a join token, or track a generated inventory or kubeconfig.
 - Keep Flux, Gitea, PostgreSQL, public DNS, TLS, backups, and recovery-region infrastructure out of Milestone 2.
 - The operator runs Terraform, gcloud, Ansible against live nodes, reboots, replacements, deployments, and gate validation.
-- Record implementation in `docs/worklogs/02-kubernetes-bootstrap.md`. Record validation results only after the operator supplies sanitized output.
+- Record implementation in `docs/worklogs/02-kubernetes-bootstrap.md`. Record validation results only when sanitized output is available.
 
 ## Review Focus
 
