@@ -3,6 +3,11 @@
 *.tfstate
 *.tfstate.*
 .terraform.tfstate.lock.info
+*.tfplan
+*.plan
+backend.hcl
+infra/bootstrap/backend.tf
+.private/
 crash.log
 crash.*.log
 *.tfvars

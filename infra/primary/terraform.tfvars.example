@@ -1,0 +1,12 @@
+project_id             = "REPLACE_WITH_PROJECT_ID"
+name_prefix            = "k8sdr-primary"
+primary_zone           = "europe-north1-a"
+# Choose an unused private range that does not overlap a future recovery subnet.
+primary_subnet_cidr    = "REPLACE_WITH_UNUSED_PRIVATE_CIDR"
+backup_bucket_name    = "REPLACE_WITH_GLOBALLY_UNIQUE_BACKUP_BUCKET"
+backup_bucket_location = "europe-west1"
+
+# Use user: for individual accounts, or group: for Google Groups.
+admin_member           = "user:REPLACE_WITH_CLUSTER_ADMIN_EMAIL@example.com"
+backup_operator_member = "user:REPLACE_WITH_BACKUP_OPERATOR_EMAIL@example.com"
+recovery_reader_member = "user:REPLACE_WITH_RECOVERY_READER_EMAIL@example.com"
