@@ -12,6 +12,7 @@ Provision a primary control-plane VM and worker VM, their private network, restr
 - Added the primary Terraform root, including a Finland regional cluster module, private VMs, IAP SSH, Cloud NAT, a dedicated worker disk, a separate Belgium backup bucket, IAM access, and a project-scoped monthly budget.
 - Added placeholder configuration, local-file ignore rules, a cost calculator input table, and the [operator procedure](../runbooks/primary-infrastructure.md).
 - Recorded the architecture and its trade-offs in [decision 0003](../decisions/0003-regional-infrastructure-and-state.md). No Terraform, gcloud, deployment, or validation command has been run by the implementer.
+- Recorded the observed budget errors in [troubleshooting](../troubleshooting/02-billing-budget-apply-errors.md) and clarified the tracked variable examples. Local values and provider lock files were not changed.
 
 ## Validation gate
 
@@ -33,14 +34,4 @@ Do not mark this milestone complete until evidence shows that:
 
 ## Failures and remaining work
 
-All milestone 1 plan steps remain open. Do not paste credentials, Terraform state, or raw command output.
-
-- Symptom: Primary `terraform apply` stopped on `Call to unknown function` at `main.tf:101`.
-- Confirmed cause: Terraform does not provide `round()`; the budget nanos expression called it.
-- Fix written: Use supported `floor()` to turn the fractional billing-currency amount into whole nanos.
-- Verification: The next apply advanced past this expression to provider validation; a successful plan and apply are still pending.
-
-- Symptom: The next primary `terraform apply` reported missing `monitoring_notification_channels` and `pubsub_topic` in `all_updates_rule`.
-- Confirmed cause: The configured `all_updates_rule` set only `enable_project_level_recipients`, while the selected Google provider requires a Monitoring channel or Pub/Sub topic when that block is present.
-- Fix written: Remove the optional block and use default email delivery to Billing Account Administrators and Billing Account Users. Confirm an intended recipient has one of these roles.
-- Verification: Pending operator rerun of `terraform validate` and `terraform plan`. No post-fix result has been supplied.
+All milestone 1 plan steps remain open. The operator reports the latest retry worked, but has not supplied command output for a validation record. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the symptoms, confirmed causes, fixes, and pending checks. Do not paste credentials, Terraform state, or raw command output.

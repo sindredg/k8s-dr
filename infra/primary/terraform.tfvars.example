@@ -1,16 +1,19 @@
 project_id             = "REPLACE_WITH_PROJECT_ID"
+# Use the billing account ID without the billingAccounts/ prefix.
 billing_account_id     = "REPLACE_WITH_BILLING_ACCOUNT_ID"
 name_prefix            = "k8sdr-primary"
 primary_zone           = "europe-north1-a"
+# Choose an unused private range that does not overlap a future recovery subnet.
 primary_subnet_cidr    = "REPLACE_WITH_UNUSED_PRIVATE_CIDR"
 backup_bucket_name    = "REPLACE_WITH_GLOBALLY_UNIQUE_BACKUP_BUCKET"
 backup_bucket_location = "europe-west1"
 
-admin_member           = "group:REPLACE_WITH_CLUSTER_ADMINS@example.com"
-backup_operator_member = "group:REPLACE_WITH_BACKUP_OPERATORS@example.com"
-recovery_reader_member = "group:REPLACE_WITH_RECOVERY_READERS@example.com"
+# Use user: for individual accounts, or group: for Google Groups.
+admin_member           = "user:REPLACE_WITH_CLUSTER_ADMIN_EMAIL@example.com"
+backup_operator_member = "user:REPLACE_WITH_BACKUP_OPERATOR_EMAIL@example.com"
+recovery_reader_member = "user:REPLACE_WITH_RECOVERY_READER_EMAIL@example.com"
 
-# Use the billing account currency. 1000 is correct only when that currency is NOK.
-# Otherwise convert the intended 1,000 NOK alert to the account currency first.
+# Replace both values. Use 1000 only when the billing account currency is NOK.
+# For another currency, convert the intended 1,000 NOK alert first.
 budget_currency_code = "REPLACE_WITH_BILLING_CURRENCY_CODE"
-budget_amount        = 1000
+budget_amount        = 0 # Replace with a positive amount in the billing account currency.

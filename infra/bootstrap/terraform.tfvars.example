@@ -1,4 +1,5 @@
 project_id            = "REPLACE_WITH_PROJECT_ID"
 state_bucket_name     = "REPLACE_WITH_GLOBALLY_UNIQUE_STATE_BUCKET"
 state_bucket_location = "europe-west1"
-state_operator_member = "group:REPLACE_WITH_STATE_OPERATORS@example.com"
+# Use user: for one operator, or group: for a Google Group.
+state_operator_member = "user:REPLACE_WITH_STATE_OPERATOR_EMAIL@example.com"

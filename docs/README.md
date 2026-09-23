@@ -11,6 +11,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Regional infrastructure and state](decisions/0003-regional-infrastructure-and-state.md) | Explain the reusable module and offsite state decisions. |
 | [Primary infrastructure procedure](runbooks/primary-infrastructure.md) | Bootstrap state, apply the primary root, and check the milestone 1 gate. |
 | [Worker join failure](troubleshooting/01-worker-join-failure.md) | Diagnose a worker that cannot join or become Ready. This is a guide, not an incident report. |
+| [Billing budget apply errors](troubleshooting/02-billing-budget-apply-errors.md) | Record the observed Terraform budget errors and fixes. |
 | [Regional recovery](runbooks/regional-recovery.md) | Execute and measure a cold recovery drill after prerequisites are implemented. |
 
 Record completed work and the commands and results that validate it in the corresponding worklog. Keep credentials, kubeconfigs, Terraform state, database dumps, and unsanitized command output out of this repository.
