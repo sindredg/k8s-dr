@@ -446,7 +446,7 @@ Parse YAML with `yaml.safe_load` and inspect the containerd template as text. As
 def test_component_versions_are_exact(self):
     values = yaml.safe_load(Path("ansible/playbooks/group_vars/all.yml").read_text())
     self.assertEqual(values["kubernetes_version"], "1.36.2")
-    self.assertEqual(values["kubernetes_deb_version"], "1.36.2-1.1")
+    self.assertEqual(values["kubernetes_deb_version"], "1.36.2-2.1")
     self.assertEqual(values["containerd_deb_version"], "2.2.1-0ubuntu1~24.04.3")
     self.assertEqual(values["helm_version"], "3.22.0")
 
@@ -475,7 +475,7 @@ Use:
 ---
 kubernetes_version: "1.36.2"
 kubernetes_minor: "v1.36"
-kubernetes_deb_version: "1.36.2-1.1"
+kubernetes_deb_version: "1.36.2-2.1"
 containerd_deb_version: "2.2.1-0ubuntu1~24.04.3"
 helm_version: "3.22.0"
 calico_version: "3.32.2"

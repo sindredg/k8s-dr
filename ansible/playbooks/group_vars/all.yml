@@ -1,7 +1,7 @@
 ---
 kubernetes_version: "1.36.2"
 kubernetes_minor: "v1.36"
-kubernetes_deb_version: "1.36.2-1.1"
+kubernetes_deb_version: "1.36.2-2.1"
 containerd_deb_version: "2.2.1-0ubuntu1~24.04.3"
 helm_version: "3.22.0"
 calico_version: "3.32.2"
