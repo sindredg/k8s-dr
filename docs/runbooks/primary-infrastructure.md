@@ -20,9 +20,10 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
    gcloud auth application-default login
    gcloud billing projects describe "$PROJECT_ID"
    gcloud services enable serviceusage.googleapis.com compute.googleapis.com storage.googleapis.com iap.googleapis.com billingbudgets.googleapis.com --project="$PROJECT_ID"
+   gcloud auth application-default set-quota-project "$PROJECT_ID"
    ```
 
-   Expected: the billing project shows the intended account, and API enablement succeeds. Find the billing account currency in Cloud Billing settings before filling in the budget values.
+   Expected: the billing project shows the intended account, API enablement succeeds, and local Application Default Credentials (ADC) use this project for API quota and billing. Setting the ADC quota project requires `serviceusage.services.use` on the project. Find the billing account currency in Cloud Billing settings before filling in the budget values.
 
 2. Copy and edit the bootstrap example. Use a separate state operator identity that your operator credentials can access. Restrict local file permissions before Terraform creates local state.
 
@@ -80,6 +81,8 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
    ```
 
    Expected: the plan contains one Finland VPC and subnet, one NAT, two private VMs, one attached worker data disk, one Belgium backup bucket, IAM grants, and one project-scoped monthly budget. It contains no Belgium VMs or public VM addresses. Inspect the plan before apply, especially billing currency, bucket names, IAM members, and disk replacement actions.
+
+   If an apply partially succeeds, fix the reported error and make a fresh plan before applying again. For the billing-budget ADC quota-project error, run `gcloud auth application-default set-quota-project "$PROJECT_ID"`, then `terraform plan -out=primary.tfplan`. If the other resources completed, expect only the budget to be created, with no VM, disk, network, or bucket replacement. Review that plan before `terraform apply primary.tfplan`.
 
 ## Check the milestone 1 gate
 

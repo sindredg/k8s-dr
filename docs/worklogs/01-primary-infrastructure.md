@@ -31,7 +31,8 @@ Do not mark this milestone complete until evidence shows that:
 | Pending | Verify independent access to state, storage, and credentials | Not run |
 | 2026-09-23 | `terraform apply` in `infra/primary` | Failed during configuration evaluation: `Call to unknown function` for `round()` at `main.tf:101`. Output supplied by operator; post-fix verification pending. |
 | 2026-09-23 | `terraform apply` in `infra/primary` | Failed provider validation: `all_updates_rule` required a Monitoring notification channel or Pub/Sub topic. Output supplied by operator; post-fix verification pending. |
+| 2026-09-23 | `terraform apply` in `infra/primary` | Partial apply: operator output showed the Finland VMs, network and NAT, worker data disk, backup bucket, and IAM resources created. Budget creation failed with HTTP 403 because local ADC had no quota project. Post-fix verification pending. |
 
 ## Failures and remaining work
 
-All milestone 1 plan steps remain open. The operator reports the latest retry worked, but has not supplied command output for a validation record. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the symptoms, confirmed causes, fixes, and pending checks. Do not paste credentials, Terraform state, or raw command output.
+All milestone 1 plan steps remain open. The latest operator output shows a partial apply; the budget and milestone gate are not yet verified. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the symptoms, confirmed causes, fixes, and pending checks. Do not paste credentials, Terraform state, or raw command output.
