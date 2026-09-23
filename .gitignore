@@ -52,6 +52,9 @@ restore-work/
 *.zip
 *.log
 
+# Local screenshot dump; curated worklog images use descriptive names
+docs/images/Screenshot *.png
+
 # Editor and OS files
 .DS_Store
 .idea/

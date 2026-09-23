@@ -41,3 +41,11 @@ The milestone is complete because the validation record shows that:
 ## Gate conclusion
 
 The refreshed Terraform plan, live resource queries, private node ping, and external credential checks satisfy all three milestone 1 gate conditions. The checks prove convergence of the current deployment, not a destructive clean rebuild. They also prove access from an operator machine while the primary VMs are running, not access during a simulated Finland outage. Milestones 5 and 6 cover cold rebuild and regional-loss testing.
+
+## Selected screenshots
+
+The operator supplied these sanitized excerpts on 2026-09-24. The [validation record](#validation-record) contains the commands and results behind them.
+
+![Terraform copied the temporary local state into the GCS backend](../images/milestone1-state-migration.png)
+
+![The primary Terraform plan reported no changes](../images/milestone1-primary-plan-clean.png)
