@@ -1,0 +1,95 @@
+---
+- name: Confirm the supported node platform
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version == "24.04"
+      - ansible_architecture == "x86_64"
+    fail_msg: Kubernetes nodes require Ubuntu 24.04 on x86_64.
+
+- name: Install node prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - conntrack
+      - chrony
+      - curl
+      - gpg
+      - python3-debian
+      - socat
+    state: present
+    update_cache: true
+
+- name: Disable active swap
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  changed_when: true
+
+- name: Disable swap entries in fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^(\s*[^#]\S+\s+\S+\s+swap\s+.*)$'
+    replace: '# \1'
+
+- name: Persist required kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/kubernetes.conf
+    mode: "0644"
+    content: |
+      overlay
+      br_netfilter
+
+- name: Load required kernel modules
+  ansible.builtin.command: "modprobe {{ item }}"
+  loop:
+    - overlay
+    - br_netfilter
+  changed_when: false
+
+- name: Configure Kubernetes networking sysctls
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-kubernetes.conf
+    mode: "0644"
+    content: |
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward = 1
+
+# Check the live values on every run. A handler would not fire again after a
+# failed run had already written the file.
+- name: Read Kubernetes networking sysctls
+  ansible.builtin.command: >-
+    sysctl -n net.bridge.bridge-nf-call-iptables
+    net.bridge.bridge-nf-call-ip6tables net.ipv4.ip_forward
+  register: node_prepare_sysctls
+  changed_when: false
+
+- name: Apply Kubernetes networking sysctls
+  ansible.builtin.command: sysctl --system
+  when: node_prepare_sysctls.stdout_lines != ["1", "1", "1"]
+  changed_when: true
+
+- name: Verify Kubernetes networking sysctls
+  ansible.builtin.command: >-
+    sysctl -n net.bridge.bridge-nf-call-iptables
+    net.bridge.bridge-nf-call-ip6tables net.ipv4.ip_forward
+  register: node_prepare_sysctls_applied
+  changed_when: false
+  failed_when: node_prepare_sysctls_applied.stdout_lines != ["1", "1", "1"]
+
+- name: Enable and start chrony
+  ansible.builtin.service:
+    name: chrony
+    enabled: true
+    state: started
+
+- name: Gather installed package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Disable UFW when installed
+  ansible.builtin.service:
+    name: ufw
+    enabled: false
+    state: stopped
+  when: "'ufw' in ansible_facts.packages"

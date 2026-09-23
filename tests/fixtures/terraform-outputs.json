@@ -1,0 +1,33 @@
+{
+  "instance_names": {
+    "sensitive": false,
+    "type": ["map", "string"],
+    "value": {
+      "control-plane": "example-control-plane",
+      "worker": "example-worker"
+    }
+  },
+  "internal_ips": {
+    "sensitive": false,
+    "type": ["map", "string"],
+    "value": {
+      "control-plane": "10.10.0.2",
+      "worker": "10.10.0.3"
+    }
+  },
+  "primary_subnet_cidr": {
+    "sensitive": false,
+    "type": "string",
+    "value": "10.10.0.0/24"
+  },
+  "primary_zone": {
+    "sensitive": false,
+    "type": "string",
+    "value": "europe-north1-a"
+  },
+  "project_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "example-project"
+  }
+}

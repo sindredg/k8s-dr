@@ -8,6 +8,21 @@ output "internal_ips" {
   value       = module.primary_cluster.internal_ips
 }
 
+output "project_id" {
+  description = "Google Cloud project containing the primary cluster."
+  value       = var.project_id
+}
+
+output "primary_zone" {
+  description = "Zone containing the primary cluster nodes."
+  value       = var.primary_zone
+}
+
+output "primary_subnet_cidr" {
+  description = "IPv4 range assigned to the primary subnet."
+  value       = var.primary_subnet_cidr
+}
+
 output "control_plane_internal_ip" {
   description = "Private address for the node connectivity check."
   value       = module.primary_cluster.internal_ips["control-plane"]

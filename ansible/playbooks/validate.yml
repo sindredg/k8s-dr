@@ -1,0 +1,105 @@
+---
+- name: Collect read-only milestone validation evidence
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Wait for both Kubernetes nodes to be Ready
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready nodes --all --timeout=300s
+      changed_when: false
+
+    - name: Wait for worker workloads after restart
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        rollout status {{ item.resource }}
+        --namespace {{ item.namespace }} --timeout=300s
+      loop:
+        - namespace: calico-system
+          resource: daemonset/calico-node
+        - namespace: kube-system
+          resource: deployment/coredns
+        - namespace: local-path-storage
+          resource: deployment/local-path-provisioner
+        - namespace: traefik
+          resource: deployment/traefik
+        - namespace: milestone2-test
+          resource: deployment/milestone2-app
+      changed_when: false
+
+    - name: List cluster nodes
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes --output=wide
+      changed_when: false
+
+    - name: List system pods
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get pods --all-namespaces --output=wide
+      changed_when: false
+
+    - name: List cluster deployments
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get deployments --all-namespaces
+      changed_when: false
+
+    - name: Read Gateway conditions
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get gateway milestone2-gateway
+        --namespace milestone2-test --output=yaml
+      changed_when: false
+
+    - name: Read HTTPRoute conditions
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get httproute milestone2-route
+        --namespace milestone2-test --output=yaml
+      changed_when: false
+
+    - name: Read the application PVC
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get persistentvolumeclaims --namespace milestone2-test --output=wide
+      changed_when: false
+
+    - name: Read cluster persistent volumes
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get persistentvolumes --output=wide
+      changed_when: false
+
+    - name: Read application pod placement
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get pods --namespace milestone2-test --output=wide
+      changed_when: false
+
+    # Requests travel from the control plane to the worker's private address,
+    # so they exercise Calico, kube-proxy, the Traefik NodePort, and the route.
+    - name: Request the application through the Gateway route
+      ansible.builtin.uri:
+        url: >-
+          http://{{ hostvars[groups['kube_workers'] | first].node_internal_ip
+          }}:{{ traefik_http_node_port }}/
+        method: GET
+        headers:
+          Host: milestone2.local
+        return_content: true
+        status_code: 200
+      register: validate_app_response
+      changed_when: false
+      failed_when: >-
+        validate_app_response.status != 200 or
+        'milestone2 persistent marker' not in validate_app_response.content
+
+    - name: Confirm the route rejects requests without the application host
+      ansible.builtin.uri:
+        url: >-
+          http://{{ hostvars[groups['kube_workers'] | first].node_internal_ip
+          }}:{{ traefik_http_node_port }}/
+        method: GET
+        status_code: 404
+      changed_when: false

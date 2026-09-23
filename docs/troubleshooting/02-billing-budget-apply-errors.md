@@ -22,7 +22,7 @@ The number prompt was caused by the still-required `budget_amount` variable decl
 
 The earlier attempts replaced `round()` with `floor()` and removed `all_updates_rule`. These changes did not resolve the later API error.
 
-At the operator's request, the current configuration removes the budget resource, its required inputs, and the project-number lookup entirely. The [primary operator procedure](../runbooks/primary-infrastructure.md) no longer enables the Billing Budgets API or requires an ADC quota-project step for budget creation. Remove stale budget keys from local `terraform.tfvars` to avoid undeclared-variable warnings.
+The current configuration removes the budget resource, its required inputs, and the project-number lookup entirely. The [primary operator procedure](../runbooks/primary-infrastructure.md) no longer enables the Billing Budgets API or requires an ADC quota-project step for budget creation. Remove stale budget keys from local `terraform.tfvars` to avoid undeclared-variable warnings.
 
 ## Verification
 

@@ -1,0 +1,61 @@
+---
+- name: Check whether the worker is joined
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: worker_join_kubelet_config
+
+- name: Check for partial kubelet state
+  ansible.builtin.stat:
+    path: /var/lib/kubelet/config.yaml
+  register: worker_join_kubelet_state
+
+- name: Check for partial Kubernetes PKI state
+  ansible.builtin.stat:
+    path: /etc/kubernetes/pki/ca.crt
+  register: worker_join_pki_state
+
+- name: Refuse conflicting partial kubeadm state
+  ansible.builtin.assert:
+    that:
+      - not worker_join_kubelet_state.stat.exists
+      - not worker_join_pki_state.stat.exists
+    fail_msg: >-
+      Partial kubeadm state exists without /etc/kubernetes/kubelet.conf.
+      Inspect and clean the worker explicitly before retrying.
+  when: not worker_join_kubelet_config.stat.exists
+
+- name: Create a short-lived worker join command
+  ansible.builtin.command: kubeadm token create --ttl 15m --print-join-command
+  delegate_to: "{{ groups['kube_control_plane'] | first }}"
+  become: true
+  register: worker_join_token_command
+  changed_when: true
+  when: not worker_join_kubelet_config.stat.exists
+  no_log: true
+
+- name: Store the protected worker join command
+  ansible.builtin.set_fact:
+    worker_join_command: "{{ worker_join_token_command.stdout }}"
+  when: not worker_join_kubelet_config.stat.exists
+  no_log: true
+
+- name: Join the worker to the cluster
+  ansible.builtin.command: >-
+    {{ worker_join_command }}
+    --cri-socket unix:///run/containerd/containerd.sock
+    --node-name {{ gcp_instance_name }}
+  when: not worker_join_kubelet_config.stat.exists
+  changed_when: true
+  no_log: true
+
+- name: Wait until the API lists the worker node
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    get node {{ gcp_instance_name }} --output=name
+  delegate_to: "{{ groups['kube_control_plane'] | first }}"
+  become: true
+  register: worker_join_api_result
+  changed_when: false
+  retries: 30
+  delay: 2
+  until: worker_join_api_result.rc == 0

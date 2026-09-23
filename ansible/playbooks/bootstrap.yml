@@ -1,0 +1,37 @@
+---
+- name: Bootstrap Kubernetes nodes
+  hosts: kube_cluster
+  gather_facts: true
+  become: true
+  roles:
+    - node_prepare
+    - container_runtime
+    - kubernetes_packages
+
+- name: Prepare dedicated worker storage
+  hosts: kube_workers
+  gather_facts: false
+  become: true
+  roles:
+    - worker_storage
+
+- name: Initialize the Kubernetes control plane
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  roles:
+    - control_plane
+
+- name: Join Kubernetes workers
+  hosts: kube_workers
+  gather_facts: false
+  become: true
+  roles:
+    - worker_join
+
+- name: Install pinned cluster add-ons
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  roles:
+    - cluster_addons

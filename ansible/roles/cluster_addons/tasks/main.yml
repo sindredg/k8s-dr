@@ -1,0 +1,193 @@
+---
+- name: Set pinned add-on release URL roots
+  ansible.builtin.set_fact:
+    cluster_addons_calico_url: >-
+      https://raw.githubusercontent.com/projectcalico/calico/v{{ calico_version }}
+    cluster_addons_gateway_api_url: >-
+      https://github.com/kubernetes-sigs/gateway-api/releases/download/v{{ gateway_api_version }}
+    # The pinned upstream URL exceeds the project line limit.
+    # yamllint disable-line rule:line-length
+    cluster_addons_local_path_url: "https://raw.githubusercontent.com/rancher/local-path-provisioner/v{{ local_path_provisioner_version }}"
+
+- name: Label the worker node for workload placement
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    label node {{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}
+    node-role.kubernetes.io/worker= --overwrite
+  changed_when: true
+
+- name: Apply pinned Calico operator CRDs
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    -f {{ cluster_addons_calico_url }}/manifests/operator-crds.yaml
+  changed_when: true
+
+- name: Apply the pinned Calico operator
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    -f {{ cluster_addons_calico_url }}/manifests/tigera-operator.yaml
+  changed_when: true
+
+- name: Render Calico custom resources
+  ansible.builtin.template:
+    src: calico-custom-resources.yml.j2
+    dest: /etc/kubernetes/calico-custom-resources.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Apply Calico custom resources
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    apply -f /etc/kubernetes/calico-custom-resources.yml
+  changed_when: true
+
+- name: Wait for the Tigera operator
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    rollout status deployment/tigera-operator
+    --namespace tigera-operator --timeout=300s
+  changed_when: false
+
+# The operator creates calico-system and calico-node asynchronously after it
+# reconciles the Installation, so rollout status alone can race it.
+- name: Wait for the operator to create the Calico node DaemonSet
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    get daemonset/calico-node --namespace calico-system --output=name
+  register: cluster_addons_calico_node
+  changed_when: false
+  until: cluster_addons_calico_node.rc == 0
+  retries: 60
+  delay: 5
+
+- name: Wait for Calico on every node
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    rollout status daemonset/calico-node
+    --namespace calico-system --timeout=300s
+  changed_when: false
+
+- name: Wait for CoreDNS
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    rollout status deployment/coredns
+    --namespace kube-system --timeout=300s
+  changed_when: false
+
+- name: Apply pinned Gateway API Standard CRDs
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    -f {{ cluster_addons_gateway_api_url }}/standard-install.yaml
+  changed_when: true
+
+- name: Download the pinned Helm archive checksum
+  ansible.builtin.get_url:
+    url: >-
+      https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz.sha256sum
+    dest: "/tmp/helm-v{{ helm_version }}-linux-amd64.tar.gz.sha256sum"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Download the pinned Helm archive
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-v{{ helm_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/helm-v{{ helm_version }}-linux-amd64.tar.gz"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Verify the pinned Helm archive checksum
+  ansible.builtin.command: >-
+    sha256sum --check helm-v{{ helm_version }}-linux-amd64.tar.gz.sha256sum
+  args:
+    chdir: /tmp
+  changed_when: false
+
+- name: Extract the pinned Helm archive
+  ansible.builtin.unarchive:
+    src: "/tmp/helm-v{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+
+- name: Install the pinned Helm binary
+  ansible.builtin.copy:
+    src: /tmp/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Verify the installed Helm version
+  ansible.builtin.command: /usr/local/bin/helm version --short
+  register: cluster_addons_helm_version
+  changed_when: false
+  failed_when: >-
+    cluster_addons_helm_version.rc != 0 or
+    ('v' ~ helm_version) not in cluster_addons_helm_version.stdout
+
+- name: Render private Traefik values
+  ansible.builtin.template:
+    src: traefik-values.yml.j2
+    dest: /etc/kubernetes/traefik-values.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Reconcile the pinned Traefik chart
+  ansible.builtin.command: >-
+    /usr/local/bin/helm upgrade --install traefik traefik
+    --repo https://traefik.github.io/charts
+    --version {{ traefik_chart_version }}
+    --values /etc/kubernetes/traefik-values.yml
+    --namespace traefik --create-namespace
+    --kubeconfig /etc/kubernetes/admin.conf
+  changed_when: true
+
+- name: Wait for Traefik
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    rollout status deployment/traefik --namespace traefik --timeout=300s
+  changed_when: false
+
+- name: Wait for the Traefik GatewayClass
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    wait --for=condition=Accepted gatewayclass/traefik --timeout=180s
+  changed_when: false
+
+- name: Apply the pinned Local Path Provisioner
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf apply
+    -f {{ cluster_addons_local_path_url }}/deploy/local-path-storage.yaml
+  changed_when: true
+
+- name: Render the restricted Local Path Provisioner configuration
+  ansible.builtin.template:
+    src: local-path-config.yml.j2
+    dest: /etc/kubernetes/local-path-config.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Apply the restricted Local Path Provisioner configuration
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    apply -f /etc/kubernetes/local-path-config.yml
+  changed_when: true
+
+- name: Mark local-path as the default StorageClass
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    annotate storageclass local-path
+    storageclass.kubernetes.io/is-default-class=true --overwrite
+  changed_when: true
+
+- name: Wait for the Local Path Provisioner
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    rollout status deployment/local-path-provisioner
+    --namespace local-path-storage --timeout=180s
+  changed_when: false

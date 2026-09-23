@@ -1,0 +1,16 @@
+---
+kubernetes_version: "1.36.2"
+kubernetes_minor: "v1.36"
+kubernetes_deb_version: "1.36.2-2.1"
+containerd_deb_version: "2.2.1-0ubuntu1~24.04.3"
+helm_version: "3.22.0"
+calico_version: "3.32.2"
+gateway_api_version: "1.6.1"
+traefik_chart_version: "41.6.0"
+local_path_provisioner_version: "0.0.36"
+pod_cidr: "192.168.0.0/16"
+service_cidr: "10.96.0.0/12"
+worker_data_device: "/dev/disk/by-id/google-worker-data"
+worker_data_mount: "/var/lib/k8s-dr"
+local_path_root: "/var/lib/k8s-dr/local-path"
+traefik_http_node_port: 30080

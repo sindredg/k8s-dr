@@ -1,0 +1,68 @@
+---
+- name: Deploy the disposable milestone application
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Copy the disposable application manifest
+      ansible.builtin.copy:
+        src: ../manifests/milestone2-app.yml
+        dest: /etc/kubernetes/milestone2-app.yml
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Apply the disposable application manifest
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        apply -f /etc/kubernetes/milestone2-app.yml
+      changed_when: true
+
+    - name: Wait for the disposable application Deployment
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        rollout status deployment/milestone2-app
+        --namespace milestone2-test --timeout=180s
+      changed_when: false
+
+    - name: Wait for the disposable application PVC
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - /etc/kubernetes/admin.conf
+          - get
+          - persistentvolumeclaim/milestone2-content
+          - --namespace
+          - milestone2-test
+          - --output=jsonpath={.status.phase}
+      register: deploy_test_app_pvc
+      changed_when: false
+      retries: 30
+      delay: 2
+      until: deploy_test_app_pvc.stdout == "Bound"
+
+    - name: Wait for the disposable application Gateway
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Programmed gateway/milestone2-gateway
+        --namespace milestone2-test --timeout=180s
+      changed_when: false
+
+    - name: Wait for the disposable application HTTPRoute
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - /etc/kubernetes/admin.conf
+          - get
+          - httproute/milestone2-route
+          - --namespace
+          - milestone2-test
+          - >-
+            --output=jsonpath={.status.parents[0].conditions[?(@.type=="Accepted")].status}
+      register: deploy_test_app_route
+      changed_when: false
+      retries: 30
+      delay: 2
+      until: deploy_test_app_route.stdout == "True"

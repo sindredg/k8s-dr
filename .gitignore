@@ -36,7 +36,12 @@ kubeconfig.*
 secrets.local.*
 
 # Generated inventories, backups, and logs
+.venv/
+__pycache__/
+*.py[cod]
+ansible/.cache/
 inventory/generated/
+ansible/inventory/generated/
 *.retry
 backups/
 restore-work/
@@ -46,6 +51,9 @@ restore-work/
 *.tar.gz
 *.zip
 *.log
+
+# Local screenshot dump; curated worklog images use descriptive names
+docs/images/Screenshot *.png
 
 # Editor and OS files
 .DS_Store

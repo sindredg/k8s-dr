@@ -1,0 +1,42 @@
+---
+deployment:
+  replicas: 1
+
+nodeSelector:
+  node-role.kubernetes.io/worker: ""
+
+providers:
+  kubernetesCRD:
+    enabled: false
+  kubernetesIngress:
+    enabled: false
+  kubernetesGateway:
+    enabled: true
+
+gateway:
+  enabled: true
+
+gatewayClass:
+  enabled: true
+  name: traefik
+
+service:
+  spec:
+    type: NodePort
+
+ports:
+  web:
+    nodePort: {{ traefik_http_node_port }}
+  websecure:
+    expose:
+      default: false
+
+api:
+  dashboard: false
+
+ingressRoute:
+  dashboard:
+    enabled: false
+
+ingressClass:
+  enabled: false
