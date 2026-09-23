@@ -15,11 +15,11 @@ The Finland cluster must be reproducible after a regional loss. Terraform state,
 - Use distinct bucket IAM members for state operations, backup operations, and recovery reads. Keep their credentials in an external credential store available when Finland is unavailable. VM service accounts receive no bucket roles in milestone 1.
 - Give VMs private addresses. Permit SSH ingress from the [IAP TCP forwarding range](https://docs.cloud.google.com/iap/docs/using-tcp-forwarding) and node traffic within the cluster subnet. Use Cloud NAT for outbound internet access and Private Google Access for Google APIs.
 - Enable bucket versioning, uniform bucket-level access, and public-access prevention. Use `force_destroy = false` and `prevent_destroy` on both buckets and the worker data disk.
-- Scope a monthly billing budget to this project's number. Set its amount and ISO currency code from the billing account. The intended alert is the billing-currency equivalent of 1,000 NOK.
+- Do not manage a billing budget in this Terraform root. The original alert decision was superseded by [decision 0004](0004-remove-budget-alert.md).
 
 ## Why this boundary
 
-The regional module is a coherent unit that a future Belgium root can instantiate with Belgium inputs. It has no reference to Finland resources or Terraform outputs. State, backups, and the budget are project-level concerns that remain available if the primary cluster is gone. A module for each VM or bucket would add interfaces without meaningful reuse.
+The regional module is a coherent unit that a future Belgium root can instantiate with Belgium inputs. It has no reference to Finland resources or Terraform outputs. State and backups remain available if the primary cluster is gone. A module for each VM or bucket would add interfaces without meaningful reuse.
 
 ## Trade-offs and limits
 

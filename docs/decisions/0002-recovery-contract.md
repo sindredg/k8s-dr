@@ -13,7 +13,7 @@ Build a self-managed Kubernetes service on VMs and prove it can be restored in a
 | Area | Decision |
 | --- | --- |
 | Regions | Finland (`europe-north1`) primary; Belgium (`europe-west1`) recovery |
-| Spend | Alert at 1,000 NOK per month for this GCP project; no automatic spend cap |
+| Spend | No Terraform-managed budget alert; review this project's charges and credits manually in Cloud Billing. See [decision 0004](0004-remove-budget-alert.md). |
 | Recovery targets | RTO at most 4 hours; RPO at most 2 hours |
 | Backup cadence | Every hour; alert if no completed backup remains within the RPO |
 | Primary cluster | One kubeadm control-plane VM and one worker VM, each starting at 2 vCPU and 4 GB RAM, on Ubuntu LTS |
@@ -69,7 +69,7 @@ The external probe checks every minute. During a drill, create identifiable test
 
 ## Validation gates
 
-- Before infrastructure: the recovery checks, timers, data-loss calculation, regions, and spend alert are documented.
+- Before infrastructure: the recovery checks, timers, data-loss calculation, regions, and cost monitoring approach are documented.
 - Before declaring backups ready: restore into a separate test environment and make a new push.
 - Before declaring DR ready: recover while primary access is blocked and pass the same checks through the canonical hostname.
 

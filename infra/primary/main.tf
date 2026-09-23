@@ -1,7 +1,3 @@
-data "google_project" "current" {
-  project_id = var.project_id
-}
-
 locals {
   labels = {
     environment = "primary"
@@ -83,34 +79,4 @@ resource "google_service_account_iam_member" "admin_can_use_worker" {
   service_account_id = module.primary_cluster.service_account_ids["worker"]
   role               = "roles/iam.serviceAccountUser"
   member             = var.admin_member
-}
-
-resource "google_billing_budget" "project_monthly" {
-  billing_account = var.billing_account_id
-  display_name    = "${var.name_prefix} monthly spend alert"
-
-  budget_filter {
-    projects        = ["projects/${data.google_project.current.number}"]
-    calendar_period = "MONTH"
-  }
-
-  amount {
-    specified_amount {
-      currency_code = var.budget_currency_code
-      units         = tostring(floor(var.budget_amount))
-      nanos         = floor((var.budget_amount - floor(var.budget_amount)) * 1000000000)
-    }
-  }
-
-  threshold_rules {
-    threshold_percent = 0.5
-  }
-
-  threshold_rules {
-    threshold_percent = 0.9
-  }
-
-  threshold_rules {
-    threshold_percent = 1.0
-  }
 }

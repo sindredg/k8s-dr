@@ -15,7 +15,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 ## 0. Recovery contract
 
-- [x] Select two regions and a monthly project spend alert.
+- [x] Select two regions and document how project costs will be monitored.
 - [x] Set a provisional RTO of a few hours and an RPO based on backup frequency.
 - [x] Define service recovery: login, known commit and issue present, new push succeeds.
 - [x] Define the failure drill, timer start and stop, and data-loss measurement.

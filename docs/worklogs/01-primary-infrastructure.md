@@ -9,10 +9,11 @@ Provision a primary control-plane VM and worker VM, their private network, restr
 ## Work completed
 
 - Added a bootstrap Terraform root for a Belgium GCS state bucket with versioning, public-access prevention, bucket IAM, and an explicit local-state migration procedure.
-- Added the primary Terraform root, including a Finland regional cluster module, private VMs, IAP SSH, Cloud NAT, a dedicated worker disk, a separate Belgium backup bucket, IAM access, and a project-scoped monthly budget.
+- Added the primary Terraform root, including a Finland regional cluster module, private VMs, IAP SSH, Cloud NAT, a dedicated worker disk, a separate Belgium backup bucket, and IAM access.
 - Added placeholder configuration, local-file ignore rules, a cost calculator input table, and the [operator procedure](../runbooks/primary-infrastructure.md).
 - Recorded the architecture and its trade-offs in [decision 0003](../decisions/0003-regional-infrastructure-and-state.md). No Terraform, gcloud, deployment, or validation command has been run by the implementer.
 - Recorded the observed budget errors in [troubleshooting](../troubleshooting/02-billing-budget-apply-errors.md) and clarified the tracked variable examples. Local values and provider lock files were not changed.
+- Removed the budget resource, required budget and billing inputs, and project-number lookup at the operator's request. Updated the example, operator procedure, plan, and [decision 0004](../decisions/0004-remove-budget-alert.md). No Terraform or cloud validation was run by the implementer; local `terraform.tfvars` was not edited.
 
 ## Validation gate
 
@@ -35,4 +36,4 @@ Do not mark this milestone complete until evidence shows that:
 
 ## Failures and remaining work
 
-All milestone 1 plan steps remain open. The latest operator output shows a partial apply; the budget and milestone gate are not yet verified. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the symptoms, confirmed causes, fixes, and pending checks. Do not paste credentials, Terraform state, or raw command output.
+All milestone 1 plan steps remain open. The latest supplied apply output showed the infrastructure created and the budget failing. The operator later reported that Terraform still prompted for a number after deleting a local value, but did not provide new command output. The budget has now been removed from configuration; a fresh plan and the milestone gate remain unverified. See [billing budget apply errors](../troubleshooting/02-billing-budget-apply-errors.md) for the historical symptoms and current disposition. Do not paste credentials, Terraform state, or raw command output.

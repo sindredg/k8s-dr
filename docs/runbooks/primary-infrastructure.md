@@ -6,24 +6,23 @@ Status: Implementation written; no cloud validation recorded. Run these steps fo
 
 Use an existing GCP project linked to a billing account. Choose globally unique names for the state and backup buckets. Choose an unused private subnet range and a Finland zone. Keep the state operator, backup operator, and recovery reader identities available through an external identity provider or credential store, independent of the primary VMs. Separate these identities where possible.
 
-The operator needs permissions to enable APIs, create Compute Engine and Storage resources, manage project IAM and service accounts, and create a budget on the linked billing account. The state operator needs object read and write access to the state bucket. The cluster administrator needs IAP tunnel, OS Login, instance administration, and service account user access; Terraform grants these to `admin_member`. If an organization policy prevents any of these grants, resolve it before apply.
+The operator needs permissions to enable APIs, create Compute Engine and Storage resources, and manage project IAM and service accounts. The state operator needs object read and write access to the state bucket. The cluster administrator needs IAP tunnel, OS Login, instance administration, and service account user access; Terraform grants these to `admin_member`. If an organization policy prevents any of these grants, resolve it before apply.
 
 Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/best-practices/security). A Terraform `sensitive` marker only hides selected CLI display; it does not remove values from state. This configuration creates no keys or passwords, but state still exposes resource metadata and private addresses. Treat plans and all state generations as sensitive.
 
 ## Bootstrap the state bucket
 
-1. Set the project in your shell and authenticate your operator identity. Replace the placeholder locally. Confirm the project is linked to the expected billing account and that its currency is known from the billing account settings.
+1. Set the project in your shell and authenticate your operator identity. Replace the placeholder locally. Confirm the project is linked to the expected billing account.
 
    ```bash
    export PROJECT_ID='REPLACE_WITH_PROJECT_ID'
    gcloud auth login
    gcloud auth application-default login
    gcloud billing projects describe "$PROJECT_ID"
-   gcloud services enable serviceusage.googleapis.com compute.googleapis.com storage.googleapis.com iap.googleapis.com billingbudgets.googleapis.com --project="$PROJECT_ID"
-   gcloud auth application-default set-quota-project "$PROJECT_ID"
+   gcloud services enable serviceusage.googleapis.com compute.googleapis.com storage.googleapis.com iap.googleapis.com --project="$PROJECT_ID"
    ```
 
-   Expected: the billing project shows the intended account, API enablement succeeds, and local Application Default Credentials (ADC) use this project for API quota and billing. Setting the ADC quota project requires `serviceusage.services.use` on the project. Find the billing account currency in Cloud Billing settings before filling in the budget values.
+   Expected: the billing project shows the intended account, and API enablement succeeds. No Billing Budgets API is needed for this configuration.
 
 2. Copy and edit the bootstrap example. Use a separate state operator identity that your operator credentials can access. Restrict local file permissions before Terraform creates local state.
 
@@ -66,13 +65,13 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
 ## Apply the primary root
 
-5. Fill in the local primary variables and backend configuration. Set `budget_currency_code` to the billing account currency. Set `budget_amount` to the account-currency equivalent of the intended 1,000 NOK alert at an exchange rate you choose. `1000` is correct only if the account bills in NOK. An alert does not cap spending.
+5. Fill in the local primary variables and backend configuration. If these local files already exist, keep them and remove any old `billing_account_id`, `budget_currency_code`, and `budget_amount` entries from `terraform.tfvars`. Do not copy examples over existing local values.
 
    ```bash
    cd ../primary
    umask 077
-   cp terraform.tfvars.example terraform.tfvars
-   cp backend.hcl.example backend.hcl
+   if [ ! -e terraform.tfvars ]; then cp terraform.tfvars.example terraform.tfvars; fi
+   if [ ! -e backend.hcl ]; then cp backend.hcl.example backend.hcl; fi
    chmod 600 terraform.tfvars backend.hcl
    # Edit both files and replace every placeholder.
    terraform init -backend-config=backend.hcl
@@ -80,9 +79,9 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
    terraform apply primary.tfplan
    ```
 
-   Expected: the plan contains one Finland VPC and subnet, one NAT, two private VMs, one attached worker data disk, one Belgium backup bucket, IAM grants, and one project-scoped monthly budget. It contains no Belgium VMs or public VM addresses. Inspect the plan before apply, especially billing currency, bucket names, IAM members, and disk replacement actions.
+   Expected for an initial apply: the plan contains one Finland VPC and subnet, one NAT, two private VMs, one attached worker data disk, one Belgium backup bucket, and IAM grants. It contains no budget, Belgium VMs, or public VM addresses. Inspect the plan before apply, especially bucket names, IAM members, and disk replacement actions.
 
-   If an apply partially succeeds, fix the reported error and make a fresh plan before applying again. For the billing-budget ADC quota-project error, run `gcloud auth application-default set-quota-project "$PROJECT_ID"`, then `terraform plan -out=primary.tfplan`. If the other resources completed, expect only the budget to be created, with no VM, disk, network, or bucket replacement. Review that plan before `terraform apply primary.tfplan`.
+   If an earlier apply partially succeeded, make a fresh plan before applying again. After removing the budget configuration, expect no infrastructure changes if the other resources were created. If a budget was created, Terraform may propose deleting that budget. Do not apply if it proposes VM, disk, network, or bucket replacement. Review the plan before `terraform apply primary.tfplan`; skip apply if there are no changes.
 
 ## Check the milestone 1 gate
 
@@ -125,7 +124,7 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
    Expected: state resources list through GCS, both Belgium buckets respond, and the configured recovery reader identity can authenticate without using either primary VM. An empty backup bucket is expected. It cannot prove restore readiness; milestone 4 supplies backups and a restore test. Do not record this gate as passed until you send sanitized evidence for all three checks.
 
-9. Check the budget in Cloud Billing, Budgets & alerts. Confirm the displayed project, month, currency, amount, thresholds (50%, 90%, 100%), and recipients. With no custom notification rule, budget emails go to Billing Account Administrators and Billing Account Users. Confirm the person who must act on the alert has one of those roles. Budget creation does not send a test alert and does not stop billing.
+9. Review this project's charges and remaining credits in Cloud Billing. No Terraform-managed alert or automatic spend cap exists. Repeat this review while the lab is running.
 
 If a check fails, send the failing command, its exit code, the relevant error text with IDs and addresses redacted, the expected and observed result, and the sanitized `terraform plan` resource summary. Do not send `terraform.tfstate`, plan files, credentials, kubeconfigs, or full IAM policy output. Validation results belong in the [milestone 1 worklog](../worklogs/01-primary-infrastructure.md) only after they are observed.
 
@@ -142,7 +141,7 @@ Prices vary by billing currency, discounts, and traffic. Use the [Google Cloud p
 | Cloud Storage state | Belgium `europe-west1`, Standard, 1 GiB including object versions |
 | Cloud Storage backups | Belgium `europe-west1`, Standard, 20 GiB including object versions; no backup objects exist yet |
 
-The calculator may show NAT and egress outside the Compute Engine section. Include them once. Exclude tax and promotional credits from the estimate, and note your billing account's actual currency. Backup volume, state versions, snapshots, storage operations, public ingress, and future recovery drills can increase cost. The bucket and budget remain billable or active after the VMs stop.
+The calculator may show NAT and egress outside the Compute Engine section. Include them once. Exclude tax and promotional credits from the estimate, and note your billing account's actual currency. Backup volume, state versions, snapshots, storage operations, public ingress, and future recovery drills can increase cost. The buckets remain billable after the VMs stop.
 
 ## Future Belgium cluster
 

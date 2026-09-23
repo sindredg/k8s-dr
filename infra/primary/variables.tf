@@ -1,10 +1,5 @@
 variable "project_id" {
-  description = "Existing project for the cluster, backup bucket, and budget filter."
-  type        = string
-}
-
-variable "billing_account_id" {
-  description = "Billing account linked to the project."
+  description = "Existing project for the cluster and backup bucket."
   type        = string
 }
 
@@ -92,24 +87,4 @@ variable "recovery_reader_member" {
 variable "admin_member" {
   description = "IAM user or group allowed to administer nodes through IAP and OS Login."
   type        = string
-}
-
-variable "budget_currency_code" {
-  description = "ISO 4217 currency code of the linked billing account."
-  type        = string
-
-  validation {
-    condition     = can(regex("^[A-Z]{3}$", var.budget_currency_code))
-    error_message = "Use the three-letter billing account currency code."
-  }
-}
-
-variable "budget_amount" {
-  description = "Monthly alert amount in the billing account currency, equivalent to the intended 1,000 NOK at operator-selected exchange rate."
-  type        = number
-
-  validation {
-    condition     = var.budget_amount > 0
-    error_message = "Budget amount must be positive."
-  }
 }
