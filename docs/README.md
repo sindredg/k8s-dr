@@ -13,6 +13,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Kubernetes bootstrap architecture](decisions/0005-kubernetes-bootstrap-architecture.md) | Define the Milestone 2 automation, networking, storage, access, and validation design. |
 | [Kubernetes bootstrap implementation plan](superpowers/plans/2026-09-23-kubernetes-bootstrap.md) | Break Milestone 2 implementation into tested, reviewable tasks. |
 | [Primary infrastructure procedure](runbooks/primary-infrastructure.md) | Bootstrap state, apply the primary root, and check the milestone 1 gate. |
+| [Kubernetes bootstrap procedure](runbooks/kubernetes-bootstrap.md) | Bootstrap the private kubeadm cluster and collect the milestone 2 gate evidence. |
 | [Worker join failure](troubleshooting/01-worker-join-failure.md) | Diagnose a worker that cannot join or become Ready. This is a guide, not an incident report. |
 | [Billing budget apply errors](troubleshooting/02-billing-budget-apply-errors.md) | Record the historical budget errors and the decision to remove the alert. |
 | [Regional recovery](runbooks/regional-recovery.md) | Execute and measure a cold recovery drill after prerequisites are implemented. |

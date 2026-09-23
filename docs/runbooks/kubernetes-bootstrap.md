@@ -1,0 +1,207 @@
+# Kubernetes bootstrap: operator procedure
+
+Status: Implemented, not validated. The Milestone 2 gate is open. Run these steps to bootstrap the primary cluster and collect gate evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
+
+Run every command from the repository root on the external operator machine unless a step says otherwise. Both VMs stay private. Ansible reaches them only through IAP and OS Login.
+
+Do not commit or share the generated inventory, the generated `known_hosts` file, kubeconfigs, join tokens, Terraform plans, real project IDs, private addresses, or complete logs. When you report evidence, send the command, exit code, expected and observed results, and relevant excerpts with identifiers replaced.
+
+## Gate checks
+
+| Gate condition | Evidence step |
+| --- | --- |
+| Both nodes report `Ready` | [Bootstrap the cluster](#bootstrap-the-cluster) |
+| A disposable app schedules and is reachable | [Validate the disposable application](#validate-the-disposable-application) |
+| The worker rejoins after a restart | [Restart the worker](#restart-the-worker) |
+| A fresh rebuild follows the same steps | [Rebuild from fresh VMs](#rebuild-from-fresh-vms) |
+
+## Prepare the toolchain and inventory
+
+1. Install the pinned controller toolchain.
+
+   ```bash
+   python3 -m venv .venv
+   .venv/bin/pip install -r ansible/requirements.txt
+   ```
+
+   Expected: pip installs the exact versions in `ansible/requirements.txt` without errors.
+
+2. Confirm Terraform has no pending changes, then export the node identifiers into your shell.
+
+   ```bash
+   cd infra/primary
+   terraform plan -detailed-exitcode
+   export PROJECT_ID="$(terraform output -raw project_id)"
+   export PRIMARY_ZONE="$(terraform output -raw primary_zone)"
+   export CONTROL_PLANE_NAME="$(terraform output -json instance_names | python3 -c 'import json,sys; print(json.load(sys.stdin)["control-plane"])')"
+   export WORKER_NAME="$(terraform output -raw worker_name)"
+   export OS_LOGIN_USER="$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')"
+   ```
+
+   Expected: the plan exits `0` (no changes). All five variables are nonempty. If the plan exits `2`, resolve the drift before you continue.
+
+3. Confirm IAP and OS Login access to both nodes.
+
+   ```bash
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command=true
+   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command=true
+   cd ../..
+   ```
+
+   Expected: both commands exit `0`. The first connection also creates `~/.ssh/google_compute_engine` if it does not exist.
+
+4. Generate the inventory from Terraform outputs.
+
+   ```bash
+   python3 scripts/prepare_ansible_inventory.py --terraform-dir infra/primary --ssh-user "$OS_LOGIN_USER" --ssh-key "$HOME/.ssh/google_compute_engine" --output ansible/inventory/generated/hosts.json
+   git status --short ansible/inventory
+   ```
+
+   Expected: the script writes `ansible/inventory/generated/hosts.json`, and `git status` prints nothing for it. The file contains real node names and private addresses. It stays ignored by Git. Do not share it.
+
+## Pin the boot image
+
+Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the image family can resolve to a newer image and the rebuild is not the same build.
+
+1. Read the source image of both boot disks. These commands are read-only.
+
+   ```bash
+   export CONTROL_PLANE_DISK="$(gcloud compute instances describe "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --format='value(disks[0].source.basename())')"
+   export WORKER_DISK="$(gcloud compute instances describe "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --format='value(disks[0].source.basename())')"
+   export CONTROL_PLANE_IMAGE="$(gcloud compute disks describe "$CONTROL_PLANE_DISK" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --format='value(sourceImage)')"
+   export WORKER_IMAGE="$(gcloud compute disks describe "$WORKER_DISK" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --format='value(sourceImage)')"
+   test "$CONTROL_PLANE_IMAGE" = "$WORKER_IMAGE" && echo "$CONTROL_PLANE_IMAGE"
+   ```
+
+   Expected: the test passes and prints one image self-link, for example `https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-vYYYYMMDD`. If the images differ, stop and report both image names.
+
+2. Set `boot_image` in the ignored `infra/primary/terraform.tfvars` to the printed self-link, then plan.
+
+   ```bash
+   cd infra/primary
+   terraform plan -detailed-exitcode
+   cd ../..
+   ```
+
+   Expected: the plan exits `0`. The pin alone must not replace either VM. If the plan shows a replacement, revert the pin and report the planned change.
+
+## Bootstrap the cluster
+
+1. Run the bootstrap playbook through the IAP runner.
+
+   ```bash
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/bootstrap.yml
+   ```
+
+   Expected: the play recap shows `failed=0` and `unreachable=0` for both hosts. The runner closes both tunnels when Ansible exits.
+
+2. Run the same command a second time to prove the rerun is safe.
+
+   Expected: `failed=0` and `unreachable=0` again. kubeadm does not initialize or join again, and the worker disk is not formatted. Some add-on tasks, such as `kubectl apply` and `helm upgrade --install`, always report `changed`. That is expected and is not a failure.
+
+3. Collect node and system evidence.
+
+   ```bash
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
+   ```
+
+   Expected: `get nodes` lists both nodes as `Ready` with Kubernetes `v1.36.2`. The Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods are `Running`. The Gateway, HTTPRoute, and application tasks fail until you deploy the test application. Report the node table first.
+
+## Validate the disposable application
+
+1. Deploy the application and rerun validation.
+
+   ```bash
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/deploy_test_app.yml
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
+   ```
+
+   Expected: deployment ends with `failed=0`. Validation shows the PVC `Bound` with StorageClass `local-path`, a matching PV, the application pod `Running` on the worker, the Gateway `Programmed=True`, and the HTTPRoute `Accepted=True`.
+
+2. In a separate terminal, forward local port 18080 to the Traefik NodePort on the worker. Leave it running.
+
+   ```bash
+   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap -- -N -L 18080:127.0.0.1:30080
+   ```
+
+3. Request the application through Gateway API routing.
+
+   ```bash
+   curl --fail --header 'Host: milestone2.local' http://127.0.0.1:18080/
+   ```
+
+   Expected: the response body is `milestone2 persistent marker`. A request without the `Host` header returns `404`, which confirms that the route matches the hostname.
+
+   If `curl` reports a connection reset or refusal, kube-proxy may not serve NodePorts on the worker's loopback address. Restart the forward with the worker's private address in place of `127.0.0.1` (`-L 18080:WORKER_PRIVATE_IP:30080`) and report which form worked.
+
+4. Delete the application pod, wait for its replacement, and repeat step 3.
+
+   ```bash
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test delete pod -l app=milestone2-app --wait=true && sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test rollout status deployment/milestone2-app --timeout=180s'
+   ```
+
+   Expected: the rollout completes and `curl` returns the same marker. The replacement pod read the file that the first pod wrote to the persistent volume.
+
+## Restart the worker
+
+1. Reboot the worker, then wait for SSH to return.
+
+   ```bash
+   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='sudo systemctl reboot'
+   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='findmnt /var/lib/k8s-dr'
+   ```
+
+   Expected: the reboot command may exit nonzero when the connection drops. Retry the second command until it succeeds. It shows an `ext4` filesystem mounted at `/var/lib/k8s-dr`, restored from the UUID entry in `/etc/fstab`.
+
+2. Rerun validation, restart the port forward from the previous section, and repeat the `curl` check.
+
+   ```bash
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
+   curl --fail --header 'Host: milestone2.local' http://127.0.0.1:18080/
+   ```
+
+   Expected: the worker is `Ready` again without a new join, the PVC is still `Bound` to the same PV, and `curl` returns the same marker.
+
+3. Remove the disposable application.
+
+   ```bash
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/cleanup_test_app.yml
+   ```
+
+   Expected: `failed=0`. The namespace `milestone2-test` no longer exists, and the provisioner deletes the PV directory because the `local-path` reclaim policy is `Delete`.
+
+## Rebuild from fresh VMs
+
+This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, buckets, and state. The data disk has `prevent_destroy`, and the storage role reuses its existing `k8sdr-data` filesystem instead of formatting it.
+
+1. Confirm the image pin from [Pin the boot image](#pin-the-boot-image) is in place and that cleanup ran. Then save a replacement plan for exactly the two VMs.
+
+   ```bash
+   cd infra/primary
+   terraform plan -out=milestone2-rebuild.tfplan -replace='module.primary_cluster.google_compute_instance.node["control-plane"]' -replace='module.primary_cluster.google_compute_instance.node["worker"]'
+   terraform show milestone2-rebuild.tfplan
+   ```
+
+   Expected: the plan replaces the two `google_compute_instance.node` resources and the `google_compute_attached_disk.worker_data` attachment, which depends on the worker instance. It must not destroy `google_compute_disk.worker_data`, the network, subnet, firewall rules, router, NAT, service accounts, or buckets. If it does, do not apply. Report the plan summary line.
+
+2. Apply only the reviewed plan, then delete it.
+
+   ```bash
+   terraform apply milestone2-rebuild.tfplan
+   rm milestone2-rebuild.tfplan
+   cd ../..
+   ```
+
+   Expected: the apply completes, and the resource counts match the reviewed plan. The plan file contains sensitive data and is ignored by Git.
+
+3. Repeat these sections in order with no manual changes on the nodes:
+   1. [Prepare the toolchain and inventory](#prepare-the-toolchain-and-inventory), steps 2 to 4. The IAP runner scans new host keys on every run, so the replaced VMs need no `known_hosts` cleanup.
+   2. [Bootstrap the cluster](#bootstrap-the-cluster), all steps, including the second run.
+   3. [Validate the disposable application](#validate-the-disposable-application), steps 1 to 3.
+   4. Cleanup from [Restart the worker](#restart-the-worker), step 3.
+
+   Expected: every step gives the same result as the first build. Record any step that needed a manual action as a failure in the worklog.
+
+## Troubleshooting
+
+For join failures or a worker that stays `NotReady`, use the [worker join guide](../troubleshooting/01-worker-join-failure.md). Record the symptom, confirmed cause, fix, and verification in the [worklog](../worklogs/02-kubernetes-bootstrap.md). Label unconfirmed causes as hypotheses.

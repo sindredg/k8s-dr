@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: Pending. No cluster bootstrap or validation is recorded yet.
+Status: In progress. Automation is implemented and passes local checks. No live cluster validation is recorded yet.
 
 ## Scope
 
@@ -8,7 +8,21 @@ Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible. Initial
 
 ## Work completed
 
-None recorded.
+Implemented on 2026-09-23 on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../superpowers/plans/2026-09-23-kubernetes-bootstrap.md). None of it has run against the live VMs.
+
+| Area | Files | Summary |
+| --- | --- | --- |
+| Toolchain and CI | `ansible/requirements.txt`, `ansible.cfg`, `ansible/.yamllint.yml`, `.github/workflows/ansible.yml` | Pinned controller packages. CI runs unit tests, yamllint, ansible-lint, playbook syntax checks, and `terraform validate` without a backend. |
+| Inventory | `scripts/prepare_ansible_inventory.py`, `infra/primary/outputs.tf` | Builds an ignored JSON inventory from Terraform outputs and rejects malformed or overlapping network data. |
+| IAP access | `scripts/run_with_iap.py` | Opens one IAP tunnel per node, scans host keys into a private `known_hosts`, runs Ansible, and stops every tunnel on exit. |
+| Node preparation | `ansible/roles/node_prepare/`, `container_runtime/`, `kubernetes_packages/` | Configures Ubuntu, containerd with the systemd cgroup driver, and held Kubernetes 1.36.2 packages. |
+| Worker storage | `ansible/roles/worker_storage/` | Refuses the boot disk and unexpected filesystems, formats only a blank data disk, and mounts it by UUID. |
+| Cluster creation | `ansible/roles/control_plane/`, `worker_join/` | Initializes kubeadm once and joins the worker with a protected, unlogged join command. Partial state stops the run instead of resetting. |
+| Add-ons | `ansible/roles/cluster_addons/` | Installs Calico 3.32.2 with VXLAN, Gateway API 1.6.1 Standard CRDs, Traefik chart 41.6.0 on NodePort 30080, and Local Path Provisioner 0.0.36 restricted to the worker disk. |
+| Test application | `ansible/manifests/milestone2-app.yml`, `ansible/playbooks/deploy_test_app.yml`, `validate.yml`, `cleanup_test_app.yml` | Deploys a private nginx app with a PVC marker and an HTTPRoute for `milestone2.local`, collects read-only evidence, and removes the app. |
+| Procedure | `docs/runbooks/kubernetes-bootstrap.md` | Lists operator commands, expected results, and evidence for each gate condition. |
+
+Local checks: `python3 -m unittest discover -s tests`, yamllint with `ansible/.yamllint.yml`, `ansible-lint ansible`, and `--syntax-check` for all four playbooks pass. These checks are not gate evidence.
 
 ## Validation gate
 
