@@ -1,6 +1,6 @@
 # 0005: Kubernetes bootstrap architecture
 
-Status: Accepted. Implementation and validation are pending.
+Status: Accepted. Amended on 2026-09-23 for the ingress reachability check. Implementation and validation are pending.
 
 Date: 2026-09-23
 
@@ -109,9 +109,29 @@ The automation does not run `kubeadm reset`, delete Kubernetes state, or reforma
 
 ### Validate ingress privately
 
-Traefik uses the Gateway API provider and a fixed HTTP NodePort for the Milestone 2 test only. The disposable application includes a Deployment, ClusterIP Service, Gateway, and HTTPRoute. The operator opens an SSH local forward through the worker's existing IAP SSH path to the Traefik NodePort, then sends an HTTP request with the test hostname.
+Traefik uses the Gateway API provider and a fixed HTTP NodePort for the Milestone 2 test only. The disposable application includes a Deployment, ClusterIP Service, Gateway, and HTTPRoute. The validation playbook sends HTTP requests from the control plane to the worker's private address and the Traefik NodePort, with and without the test hostname. See the [amendment](#amendment-in-cluster-reachability-check).
 
-This path proves scheduling, pod networking, Service routing, Gateway API reconciliation, and Traefik without adding public ingress. It does not prove public DNS, TLS, or an internet-facing load balancer. Milestone 3 must design those resources before Gitea is exposed.
+This path proves scheduling, cross-node pod networking, NodePort handling, Service routing, Gateway API reconciliation, and Traefik without adding public ingress. It does not prove public DNS, TLS, or an internet-facing load balancer. Milestone 3 must design those resources before Gitea is exposed.
+
+### Amendment: in-cluster reachability check
+
+Date: 2026-09-23.
+
+**Problem:** the original design reached the application through an interactive `gcloud compute ssh --tunnel-through-iap -- -N -L` forward from the operator machine. On the first attempt, the SSH session ended with `Failed to send all data from [stdin]` and `client_loop: send disconnect: Broken pipe` (exit `255`). The cause is not confirmed. The same IAP and OS Login path works reliably through `scripts/run_with_iap.py`, which uses `gcloud compute start-iap-tunnel` with a local port instead of the standard-input proxy mode that `gcloud compute ssh` uses.
+
+**Decision:** `validate.yml` requests the application with `ansible.builtin.uri` from the control plane to `http://<worker private address>:30080/`. It expects `200` with the persistent marker when it sends `Host: milestone2.local`, and `404` without it.
+
+**Trade-offs:**
+
+| | Interactive SSH forward | In-cluster request (selected) |
+| --- | --- | --- |
+| Transport | `gcloud compute ssh` standard-input proxy, long-lived | The existing IAP runner, short-lived |
+| Repeatable in recovery drills | Manual, second terminal | Part of `validate.yml` |
+| Infrastructure change | None | None |
+| Proves access from the operator machine | Yes | No |
+| Tests cross-node networking | No, the request enters on the worker | Yes, the request leaves the control plane |
+
+The check no longer proves that the operator can open HTTP to the cluster from outside the VPC. Milestone 2 does not require that path, and Milestone 3 designs public exposure separately. If operator access is needed later, `gcloud compute start-iap-tunnel` to port 30080 is the fallback. It needs a firewall rule that allows the IAP range on that port.
 
 ## Data and credential flow
 
@@ -156,7 +176,7 @@ The operator procedure will provide commands, expected results, and evidence req
 2. Run the bootstrap playbook twice. The second run must make no unintended changes and must leave both nodes `Ready`.
 3. Confirm Calico, CoreDNS, Traefik, Gateway API resources, and Local Path Provisioner are healthy.
 4. Deploy the disposable application with a persistent-volume claim and constrain it to the worker.
-5. Reach it through an IAP-backed SSH local forward and the Traefik Gateway route.
+5. Reach it from the control plane through the worker's private address, the Traefik NodePort, and the Gateway route.
 6. Restart the worker through the operator-controlled GCP command, wait for `Ready`, and repeat the application and storage checks.
 7. Remove the disposable resources.
 8. Review a Terraform plan that replaces only the two VM boot disks and their attachment relationship while preserving the worker data disk, network, buckets, and state.

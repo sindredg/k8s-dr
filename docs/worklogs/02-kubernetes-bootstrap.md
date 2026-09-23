@@ -90,17 +90,25 @@ Do not mark this milestone complete until evidence shows that:
 - **Follow-up validation:** `validate.yml -v` listed `k8sdr-primary-control-plane` (`control-plane`) and `k8sdr-primary-worker` (`worker`), both `Ready` on `v1.36.2` with `containerd://2.2.1`. All pods in `calico-system`, `kube-system`, `tigera-operator`, `traefik`, and `local-path-storage` were `Running`. The run stopped at `Read Gateway conditions` (`failed=1`), which the runbook expects before the test application is deployed.
 - **Observed, not blocking:** `tigerastatus/tiers` reports `Degraded` with `Waiting for Tigera API server to be ready`. The `Installation` does not request the Calico API server, and `calico`, `ippools`, and every Calico pod are healthy. Hypothesis: this status is expected without an `APIServer` resource. It is not investigated further in this milestone.
 
+### Operator port forward dropped with a broken pipe
+
+- **Symptom:** In [Validate the disposable application](../runbooks/kubernetes-bootstrap.md#validate-the-disposable-application), step 2 of the earlier runbook, `gcloud compute ssh <worker> --tunnel-through-iap -- -N -L 18080:127.0.0.1:30080` exited `255` with `WARNING: [0] Failed to send all data from [stdin].` and `client_loop: send disconnect: Broken pipe`. The operator did not note whether it failed immediately or later.
+- **Cause (hypothesis, not confirmed):** the IAP WebSocket behind the `gcloud compute ssh` standard-input proxy closed. The same IAP and OS Login access works reliably through `scripts/run_with_iap.py`, which uses `gcloud compute start-iap-tunnel` with a local port. The failure is in the operator's SSH transport, not in the cluster, and says nothing about the application.
+- **Fix:** Replaced the interactive forward with two read-only requests in `validate.yml`. They go from the control plane to the worker's private address on NodePort 30080, and expect `200` with the marker when sending `Host: milestone2.local`, and `404` without it. The pod-replacement step now runs through the IAP runner instead of `gcloud compute ssh`. [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-in-cluster-reachability-check) records the change and its trade-off: the check no longer proves access from the operator machine.
+- **Verification:** Local unit tests, yamllint, ansible-lint, and syntax checks pass. Rendering the request URL against the generated inventory gives the worker's private address on port `30080`. The live validation run is pending.
+
 ## Resume here
 
-State on 2026-09-23: the primary cluster is bootstrapped and running. The test application is not deployed. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
+State on 2026-09-23: the primary cluster is bootstrapped and running. The operator reached the port-forward step, so the test application is probably deployed, but no deploy or validation output is recorded. Continue with the [runbook](../runbooks/kubernetes-bootstrap.md) in this order:
 
-1. [Validate the disposable application](../runbooks/kubernetes-bootstrap.md#validate-the-disposable-application): run `deploy_test_app.yml`, then `validate.yml -v`, then the port forward and `curl` checks, then the pod replacement check.
+1. [Validate the disposable application](../runbooks/kubernetes-bootstrap.md#validate-the-disposable-application): rerun `deploy_test_app.yml` (safe to repeat), then `validate.yml -v`, which now includes the reachability requests. Then run the pod replacement check.
 2. [Restart the worker](../runbooks/kubernetes-bootstrap.md#restart-the-worker).
 3. [Rebuild from fresh VMs](../runbooks/kubernetes-bootstrap.md#rebuild-from-fresh-vms). This is the first run that exercises the Calico DaemonSet wait against a real race.
 
 Known limitations to keep in mind:
 
 - `validate.yml` fails at `Read Gateway conditions` until the test application is deployed. This is expected, but a failed recap does not by itself mean the cluster is unhealthy. Splitting cluster and application checks is a possible follow-up.
+- The reachability check runs inside the VPC. HTTP access from the operator machine is not tested.
 - `tigerastatus/tiers` is `Degraded` (see the Calico entry above). Not investigated.
 - Ansible prints `INJECT_FACTS_AS_VARS` deprecation warnings for `ansible_*` facts in `node_prepare`. They do not affect results before ansible-core 2.24.
 

@@ -116,31 +116,21 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: deployment ends with `failed=0`. Validation shows the PVC `Bound` with StorageClass `local-path`, a matching PV, the application pod `Running` on the worker, the Gateway `Programmed=True`, and the HTTPRoute `Accepted=True`.
+   Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Validation shows the PVC `Bound` with StorageClass `local-path`, a matching PV, the application pod `Running` on the worker, the Gateway `Programmed=True`, and the HTTPRoute `Accepted=True`. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
 
-2. In a separate terminal, forward local port 18080 to the Traefik NodePort on the worker. Leave it running.
+   - `Request the application through the Gateway route` returns `200` with body `milestone2 persistent marker`.
+   - `Confirm the route rejects requests without the application host` returns `404`, which confirms that the route matches the hostname.
 
-   ```bash
-   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap -- -N -L 18080:127.0.0.1:30080
-   ```
+   These requests prove reachability inside the VPC. They do not test access from the operator machine. See [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-in-cluster-reachability-check).
 
-3. Request the application through Gateway API routing.
-
-   ```bash
-   curl --fail --header 'Host: milestone2.local' http://127.0.0.1:18080/
-   ```
-
-   Expected: the response body is `milestone2 persistent marker`. A request without the `Host` header returns `404`, which confirms that the route matches the hostname.
-
-   If `curl` reports a connection reset or refusal, kube-proxy may not serve NodePorts on the worker's loopback address. Restart the forward with the worker's private address in place of `127.0.0.1` (`-L 18080:WORKER_PRIVATE_IP:30080`) and report which form worked.
-
-4. Delete the application pod, wait for its replacement, and repeat step 3.
+2. Delete the application pod, wait for its replacement, and rerun validation.
 
    ```bash
-   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test delete pod -l app=milestone2-app --wait=true && sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test rollout status deployment/milestone2-app --timeout=180s'
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible control-plane -i ansible/inventory/generated/hosts.json --become -m ansible.builtin.shell -a 'kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test delete pod -l app=milestone2-app --wait=true && kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test rollout status deployment/milestone2-app --timeout=180s'
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: the rollout completes and `curl` returns the same marker. The replacement pod read the file that the first pod wrote to the persistent volume.
+   Expected: the rollout completes, the application pod has a new name, and validation ends with `failed=0` with the same marker. The replacement pod read the file that the first pod wrote to the persistent volume.
 
 ## Restart the worker
 
@@ -153,14 +143,13 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
 
    Expected: the reboot command may exit nonzero when the connection drops. Retry the second command until it succeeds. It shows an `ext4` filesystem mounted at `/var/lib/k8s-dr`, restored from the UUID entry in `/etc/fstab`.
 
-2. Rerun validation, restart the port forward from the previous section, and repeat the `curl` check.
+2. Rerun validation.
 
    ```bash
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
-   curl --fail --header 'Host: milestone2.local' http://127.0.0.1:18080/
    ```
 
-   Expected: the worker is `Ready` again without a new join, the PVC is still `Bound` to the same PV, and `curl` returns the same marker.
+   Expected: validation ends with `failed=0`. The worker is `Ready` again without a new join, the PVC is still `Bound` to the same PV, and the application request returns the same marker.
 
 3. Remove the disposable application.
 
@@ -197,7 +186,7 @@ This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, 
 3. Repeat these sections in order with no manual changes on the nodes:
    1. [Prepare the toolchain and inventory](#prepare-the-toolchain-and-inventory), steps 2 to 4. The IAP runner scans new host keys on every run, so the replaced VMs need no `known_hosts` cleanup.
    2. [Bootstrap the cluster](#bootstrap-the-cluster), all steps, including the second run.
-   3. [Validate the disposable application](#validate-the-disposable-application), steps 1 to 3.
+   3. [Validate the disposable application](#validate-the-disposable-application), step 1.
    4. Cleanup from [Restart the worker](#restart-the-worker), step 3.
 
    Expected: every step gives the same result as the first build. Record any step that needed a manual action as a failure in the worklog.
