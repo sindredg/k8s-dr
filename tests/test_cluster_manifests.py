@@ -77,10 +77,31 @@ class ClusterManifestTests(unittest.TestCase):
     def test_validation_playbook_contains_only_read_only_kubectl_commands(self):
         plays = yaml.safe_load(Path("ansible/playbooks/validate.yml").read_text())
         tasks = plays[0]["tasks"]
-        commands = [task["ansible.builtin.command"] for task in tasks]
+        commands = [
+            task["ansible.builtin.command"]
+            for task in tasks
+            if "ansible.builtin.command" in task
+        ]
         for command in commands:
             self.assertRegex(command, r"^kubectl .*\bget\b")
+        requests = [task["ansible.builtin.uri"] for task in tasks if "ansible.builtin.uri" in task]
+        self.assertEqual(len(commands) + len(requests), len(tasks))
+        self.assertTrue(all(request["method"] == "GET" for request in requests))
         self.assertTrue(all(task["changed_when"] is False for task in tasks))
+
+    def test_validation_reaches_the_app_over_the_private_node_port(self):
+        plays = yaml.safe_load(Path("ansible/playbooks/validate.yml").read_text())
+        requests = [
+            task["ansible.builtin.uri"]
+            for task in plays[0]["tasks"]
+            if "ansible.builtin.uri" in task
+        ]
+        self.assertEqual([request["status_code"] for request in requests], [200, 404])
+        for request in requests:
+            self.assertIn("node_internal_ip", request["url"])
+            self.assertIn("{{ traefik_http_node_port }}", request["url"])
+        self.assertEqual(requests[0]["headers"], {"Host": "milestone2.local"})
+        self.assertNotIn("headers", requests[1])
 
 
 if __name__ == "__main__":
