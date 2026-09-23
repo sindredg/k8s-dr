@@ -36,6 +36,21 @@ class ClusterManifestTests(unittest.TestCase):
         self.assertIn("node-role.kubernetes.io/worker", text)
         self.assertNotIn(":latest", text)
 
+    def test_calico_rollout_waits_for_operator_created_daemonset(self):
+        tasks = yaml.safe_load(
+            Path("ansible/roles/cluster_addons/tasks/main.yml").read_text()
+        )
+        names = [t["name"] for t in tasks]
+        create_wait = tasks[
+            names.index("Wait for the operator to create the Calico node DaemonSet")
+        ]
+        self.assertIn("get daemonset/calico-node", create_wait["ansible.builtin.command"])
+        self.assertIn("until", create_wait)
+        self.assertLess(
+            names.index("Wait for the operator to create the Calico node DaemonSet"),
+            names.index("Wait for Calico on every node"),
+        )
+
     def test_worker_label_targets_the_kubernetes_node_name(self):
         tasks = yaml.safe_load(
             Path("ansible/roles/cluster_addons/tasks/main.yml").read_text()

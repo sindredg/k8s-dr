@@ -49,6 +49,18 @@
     --namespace tigera-operator --timeout=300s
   changed_when: false
 
+# The operator creates calico-system and calico-node asynchronously after it
+# reconciles the Installation, so rollout status alone can race it.
+- name: Wait for the operator to create the Calico node DaemonSet
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    get daemonset/calico-node --namespace calico-system --output=name
+  register: cluster_addons_calico_node
+  changed_when: false
+  until: cluster_addons_calico_node.rc == 0
+  retries: 60
+  delay: 5
+
 - name: Wait for Calico on every node
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf
