@@ -13,13 +13,13 @@ output "project_id" {
   value       = var.project_id
 }
 
-output "primary_zone" {
-  description = "Zone containing the primary cluster nodes."
+output "zone" {
+  description = "Zone containing the cluster nodes."
   value       = var.primary_zone
 }
 
-output "primary_subnet_cidr" {
-  description = "IPv4 range assigned to the primary subnet."
+output "subnet_cidr" {
+  description = "IPv4 range assigned to the cluster subnet."
   value       = var.primary_subnet_cidr
 }
 
@@ -34,13 +34,8 @@ output "worker_name" {
 }
 
 output "worker_data_disk_name" {
-  description = "Dedicated worker disk to mount during milestone 2."
-  value       = module.primary_cluster.worker_data_disk_name
-}
-
-output "backup_bucket_name" {
-  description = "Offsite bucket for future verified application backup sets."
-  value       = google_storage_bucket.backups.name
+  description = "Dedicated worker data disk."
+  value       = google_compute_disk.worker_data.name
 }
 
 output "network_name" {

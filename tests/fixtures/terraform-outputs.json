@@ -15,12 +15,12 @@
       "worker": "10.10.0.3"
     }
   },
-  "primary_subnet_cidr": {
+  "subnet_cidr": {
     "sensitive": false,
     "type": "string",
     "value": "10.10.0.0/24"
   },
-  "primary_zone": {
+  "zone": {
     "sensitive": false,
     "type": "string",
     "value": "europe-north1-a"

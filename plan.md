@@ -39,6 +39,17 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 **Gate:** Nodes are Ready; a disposable app schedules and is reachable; the worker rejoins after a restart; a fresh rebuild follows the same steps.
 
+## Before milestone 3: recovery readiness
+
+These changes are easier before the worker disk holds service data. See the [preparation worklog](docs/worklogs/03-service-deployment.md#preparation).
+
+- [ ] Move the backup bucket and project IAM into a shared Terraform root, and the worker data disk out of the regional module.
+- [ ] Split cluster validation from test-app validation, and record playbook run times.
+- [ ] Check in CI that every pinned artifact still resolves upstream.
+- [ ] Decide the milestone 3 service architecture in a decision record.
+
+**Gate:** Both the shared and primary roots plan with no changes after the migration; IAP access still works; cluster-only validation passes; the pin check passes in CI; the milestone 3 decision record is accepted.
+
 ## 3. Service deployment
 
 - [ ] Bootstrap Flux from the external GitHub repository.

@@ -38,14 +38,16 @@ variable "boot_disk_size_gb" {
   type        = number
 }
 
-variable "worker_data_disk_size_gb" {
-  description = "Dedicated worker persistent disk size."
-  type        = number
+variable "worker_data_disk_id" {
+  description = "ID of the dedicated worker data disk in the cluster zone, owned by the calling root."
+  type        = string
 }
 
 variable "boot_image" {
-  description = "Ubuntu image family or pinned image self-link."
+  description = "Pinned Ubuntu 24.04 LTS image self-link. Images are global, so every region uses the same tested image."
   type        = string
+  default     = "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20260918"
+  nullable    = false
 }
 
 variable "labels" {

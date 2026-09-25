@@ -31,13 +31,13 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
    ```bash
    cd infra/primary
    export PROJECT_ID="$(terraform output -raw project_id)"
-   export PRIMARY_ZONE="$(terraform output -raw primary_zone)"
+   export PRIMARY_ZONE="$(terraform output -raw zone)"
    export CONTROL_PLANE_NAME="$(terraform output -json instance_names | python3 -c 'import json,sys; print(json.load(sys.stdin)["control-plane"])')"
    export WORKER_NAME="$(terraform output -raw worker_name)"
    export OS_LOGIN_USER="$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')"
    ```
 
-   Expected: all five variables are nonempty. The no-change Terraform plan comes after the exact boot image is pinned, because an image family may resolve to a newer image before that pin.
+   Expected: all five variables are nonempty.
 
 3. Confirm IAP and OS Login access to both nodes.
 
@@ -58,9 +58,9 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
 
    Expected: the script writes `ansible/inventory/generated/hosts.json`, and `git status` prints nothing for it. The file contains real node names and private addresses. It stays ignored by Git. Do not share it.
 
-## Pin the boot image
+## Confirm the boot image
 
-Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the image family can resolve to a newer image and the rebuild is not the same build.
+The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/regional_cluster/variables.tf`. Images are global, so the primary and recovery roots use the same image. Confirm the running VMs match the pin before any rebuild.
 
 1. Read the source image of both boot disks. These commands are read-only.
 
@@ -70,11 +70,12 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    export CONTROL_PLANE_IMAGE="$(gcloud compute disks describe "$CONTROL_PLANE_DISK" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --format='value(sourceImage)')"
    export WORKER_IMAGE="$(gcloud compute disks describe "$WORKER_DISK" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --format='value(sourceImage)')"
    test "$CONTROL_PLANE_IMAGE" = "$WORKER_IMAGE" && echo "$CONTROL_PLANE_IMAGE"
+   grep -A 4 'variable "boot_image"' infra/modules/regional_cluster/variables.tf
    ```
 
-   Expected: the test passes and prints one image self-link, for example `https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-vYYYYMMDD`. If the images differ, stop and report both image names.
+   Expected: the test passes and prints one image self-link that equals the tracked default. If the images differ from each other or from the default, stop and report the image names.
 
-2. Set `boot_image` in the ignored `infra/primary/terraform.tfvars` to the printed self-link, then plan.
+2. Plan the primary root.
 
    ```bash
    cd infra/primary
@@ -82,7 +83,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
    cd ../..
    ```
 
-   Expected: the plan exits `0`. The pin alone must not replace either VM. If the plan shows a replacement, revert the pin and report the planned change.
+   Expected: the plan exits `0`. Leave `boot_image` unset in the local `terraform.tfvars`. To adopt a newer image, change the tracked default in a reviewed PR and repeat the milestone 2 rebuild validation.
 
 ## Bootstrap the cluster
 
@@ -156,7 +157,7 @@ Pin the exact Ubuntu image the current VMs run before any rebuild. Otherwise the
 
 This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, buckets, and state. The data disk has `prevent_destroy`, and the storage role reuses its existing `k8sdr-data` filesystem instead of formatting it.
 
-1. Confirm the image pin from [Pin the boot image](#pin-the-boot-image) is in place and that cleanup ran. Then save a replacement plan for exactly the two VMs.
+1. Confirm the image from [Confirm the boot image](#confirm-the-boot-image) matches the tracked pin and that cleanup ran. Then save a replacement plan for exactly the two VMs.
 
    ```bash
    cd infra/primary
