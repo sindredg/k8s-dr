@@ -25,12 +25,14 @@ jobs:
           cache-dependency-path: ansible/requirements.txt
       - run: python -m pip install -r ansible/requirements.txt
       - run: python -m unittest discover -s tests -v
-      - run: yamllint -c ansible/.yamllint.yml ansible .github/workflows/ansible.yml
+      - run: yamllint -c ansible/.yamllint.yml ansible .github/workflows
       - run: ansible-lint ansible
       - run: ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/bootstrap.yml
       - run: ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/deploy_test_app.yml
       - run: ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/cleanup_test_app.yml
       - run: ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/validate.yml
+      - run: ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/validate_cluster.yml
+      - run: ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/validate_test_app.yml
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
         with:
           terraform_version: "1.15.8"

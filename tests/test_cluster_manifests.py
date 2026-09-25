@@ -98,26 +98,47 @@ class ClusterManifestTests(unittest.TestCase):
         self.assertIn('"paths": []', config)
         self.assertIn("{{ local_path_root }}", config)
 
-    def test_validation_playbook_contains_only_read_only_kubectl_commands(self):
+    VALIDATION_PLAYBOOKS = (
+        "ansible/playbooks/validate_cluster.yml",
+        "ansible/playbooks/validate_test_app.yml",
+    )
+
+    @staticmethod
+    def _tasks(path):
+        return yaml.safe_load(Path(path).read_text())[0]["tasks"]
+
+    def test_validation_playbooks_contain_only_read_only_checks(self):
+        for path in self.VALIDATION_PLAYBOOKS:
+            with self.subTest(playbook=path):
+                tasks = self._tasks(path)
+                commands = [
+                    task["ansible.builtin.command"]
+                    for task in tasks
+                    if "ansible.builtin.command" in task
+                ]
+                for command in commands:
+                    self.assertRegex(command, r"^kubectl .*\b(get|wait|rollout status)\b")
+                    self.assertNotRegex(command, r"\b(apply|delete|patch|label|annotate|scale)\b")
+                requests = [task["ansible.builtin.uri"] for task in tasks if "ansible.builtin.uri" in task]
+                self.assertEqual(len(commands) + len(requests), len(tasks))
+                self.assertTrue(all(request["method"] == "GET" for request in requests))
+                self.assertTrue(all(task["changed_when"] is False for task in tasks))
+
+    def test_full_validation_runs_cluster_checks_before_app_checks(self):
         plays = yaml.safe_load(Path("ansible/playbooks/validate.yml").read_text())
-        tasks = plays[0]["tasks"]
-        commands = [
-            task["ansible.builtin.command"]
-            for task in tasks
-            if "ansible.builtin.command" in task
-        ]
-        for command in commands:
-            self.assertRegex(command, r"^kubectl .*\b(get|wait|rollout status)\b")
-        requests = [task["ansible.builtin.uri"] for task in tasks if "ansible.builtin.uri" in task]
-        self.assertEqual(len(commands) + len(requests), len(tasks))
-        self.assertTrue(all(request["method"] == "GET" for request in requests))
-        self.assertTrue(all(task["changed_when"] is False for task in tasks))
+        self.assertEqual(
+            [play["ansible.builtin.import_playbook"] for play in plays],
+            ["validate_cluster.yml", "validate_test_app.yml"],
+        )
+
+    def test_cluster_validation_needs_no_test_application(self):
+        text = Path("ansible/playbooks/validate_cluster.yml").read_text()
+        self.assertNotIn("milestone2", text)
 
     def test_validation_reaches_the_app_over_the_private_node_port(self):
-        plays = yaml.safe_load(Path("ansible/playbooks/validate.yml").read_text())
         requests = [
             task["ansible.builtin.uri"]
-            for task in plays[0]["tasks"]
+            for task in self._tasks("ansible/playbooks/validate_test_app.yml")
             if "ansible.builtin.uri" in task
         ]
         self.assertEqual([request["status_code"] for request in requests], [200, 404])
@@ -127,14 +148,25 @@ class ClusterManifestTests(unittest.TestCase):
         self.assertEqual(requests[0]["headers"], {"Host": "milestone2.local"})
         self.assertNotIn("headers", requests[1])
 
+    def test_app_validation_asserts_gateway_route_and_volume_status(self):
+        tasks = self._tasks("ansible/playbooks/validate_test_app.yml")
+        by_name = {task["name"]: task for task in tasks}
+        self.assertIn(
+            "--for=condition=Programmed gateway/milestone2-gateway",
+            by_name["Wait for the Gateway to be programmed"]["ansible.builtin.command"],
+        )
+        route = by_name["Require the HTTPRoute to be accepted"]
+        self.assertIn('@.type=="Accepted"', route["ansible.builtin.command"])
+        self.assertEqual(route["until"], 'validate_route_accepted.stdout == "True"')
+        pvc = by_name["Require the application PVC to be bound"]
+        self.assertEqual(pvc["failed_when"], 'validate_pvc_phase.stdout != "Bound"')
+
     def test_validation_waits_for_workloads_after_worker_restart(self):
-        plays = yaml.safe_load(Path("ansible/playbooks/validate.yml").read_text())
-        tasks = plays[0]["tasks"]
+        tasks = self._tasks("ansible/playbooks/validate_cluster.yml")
         names = [task["name"] for task in tasks]
-        self.assertIn("Wait for both Kubernetes nodes to be Ready", names)
         wait = tasks[names.index("Wait for both Kubernetes nodes to be Ready")]
         self.assertIn("wait --for=condition=Ready nodes --all", wait["ansible.builtin.command"])
-        rollouts = tasks[names.index("Wait for worker workloads after restart")]
+        rollouts = tasks[names.index("Wait for cluster add-ons after restart")]
         self.assertIn("rollout status", rollouts["ansible.builtin.command"])
         self.assertEqual(
             {(item["namespace"], item["resource"]) for item in rollouts["loop"]},
@@ -143,10 +175,11 @@ class ClusterManifestTests(unittest.TestCase):
                 ("kube-system", "deployment/coredns"),
                 ("local-path-storage", "deployment/local-path-provisioner"),
                 ("traefik", "deployment/traefik"),
-                ("milestone2-test", "deployment/milestone2-app"),
             },
         )
-        self.assertLess(names.index("Wait for worker workloads after restart"), names.index("List system pods"))
+        self.assertLess(names.index("Wait for cluster add-ons after restart"), names.index("List system pods"))
+        app_tasks = self._tasks("ansible/playbooks/validate_test_app.yml")
+        self.assertEqual(app_tasks[0]["name"], "Wait for the test application after restart")
 
 
 if __name__ == "__main__":

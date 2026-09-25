@@ -1,0 +1,52 @@
+---
+# Cluster-only checks. They need no application, so recovery drills can run
+# them right after bootstrap.
+- name: Collect read-only cluster validation evidence
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Wait for both Kubernetes nodes to be Ready
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready nodes --all --timeout=300s
+      changed_when: false
+
+    - name: Wait for cluster add-ons after restart
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        rollout status {{ item.resource }}
+        --namespace {{ item.namespace }} --timeout=300s
+      loop:
+        - namespace: calico-system
+          resource: daemonset/calico-node
+        - namespace: kube-system
+          resource: deployment/coredns
+        - namespace: local-path-storage
+          resource: deployment/local-path-provisioner
+        - namespace: traefik
+          resource: deployment/traefik
+      changed_when: false
+
+    - name: Wait for the Traefik GatewayClass
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Accepted gatewayclass/traefik --timeout=180s
+      changed_when: false
+
+    - name: List cluster nodes
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes --output=wide
+      changed_when: false
+
+    - name: List system pods
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get pods --all-namespaces --output=wide
+      changed_when: false
+
+    - name: List cluster deployments
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get deployments --all-namespaces
+      changed_when: false

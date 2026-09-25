@@ -99,7 +99,15 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 
    Expected: `failed=0` and `unreachable=0` again. kubeadm does not initialize or join again, and the worker disk is not formatted. Some add-on tasks, such as `kubectl apply` and `helm upgrade --install`, always report `changed`. That is expected and is not a failure.
 
-3. Deploy the disposable application before running `validate.yml`. That playbook includes application resources and exits nonzero when the test namespace does not exist.
+3. Check the cluster without an application.
+
+   ```bash
+   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate_cluster.yml -v
+   ```
+
+   Expected: `failed=0`. Both nodes are `Ready`; the Calico, CoreDNS, Local Path Provisioner, and Traefik rollouts complete; and the `traefik` GatewayClass is `Accepted`. `validate.yml` runs this playbook and then `validate_test_app.yml`, which needs the disposable application.
+
+   The IAP runner prints a final line such as `run_with_iap: started 2026-09-25T08:00:00Z, finished 2026-09-25T08:07:30Z, elapsed 450s, exit 0` for every command. Include it in evidence for bootstrap runs; it is the baseline for recovery timing.
 
 ## Validate the disposable application
 
@@ -110,7 +118,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
    ```
 
-   Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Inspect its output: both nodes must be `Ready` on Kubernetes `v1.36.2`; the Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods must be `Running`; the PVC must be `Bound` with StorageClass `local-path`, with a matching PV; and the application pod must be `Running` on the worker. The Gateway must show `Programmed=True` and the HTTPRoute `Accepted=True`. The playbook lists these resources but does not assert their status. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
+   Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Inspect its output: both nodes must be `Ready` on Kubernetes `v1.36.2`; the Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods must be `Running`; the PVC must be `Bound` with StorageClass `local-path`, with a matching PV; and the application pod must be `Running` on the worker. The playbook fails unless the Gateway is `Programmed`, the HTTPRoute is `Accepted`, and the PVC is `Bound`. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
 
    - `Request the application through the Gateway route` returns `200` with body `milestone2 persistent marker`.
    - `Confirm the route rejects requests without the application host` returns `404`, which confirms that the route matches the hostname.
