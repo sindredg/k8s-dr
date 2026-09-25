@@ -43,10 +43,10 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 These changes are easier before the worker disk holds service data. See the [preparation worklog](docs/worklogs/03-service-deployment.md#preparation).
 
-- [ ] Move the backup bucket and project IAM into a shared Terraform root, and the worker data disk out of the regional module.
-- [ ] Split cluster validation from test-app validation, and record playbook run times.
-- [ ] Check in CI that every pinned artifact still resolves upstream.
-- [ ] Decide the milestone 3 service architecture in a decision record.
+- [x] Move the backup bucket and project IAM into a shared Terraform root, and the worker data disk out of the regional module.
+- [x] Split cluster validation from test-app validation, and record playbook run times.
+- [x] Check in CI that every pinned artifact still resolves upstream.
+- [x] Decide the milestone 3 service architecture in a decision record.
 
 **Gate:** Both the shared and primary roots plan with no changes after the migration; IAP access still works; cluster-only validation passes; the pin check passes in CI; the milestone 3 decision record is accepted.
 

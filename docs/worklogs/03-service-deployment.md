@@ -1,6 +1,6 @@
 # Milestone 3: Service deployment
 
-Status: Pending. Preparation is implemented and validated, except for the pin check in CI.
+Status: Pending. The preparation gate passed on 2026-09-25; milestone 3 implementation has not started.
 
 ## Scope
 
@@ -47,8 +47,9 @@ Local checks: `terraform fmt -check -recursive` and `terraform validate` pass fo
 | 2026-09-25 | `gcloud projects get-iam-policy` filtered to the administrator member, then `gcloud compute ssh <worker> --tunnel-through-iap --command=true` | The member still holds `roles/iap.tunnelResourceAccessor`, `roles/compute.osAdminLogin`, and `roles/compute.instanceAdmin.v1`. IAP SSH exited `0`. |
 | 2026-09-25 | `scripts/prepare_ansible_inventory.py --terraform-dir infra/primary`, then `validate_cluster.yml` through `scripts/run_with_iap.py` | Inventory generation from the renamed outputs exited `0`. Validation recap: control plane `ok=6 changed=0 unreachable=0 failed=0`; `elapsed 18s, exit 0`. |
 | 2026-09-25 | Deleted `infra/shared/migrations.tf` and `infra/primary/migrations.tf`, then `terraform plan -detailed-exitcode` in both roots | Both exited `0`. |
+| 2026-09-25 | GitHub Actions on PRs #7, #8, and #9 | `docs` and `validate` passed on all three. The `pins` job passed on #8 and #9. |
 
-The migration is complete. The remaining gate item is the pin check passing in CI, which runs when the branches are pushed.
+The preparation gate passed on 2026-09-25: both roots plan with no changes, IAP access works, cluster-only validation passes, the pin check passes in CI, and decision 0006 is accepted.
 
 ![Shared root apply: 6 imported, 0 added, 1 changed, 0 destroyed](../images/prep-shared-root-import-apply.png)
 
