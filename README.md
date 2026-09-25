@@ -25,8 +25,8 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | Tool | Responsibility |
 | --- | --- |
 | Terraform | VM, network, DNS, and backup infrastructure |
-| Ansible and kubeadm | VM configuration and Kubernetes bootstrap |
-| Flux and Helm | Deploy and reconcile cluster add-ons and Gitea from GitHub |
+| Ansible and kubeadm | VM configuration, Kubernetes bootstrap, and the add-ons Flux depends on |
+| Flux and Helm | Deploy and reconcile the application layer from GitHub: cert-manager, PostgreSQL, and Gitea |
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
 | Offsite object storage | Application backups and recovery artifacts |
 | External health probe | Measure outage and restored service |
@@ -38,5 +38,7 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 3. Provision recovery VMs, bootstrap Kubernetes, and reconcile deployment configuration from GitHub.
 4. Restore a verified, consistent application backup and route traffic to the recovered service.
 5. Confirm login, the commit and issue, and a new push. Record actual RTO, RPO, manual steps, and cost.
+
+The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds.
 
 See [plan.md](plan.md) for milestones and validation gates, and [docs](docs/README.md) for worklogs, decisions, troubleshooting, and the recovery runbook. The project does not depend on Gitea to store its own recovery configuration.

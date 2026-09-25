@@ -6,6 +6,8 @@ Status: Accepted as the design choice in the [project overview](../../README.md)
 
 This lab measures recovery of a self-managed Kubernetes service after losing a region. The cluster must be rebuilt on fresh VMs using the same documented steps in the primary and recovery regions. The separate [k8-lab](https://github.com/sindredg/k8-lab) already covers managed GKE, so this project focuses on operating the Kubernetes control plane.
 
+Self-managed Kubernetes on VMs also models organizations that must control the operating system layer, for example to meet regulatory requirements for host hardening, patching, audit, or data handling that a managed service does not expose. In that setting, managed Kubernetes is not an option, and regional recovery must work with self-operated nodes. See [production readiness](../production-readiness.md) for what this lab leaves out.
+
 ## Decision
 
 Use kubeadm to initialize the control plane and join workers. Use Ansible to configure hosts and run the repeatable bootstrap steps. Keep the cluster configuration in the external source repository so recovery does not depend on the primary cluster or Gitea.
