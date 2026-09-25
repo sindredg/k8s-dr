@@ -21,7 +21,7 @@ The [pre-milestone 3 steps](../../plan.md#before-milestone-3-recovery-readiness)
 | Split validation | `ansible/playbooks/validate_cluster.yml`, `validate_test_app.yml`, `validate.yml` | Cluster checks run without an application, so a recovery drill can use them right after bootstrap. `validate.yml` imports both, so existing commands still work. The app checks now fail unless the Gateway is `Programmed`, the HTTPRoute is `Accepted`, and the PVC is `Bound`; milestone 2 only listed them. |
 | Run timing | `scripts/run_with_iap.py` | Prints UTC start and finish times, elapsed seconds, and the exit code after each command. No new dependency. Per-task timing through the `ansible.posix.profile_tasks` callback would add a Galaxy collection download to the recovery path, so it is deferred until milestone 7 needs task-level bottlenecks. |
 | Pin check | `scripts/check_pins.py`, `.github/workflows/pins.yml` | Confirms every pinned artifact in `group_vars/all.yml` still resolves: the Kubernetes package revision, the containerd build, the Traefik chart, and the Calico, Gateway API, Local Path, and Helm files. Runs on pull requests, on `main`, and weekly. A unit test fails when a new version pin is not checked. |
-| Service architecture | `docs/decisions/0006-service-deployment-architecture.md`, `docs/production-readiness.md`, `docs/decisions/0001-use-kubeadm.md` | Proposed decisions for Flux, the Ansible and Flux ownership boundary, SOPS secrets, PostgreSQL, Gitea, public exposure, and network policies. Records the regulatory VM rationale and the production gap. Awaits operator decisions. |
+| Service architecture | `docs/decisions/0006-service-deployment-architecture.md`, `docs/production-readiness.md`, `docs/decisions/0001-use-kubeadm.md` | Decisions for Flux, the Ansible and Flux ownership boundary, SOPS secrets, PostgreSQL 18, Gitea, public exposure through a passthrough load balancer (option A), and network policies. Accepted on 2026-09-25. Records the regulatory VM rationale and the production gap. |
 
 Local checks: `terraform fmt -check -recursive` and `terraform validate` pass for the bootstrap, shared, and primary roots. `python3 -m unittest discover -s tests`, yamllint, ansible-lint, and syntax checks for all six playbooks pass. These checks are not gate evidence.
 
@@ -34,4 +34,11 @@ Local checks: `terraform fmt -check -recursive` and `terraform validate` pass fo
 
 ### Validation record
 
-No results recorded yet. Run the [shared-root migration](../runbooks/terraform-shared-root-migration.md).
+| Date | Check and command | Result and sanitized evidence |
+| --- | --- | --- |
+| 2026-09-25 | `terraform plan` in `infra/primary` on the refactor branch, against remote state | `Plan: 0 to add, 0 to change, 0 to destroy.` `module.primary_cluster.google_compute_disk.worker_data` moved to `google_compute_disk.worker_data`. The backup bucket, its two IAM members, and three project IAM members "will no longer be managed by Terraform, but will not be destroyed". The tracked boot image caused no VM change. |
+| 2026-09-25 | `terraform init -backend-config=backend.hcl` and `terraform plan` in `infra/shared`, against remote state with prefix `shared` | `Plan: 6 to import, 0 to add, 1 to change, 0 to destroy.` Imports: the backup bucket, its two IAM members, and the three `google_project_iam_member.admin` grants. The change sets the bucket label `environment` from `primary` to `shared`. The local `terraform.tfvars` and `backend.hcl` are ignored by Git. |
+| 2026-09-25 | `python3 scripts/check_pins.py` | Exited `0`. All nine checks passed, including Kubernetes `1.36.2-2.1`, containerd `2.2.1-0ubuntu1~24.04.3` in `noble-updates`, and Traefik chart `41.6.0`. |
+| 2026-09-25 | `scripts/run_with_iap.py ... validate_cluster.yml -v` | Passed. Recap: control plane `ok=6 changed=0 unreachable=0 failed=0`. `run_with_iap: started 2026-09-25T20:16:12Z, finished 2026-09-25T20:16:53Z, elapsed 41s, exit 0`. Both nodes `Ready` on `v1.36.2`, Ubuntu 24.04.5 LTS; all 17 pods `Running`; the `traefik` GatewayClass `Accepted`. The cluster check ran without the test application. |
+
+The migration applies are pending. Gate items still open: both roots converge after the applies, IAP access still works, and the pin check passes in CI.

@@ -1,6 +1,6 @@
 # 0006: Service deployment architecture
 
-Status: Proposed. Needs operator decisions on the [open questions](#open-questions) before milestone 3 implementation starts.
+Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Not yet implemented.
 
 Date: 2026-09-25
 
@@ -52,7 +52,7 @@ Secrets in scope: the Gitea administrator password, the PostgreSQL password, and
 
 Gitea chart 12.7.0 still depends on Bitnami `postgresql`, `postgresql-ha`, `valkey`, and `valkey-cluster` subcharts. Bitnami stopped publishing free versioned images in 2025, so those dependencies are not a stable base. Disable all four.
 
-Run PostgreSQL as a single-replica StatefulSet from the official `postgres` image, pinned by tag and digest, with a `local-path` volume on the worker disk. Configure Gitea to use memory cache and database-backed sessions and queues, which fit one Gitea replica.
+Run PostgreSQL 18 as a single-replica StatefulSet from the official `postgres` image, pinned by tag and digest, with a `local-path` volume on the worker disk. Configure Gitea to use memory cache and database-backed sessions and queues, which fit one Gitea replica.
 
 | Option | Trade-off |
 | --- | --- |
@@ -65,13 +65,13 @@ Run PostgreSQL as a single-replica StatefulSet from the official `postgres` imag
 
 Deploy the [Gitea chart](https://gitea.com/gitea/helm-gitea) through a Flux `HelmRelease` pinned to 12.7.0 (Gitea 1.27.0). Use one replica, a `Recreate` strategy for the `ReadWriteOnce` volume, disabled registration, and HTTPS Git only. Git over SSH would need another public TCP port and is out of scope.
 
-### Expose Gitea through a passthrough load balancer, subject to decision
+### Expose Gitea through a passthrough load balancer
 
-This needs an operator decision. The recommendation is option A.
+Option A is selected. TLS terminates inside infrastructure the operator controls, which fits the regulatory model, and cutover stays the DNS change that decision 0002 measures.
 
-**A. Regional external passthrough network load balancer (recommended).** Terraform in the regional module adds a static external address, a passthrough load balancer to the worker, and firewall rules for 80 and 443 plus the Google health-check ranges. The VMs keep no external addresses. A passthrough load balancer cannot remap ports, so Traefik binds host ports 80 and 443 on the worker, and its NodePort 30080 stays for the private validation. cert-manager issues Let's Encrypt certificates with the DNS-01 challenge through a Cloudflare API token scoped to DNS edits for the zone. Cloudflare DNS records stay DNS-only, with a 60-second TTL.
+**A. Regional external passthrough network load balancer (selected).** Terraform in the regional module adds a static external address, a passthrough load balancer to the worker, and firewall rules for 80 and 443 plus the Google health-check ranges. The VMs keep no external addresses. A passthrough load balancer cannot remap ports, so Traefik binds host ports 80 and 443 on the worker, and its NodePort 30080 stays for the private validation. cert-manager issues Let's Encrypt certificates with the DNS-01 challenge through a Cloudflare API token scoped to DNS edits for the zone. Cloudflare DNS records stay DNS-only, with a 60-second TTL.
 
-**B. Cloudflare Tunnel.** A `cloudflared` Deployment connects outbound, so there is no public address, load balancer, or inbound firewall rule, and no load balancer charge. Cloudflare terminates TLS and can read the traffic. Cutover becomes a change in Cloudflare's tunnel routing, not the DNS record that [decision 0002](0002-recovery-contract.md) measures. Two connectors that share one tunnel can serve traffic at the same time, so failover needs a fencing step.
+**B. Cloudflare Tunnel (not selected).** A `cloudflared` Deployment connects outbound, so there is no public address, load balancer, or inbound firewall rule, and no load balancer charge. Cloudflare terminates TLS and can read the traffic. Cutover becomes a change in Cloudflare's tunnel routing, not the DNS record that [decision 0002](0002-recovery-contract.md) measures. Two connectors that share one tunnel can serve traffic at the same time, so failover needs a fencing step.
 
 | | A. Passthrough load balancer | B. Cloudflare Tunnel |
 | --- | --- | --- |
@@ -105,7 +105,7 @@ flowchart TD
     KC --> CM["cert-manager"]
     KC --> PG["PostgreSQL StatefulSet"]
     KC --> GT["Gitea HelmRelease"]
-    U["Users"] --> LB["Load balancer or tunnel (open question)"]
+    U["Users"] --> LB["Passthrough load balancer"]
     LB --> T["Traefik on the worker"]
     T --> GT
     GT --> PG
@@ -120,10 +120,20 @@ The repository gains a `deploy/` tree: shared manifests in `deploy/base/` and on
 - Recovery credentials grow by the age private key and the Cloudflare token (or tunnel token). Both must be in the external credential store before the first drill.
 - Flux, cert-manager, the Gitea chart, and the PostgreSQL image become pins, so `scripts/check_pins.py` must check them.
 - Option A adds Terraform resources to the regional module and a recurring cost for as long as the primary runs.
-- Hourly backups in milestone 4 must capture PostgreSQL and the Gitea volume from one point in time. This decision does not settle how; see [open questions](#open-questions).
+- Recovery credentials include the Cloudflare DNS token for certificate issuance.
+- Hourly backups in milestone 4 must capture PostgreSQL and the Gitea volume from one point in time. This decision does not settle how; see [deferred to milestone 4](#deferred-to-milestone-4).
 
-## Open questions
+## Resolved questions
 
-1. **Public exposure:** option A or B? The recommendation is A.
-2. **PostgreSQL major version:** 18, the current major, unless you need to match an existing version.
-3. **Milestone 4, recorded here so it is not lost:** how to pause writes for a consistent backup (scale Gitea to zero, or dump and reconcile with `gitea doctor`); a separate backup prefix per cluster, with a rule that stops a returning primary from uploading backups after failover; and whether the job that writes backups gets create-only access.
+| Question | Decision |
+| --- | --- |
+| Public exposure | Option A, a regional external passthrough network load balancer with cert-manager and DNS-01 |
+| PostgreSQL major version | 18 |
+
+## Deferred to milestone 4
+
+Recorded here so they are not lost:
+
+- How to pause writes for a consistent backup: scale Gitea to zero, or dump and reconcile with `gitea doctor`.
+- A separate backup prefix per cluster, and a rule that stops a returning primary from uploading backups after failover.
+- Whether the job that writes backups gets create-only access.

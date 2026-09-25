@@ -25,8 +25,8 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | Tool | Responsibility |
 | --- | --- |
 | Terraform | VM, network, DNS, and backup infrastructure |
-| Ansible and kubeadm | VM configuration and Kubernetes bootstrap |
-| Flux and Helm | Deploy and reconcile cluster add-ons and Gitea from GitHub |
+| Ansible and kubeadm | VM configuration, Kubernetes bootstrap, and the add-ons Flux depends on |
+| Flux and Helm | Deploy and reconcile the application layer from GitHub: cert-manager, PostgreSQL, and Gitea |
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
 | Offsite object storage | Application backups and recovery artifacts |
 | External health probe | Measure outage and restored service |
