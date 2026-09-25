@@ -40,12 +40,12 @@ class PrepareAnsibleInventoryTests(unittest.TestCase):
         )
 
     def test_rejects_missing_output(self):
-        del self.outputs["primary_zone"]
-        with self.assertRaisesRegex(ValueError, "primary_zone"):
+        del self.outputs["zone"]
+        with self.assertRaisesRegex(ValueError, "zone"):
             module.build_inventory(self.outputs, "user_example", "/tmp/key")
 
     def test_rejects_overlapping_pod_and_vpc_networks(self):
-        self.outputs["primary_subnet_cidr"]["value"] = "192.168.1.0/24"
+        self.outputs["subnet_cidr"]["value"] = "192.168.1.0/24"
         with self.assertRaisesRegex(ValueError, "overlap"):
             module.build_inventory(self.outputs, "user_example", "/tmp/key")
 
@@ -56,8 +56,8 @@ class PrepareAnsibleInventoryTests(unittest.TestCase):
         self.assertEqual(self.output_path.parent.stat().st_mode & 0o777, 0o700)
 
     def test_rejects_malformed_subnet_cidr(self):
-        self.outputs["primary_subnet_cidr"]["value"] = "not-a-cidr"
-        with self.assertRaisesRegex(ValueError, "primary_subnet_cidr"):
+        self.outputs["subnet_cidr"]["value"] = "not-a-cidr"
+        with self.assertRaisesRegex(ValueError, "subnet_cidr"):
             module.build_inventory(self.outputs, "user_example", "/tmp/key")
 
     def test_rejects_missing_worker_name(self):
@@ -119,6 +119,19 @@ class PrepareAnsibleInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(OSError, "replace failed"):
             module.write_inventory(self.output_path, inventory)
         self.assertFalse(self.output_path.exists())
+
+
+class TerraformOutputContractTests(unittest.TestCase):
+    # Every regional root must expose the same outputs so one inventory
+    # script serves the primary and recovery clusters.
+    REGIONAL_ROOTS = ("infra/primary",)
+
+    def test_regional_roots_declare_every_required_output(self):
+        for root in self.REGIONAL_ROOTS:
+            declared = Path(root, "outputs.tf").read_text()
+            for name in module.REQUIRED_OUTPUTS:
+                with self.subTest(root=root, output=name):
+                    self.assertIn(f'output "{name}"', declared)
 
 
 if __name__ == "__main__":

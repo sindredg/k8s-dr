@@ -1,12 +1,12 @@
 # Primary infrastructure: operator procedure
 
-Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root; an existing deployment moves to it once with the [shared-root migration](terraform-shared-root-migration.md). Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 
 Use an existing GCP project linked to a billing account. Choose globally unique names for the state and backup buckets. Choose an unused private subnet range and a Finland zone. Keep the state operator, backup operator, and recovery reader identities available through an external identity provider or credential store, independent of the primary VMs. Separate these identities where possible.
 
-The operator needs permissions to enable APIs, create Compute Engine and Storage resources, and manage project IAM and service accounts. The state operator needs object read and write access to the state bucket. The cluster administrator needs IAP tunnel, OS Login, instance administration, and service account user access; Terraform grants these to `admin_member`. If an organization policy prevents any of these grants, resolve it before apply.
+The operator needs permissions to enable APIs, create Compute Engine and Storage resources, and manage project IAM and service accounts. The state operator needs object read and write access to the state bucket. The cluster administrator needs IAP tunnel, OS Login, instance administration, and service account user access; The shared root grants the project roles and the primary root grants service account use to `admin_member`. If an organization policy prevents any of these grants, resolve it before apply.
 
 Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/best-practices/security). A Terraform `sensitive` marker only hides selected CLI display; it does not remove values from state. This configuration creates no keys or passwords, but state still exposes resource metadata and private addresses. Treat plans and all state generations as sensitive.
 
@@ -63,9 +63,27 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
    Expected: Terraform offers to copy the existing state, lists the bucket and IAM resources from the GCS backend, and GCS lists the backend state object. Retain the encrypted offsite copy. Remove the unencrypted local state, any local state backups, and the saved plan only after confirming migration; check their exact paths first. Do not destroy the state bucket or its bootstrap root.
 
+## Apply the shared root
+
+5. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, and the project-level administrator grants that every region uses.
+
+   ```bash
+   cd ../shared
+   umask 077
+   if [ ! -e terraform.tfvars ]; then cp terraform.tfvars.example terraform.tfvars; fi
+   if [ ! -e backend.hcl ]; then cp backend.hcl.example backend.hcl; fi
+   chmod 600 terraform.tfvars backend.hcl
+   # Edit both files and replace every placeholder.
+   terraform init -backend-config=backend.hcl
+   terraform plan -out=shared.tfplan
+   terraform apply shared.tfplan
+   ```
+
+   Expected for an initial apply: the plan contains one Belgium backup bucket, two bucket IAM members, and three project IAM members. Inspect bucket names and IAM members before apply.
+
 ## Apply the primary root
 
-5. Fill in the local primary variables and backend configuration. If these local files already exist, keep them and remove any old `billing_account_id`, `budget_currency_code`, and `budget_amount` entries from `terraform.tfvars`. Do not copy examples over existing local values.
+6. Fill in the local primary variables and backend configuration. If these local files already exist, keep them and remove any old `billing_account_id`, `budget_currency_code`, and `budget_amount` entries from `terraform.tfvars`. Do not copy examples over existing local values.
 
    ```bash
    cd ../primary
@@ -79,26 +97,26 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
    terraform apply primary.tfplan
    ```
 
-   Expected for an initial apply: the plan contains one Finland VPC and subnet, one NAT, two private VMs, one attached worker data disk, one Belgium backup bucket, and IAM grants. It contains no budget, Belgium VMs, or public VM addresses. Inspect the plan before apply, especially bucket names, IAM members, and disk replacement actions.
+   Expected for an initial apply: the plan contains one Finland VPC and subnet, one NAT, two private VMs, one attached worker data disk, and two service account IAM grants. It contains no budget, Belgium VMs, or public VM addresses. Inspect the plan before apply, especially IAM members and disk replacement actions.
 
    If an earlier apply partially succeeded, make a fresh plan before applying again. After removing the budget configuration, expect no infrastructure changes if the other resources were created. If a budget was created, Terraform may propose deleting that budget. Do not apply if it proposes VM, disk, network, or bucket replacement. Review the plan before `terraform apply primary.tfplan`; skip apply if there are no changes.
 
 ## Check the milestone 1 gate
 
-6. Confirm state convergence and resource placement. Do not publish unredacted output.
+7. Confirm state convergence and resource placement. Do not publish unredacted output.
 
    ```bash
    terraform plan -detailed-exitcode
    terraform output instance_names
    terraform output internal_ips
-   terraform output backup_bucket_name
+   terraform -chdir=../shared output backup_bucket_name
    gcloud compute instances list --project="$PROJECT_ID" --filter='labels.environment=primary' --format='table(name,zone,status,networkInterfaces[0].networkIP,networkInterfaces[0].accessConfigs[0].natIP)'
    gcloud compute disks describe "$(terraform output -raw worker_data_disk_name)" --project="$PROJECT_ID" --zone='REPLACE_WITH_THE_PRIMARY_ZONE' --format='yaml(name,zone,sizeGb,users)'
    ```
 
    Expected: plan exits `0` with no changes; two running VMs appear in Finland with private addresses and an empty external address column. The worker disk reports one attached user, the worker VM. Exit `2` means drift or a pending change; exit `1` means an error. A successful apply followed by a no-change plan is the reproducibility evidence for this initial build. Do not mark a clean rebuild proven until it is actually performed.
 
-7. Confirm IAP administration, private node traffic, and outbound access. Run from `infra/primary` with the same operator identity. A failed SSH command may indicate IAM propagation, OS Login, firewall, or VM boot issues.
+8. Confirm IAP administration, private node traffic, and outbound access. Run from `infra/primary` with the same operator identity. A failed SSH command may indicate IAM propagation, OS Login, firewall, or VM boot issues.
 
    ```bash
    export PRIMARY_ZONE='REPLACE_WITH_THE_PRIMARY_ZONE'
@@ -110,12 +128,12 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
    Expected: IAP SSH succeeds without a public VM address, ping receives responses from the control plane, and the HTTPS request returns headers through outbound access. The data disk is attached but intentionally unformatted and unmounted until milestone 2.
 
-8. Confirm independent access to state, backup storage, and recovery credentials from this operator machine, not from a primary VM. Run the first commands as the infrastructure operator, who must also be able to access state. In a separate shell authenticated as a member of `recovery_reader_member`, run the final backup listing. Do not upload test data to the backup bucket. If you need conclusive evidence during a Finland outage, repeat these read-only checks while the primary VMs are stopped, then start them again.
+9. Confirm independent access to state, backup storage, and recovery credentials from this operator machine, not from a primary VM. Run the first commands as the infrastructure operator, who must also be able to access state. In a separate shell authenticated as a member of `recovery_reader_member`, run the final backup listing. Do not upload test data to the backup bucket. If you need conclusive evidence during a Finland outage, repeat these read-only checks while the primary VMs are stopped, then start them again.
 
    ```bash
    terraform state list
    gcloud storage buckets describe gs://REPLACE_WITH_STATE_BUCKET --project="$PROJECT_ID"
-   gcloud storage buckets describe "gs://$(terraform output -raw backup_bucket_name)" --project="$PROJECT_ID"
+   gcloud storage buckets describe "gs://$(terraform -chdir=../shared output -raw backup_bucket_name)" --project="$PROJECT_ID"
    gcloud storage ls "gs://REPLACE_WITH_STATE_BUCKET/primary/"
    # In a separate shell: authenticate as the recovery reader identity.
    gcloud auth login
@@ -124,7 +142,7 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
    Expected: state resources list through GCS, both Belgium buckets respond, and the configured recovery reader identity can authenticate without using either primary VM. An empty backup bucket is expected. It cannot prove restore readiness; milestone 4 supplies backups and a restore test. Do not record this gate as passed until you send sanitized evidence for all three checks.
 
-9. Review this project's charges and remaining credits in Cloud Billing. No Terraform-managed alert or automatic spend cap exists. Repeat this review while the lab is running.
+10. Review this project's charges and remaining credits in Cloud Billing. No Terraform-managed alert or automatic spend cap exists. Repeat this review while the lab is running.
 
 If a check fails, send the failing command, its exit code, the relevant error text with IDs and addresses redacted, the expected and observed result, and the sanitized `terraform plan` resource summary. Do not send `terraform.tfstate`, plan files, credentials, kubeconfigs, or full IAM policy output. Validation results belong in the [milestone 1 worklog](../worklogs/01-primary-infrastructure.md) only after they are observed.
 
@@ -145,4 +163,4 @@ The calculator may show NAT and egress outside the Compute Engine section. Inclu
 
 ## Future Belgium cluster
 
-Milestone 5 can instantiate `infra/modules/regional_cluster` from a separate recovery root and GCS state prefix. Pass a Belgium region and zone, a new VPC name prefix, and a non-overlapping CIDR. The module creates its own VPC, NAT, service accounts, VMs, and worker disk; it consumes no Finland VM, network, or state outputs. Retrieve verified application backups from the Belgium bucket using the independently stored recovery identity. No recovery VMs are defined in milestone 1.
+Milestone 5 can instantiate `infra/modules/regional_cluster` from a separate recovery root and GCS state prefix. Pass a Belgium region and zone, a new VPC name prefix, and a non-overlapping CIDR. The recovery root creates its own worker data disk and can leave it unprotected so a drill can be destroyed. The module creates the VPC, NAT, service accounts, and VMs. The recovery root consumes no Finland VM, network, or state outputs, and it must expose the same outputs as `infra/primary` so the inventory script works unchanged. The project-level administrator grants and the backup bucket stay in `infra/shared`. Retrieve verified application backups from the Belgium bucket using the independently stored recovery identity. No recovery VMs are defined in milestone 1.

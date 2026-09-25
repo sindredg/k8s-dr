@@ -129,22 +129,11 @@ resource "google_compute_instance" "node" {
   depends_on = [google_compute_router_nat.outbound]
 }
 
-resource "google_compute_disk" "worker_data" {
-  project = var.project_id
-  name    = "${var.name_prefix}-worker-data"
-  zone    = var.zone
-  type    = "pd-balanced"
-  size    = var.worker_data_disk_size_gb
-  labels  = var.labels
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
+# The calling root owns the data disk so it can decide whether the disk is
+# protected from destroy. A lifecycle setting cannot come from a variable.
 resource "google_compute_attached_disk" "worker_data" {
   project     = var.project_id
-  disk        = google_compute_disk.worker_data.id
+  disk        = var.worker_data_disk_id
   instance    = google_compute_instance.node["worker"].id
   device_name = "worker-data"
 }

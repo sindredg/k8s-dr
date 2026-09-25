@@ -38,5 +38,7 @@ jobs:
       - run: terraform fmt -check -recursive
       - run: terraform -chdir=infra/bootstrap init -backend=false -input=false
       - run: terraform -chdir=infra/bootstrap validate -no-color
+      - run: terraform -chdir=infra/shared init -backend=false -input=false
+      - run: terraform -chdir=infra/shared validate -no-color
       - run: terraform -chdir=infra/primary init -backend=false -input=false
       - run: terraform -chdir=infra/primary validate -no-color

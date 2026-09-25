@@ -11,6 +11,7 @@ infra/bootstrap/backend.tf
 crash.log
 crash.*.log
 *.tfvars
+*.tfvars.*
 *.auto.tfvars
 !*.tfvars.example
 !*.auto.tfvars.example

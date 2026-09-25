@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "Existing project for the cluster and backup bucket."
+  description = "Existing project for the primary cluster."
   type        = string
 }
 
@@ -53,38 +53,12 @@ variable "worker_data_disk_size_gb" {
 }
 
 variable "boot_image" {
-  description = "Ubuntu LTS image family; pin an image for exact rebuilds."
+  description = "Optional image self-link override. Null uses the tested image pinned in the regional cluster module."
   type        = string
-  default     = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
-}
-
-variable "backup_bucket_name" {
-  description = "Globally unique offsite application backup bucket name."
-  type        = string
-}
-
-variable "backup_bucket_location" {
-  description = "Backup bucket location outside Finland."
-  type        = string
-  default     = "europe-west1"
-
-  validation {
-    condition     = var.backup_bucket_location != "europe-north1"
-    error_message = "Backups must be stored outside the Finland primary region."
-  }
-}
-
-variable "backup_operator_member" {
-  description = "IAM member allowed to manage backup objects. Keep independent of the state operator."
-  type        = string
-}
-
-variable "recovery_reader_member" {
-  description = "IAM member able to read backups during recovery without primary VM access."
-  type        = string
+  default     = null
 }
 
 variable "admin_member" {
-  description = "IAM user or group allowed to administer nodes through IAP and OS Login."
+  description = "IAM user or group allowed to use the node service accounts. Must match admin_member in infra/shared."
   type        = string
 }

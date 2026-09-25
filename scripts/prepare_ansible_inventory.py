@@ -15,8 +15,8 @@ SERVICE_CIDR = ipaddress.ip_network("10.96.0.0/12")
 LOCAL_PORTS = {"control-plane": 2201, "worker": 2202}
 REQUIRED_OUTPUTS = (
     "project_id",
-    "primary_zone",
-    "primary_subnet_cidr",
+    "zone",
+    "subnet_cidr",
     "instance_names",
     "internal_ips",
 )
@@ -48,22 +48,22 @@ def build_inventory(outputs: dict, ssh_user: str, ssh_key: str) -> dict:
     if not isinstance(ssh_key, str) or not ssh_key.strip():
         raise ValueError("SSH private key path must not be empty")
 
-    subnet_value = _output_value(outputs, "primary_subnet_cidr")
+    subnet_value = _output_value(outputs, "subnet_cidr")
     try:
         vpc = ipaddress.ip_network(subnet_value, strict=True)
     except (TypeError, ValueError) as error:
-        raise ValueError("primary_subnet_cidr must be a valid network CIDR") from error
+        raise ValueError("subnet_cidr must be a valid network CIDR") from error
 
     for left, right in ((vpc, POD_CIDR), (vpc, SERVICE_CIDR), (POD_CIDR, SERVICE_CIDR)):
         if left.overlaps(right):
             raise ValueError(f"cluster and VPC networks overlap: {left} and {right}")
 
     project = _output_value(outputs, "project_id")
-    zone = _output_value(outputs, "primary_zone")
+    zone = _output_value(outputs, "zone")
     if not isinstance(project, str) or not project.strip():
         raise ValueError("project_id must be a nonempty string")
     if not isinstance(zone, str) or not zone.strip():
-        raise ValueError("primary_zone must be a nonempty string")
+        raise ValueError("zone must be a nonempty string")
 
     names = _output_value(outputs, "instance_names")
     addresses = _output_value(outputs, "internal_ips")
@@ -76,7 +76,7 @@ def build_inventory(outputs: dict, ssh_user: str, ssh_key: str) -> dict:
         except ValueError as error:
             raise ValueError(f"internal_ips contains an invalid {role} address") from error
         if address not in vpc:
-            raise ValueError(f"{role} address is outside primary_subnet_cidr")
+            raise ValueError(f"{role} address is outside subnet_cidr")
         hosts[role] = {
             "ansible_host": "127.0.0.1",
             "ansible_port": LOCAL_PORTS[role],
