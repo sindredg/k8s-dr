@@ -1,6 +1,6 @@
 # 0002: Recovery contract and target design
 
-Status: Accepted. The written milestone 0 gate is met; infrastructure validation is pending.
+Status: Accepted. The milestone 0 gate is met. Milestones 1 and 2 validated the primary infrastructure and cluster; recovery validation is pending.
 
 Date: 2026-09-22
 

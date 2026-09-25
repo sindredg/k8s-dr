@@ -1,6 +1,6 @@
 # 0004: Remove the Terraform-managed budget alert
 
-Status: Accepted for milestone 1; operator validation pending.
+Status: Accepted. Validated on 2026-09-23 by a clean primary plan without the budget resource; see the [milestone 1 worklog](../worklogs/01-primary-infrastructure.md).
 
 Date: 2026-09-23
 

@@ -1,6 +1,6 @@
 # 0005: Kubernetes bootstrap architecture
 
-Status: Accepted. Amended on 2026-09-23 for the ingress reachability check. Implementation and validation are pending.
+Status: Accepted. Amended on 2026-09-23 for the ingress reachability check. Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
 
 Date: 2026-09-23
 
@@ -182,7 +182,7 @@ The operator procedure will provide commands, expected results, and evidence req
 8. Review a Terraform plan that replaces only the two VM boot disks and their attachment relationship while preserving the worker data disk, network, buckets, and state.
 9. Apply the reviewed replacement, rerun the same bootstrap playbook, and repeat the node, add-on, ingress, and storage checks.
 
-Record sanitized validation results in the Milestone 2 worklog. The plan remains pending until all four gate conditions have evidence.
+Record sanitized validation results in the Milestone 2 worklog. All four gate conditions had evidence on 2026-09-25.
 
 ## Trade-offs and limitations
 

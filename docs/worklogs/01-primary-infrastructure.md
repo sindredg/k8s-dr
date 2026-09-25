@@ -44,7 +44,9 @@ The refreshed Terraform plan, live resource queries, private node ping, and exte
 
 ## Selected screenshots
 
-These sanitized excerpts record results from 2026-09-24. The [validation record](#validation-record) contains the commands and results behind them.
+These sanitized excerpts record results from 2026-09-23. The [validation record](#validation-record) contains the commands and results behind them.
+
+![The temporary bootstrap state was encrypted before migration](../images/milestone1-bootstrap-state-encrypted.png)
 
 ![Terraform copied the temporary local state into the GCS backend](../images/milestone1-state-migration.png)
 
