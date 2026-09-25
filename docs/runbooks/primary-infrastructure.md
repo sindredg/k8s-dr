@@ -65,7 +65,7 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
 ## Apply the shared root
 
-5. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, and the project-level administrator grants that every region uses. If `infra/shared/migrations.tf` still exists, delete it locally before a fresh apply. Its import blocks exist only for the [shared-root migration](terraform-shared-root-migration.md) and fail when the resources do not exist.
+5. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, and the project-level administrator grants that every region uses.
 
    ```bash
    cd ../shared

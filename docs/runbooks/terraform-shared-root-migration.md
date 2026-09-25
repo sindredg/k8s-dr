@@ -1,6 +1,6 @@
 # Terraform shared-root migration
 
-Status: Implemented, not yet applied. Run once on the existing deployment. A fresh deployment skips this procedure and follows the [primary infrastructure procedure](primary-infrastructure.md).
+Status: Completed on 2026-09-25; see the [preparation worklog](../worklogs/03-service-deployment.md#preparation). The one-time `migrations.tf` files were removed afterward, so this procedure cannot be rerun from the current tree. It remains as a record and as a pattern for moving resources between roots. A fresh deployment follows the [primary infrastructure procedure](primary-infrastructure.md).
 
 This procedure moves the backup bucket, its IAM members, and the project-level administrator grants from `infra/primary` to the new `infra/shared` root. It also moves the worker data disk from the regional module to the primary root. No cloud resource is created, replaced, or destroyed. The only change is the backup bucket's `environment` label, which moves from `primary` to `shared`. See the [amendment to decision 0003](../decisions/0003-regional-infrastructure-and-state.md#amendment-shared-root-and-root-owned-data-disk) for the reasons.
 
