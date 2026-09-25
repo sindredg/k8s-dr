@@ -1,7 +1,5 @@
 # Kubernetes Bootstrap Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Build a repeatable, private Ansible and kubeadm bootstrap for the two-node primary cluster and provide the operator procedure needed to prove the Milestone 2 gate.
 
 **Architecture:** Terraform exposes the minimum node metadata needed by a tested inventory generator. A tested Python wrapper opens two local IAP tunnels and runs Ansible through them. Focused Ansible roles prepare Ubuntu and containerd, protect the worker data disk, create the kubeadm cluster, and reconcile pinned cluster add-ons before a private Gateway API test.

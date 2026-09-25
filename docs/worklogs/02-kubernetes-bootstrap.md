@@ -8,7 +8,7 @@ Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible. Initial
 
 ## Work completed
 
-Implemented on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../superpowers/plans/2026-09-23-kubernetes-bootstrap.md). Live runs exposed several issues that were fixed in this branch. See [Failures and remaining work](#failures-and-remaining-work).
+Implemented on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../plans/2026-09-23-kubernetes-bootstrap.md). Live runs exposed several issues that were fixed in this branch. See [Failures and remaining work](#failures-and-remaining-work).
 
 | Area | Files | Summary |
 | --- | --- | --- |
