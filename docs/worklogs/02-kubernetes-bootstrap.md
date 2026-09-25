@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: In progress. Gate checks 1 to 3 passed: both nodes are `Ready`, the disposable app is reachable with persistent content, and the worker recovered after restart. The fresh rebuild check remains open. See [Resume here](#resume-here).
+Status: Complete. The milestone gate passed on 2026-09-25. See [Gate conclusion](#gate-conclusion).
 
 ## Scope
 
@@ -8,7 +8,7 @@ Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible. Initial
 
 ## Work completed
 
-Implemented on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../superpowers/plans/2026-09-23-kubernetes-bootstrap.md). Live runs exposed several issues that were fixed in this branch. See [Failures and remaining work](#failures-and-remaining-work).
+Implemented on branch `feat/milestone-2-kubernetes-bootstrap`, following the [implementation plan](../plans/2026-09-23-kubernetes-bootstrap.md). Live runs exposed several issues that were fixed in this branch. See [Failures and fixes](#failures-and-fixes).
 
 | Area | Files | Summary |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ Local checks: `python3 -m unittest discover -s tests`, yamllint with `ansible/.y
 
 ## Validation gate
 
-Do not mark this milestone complete until evidence shows that:
+The milestone is complete because the validation record shows that:
 
 1. Both nodes report `Ready` after bootstrap.
 2. A disposable app schedules and can be reached through the intended path.
@@ -40,13 +40,34 @@ Do not mark this milestone complete until evidence shows that:
 | 2026-09-23 | `bootstrap.yml` through `scripts/run_with_iap.py`, then `validate.yml -v` (runs `kubectl get nodes -o wide`) | Passed. Bootstrap recap: control plane `ok=57 changed=9 unreachable=0 failed=0`, worker `ok=52 changed=0 unreachable=0 failed=0`. `k8sdr-primary-control-plane` (`control-plane`) and `k8sdr-primary-worker` (`worker`) are `Ready`, `v1.36.2`, Ubuntu 24.04.5 LTS, `containerd://2.2.1`. All pods in `calico-system`, `kube-system`, `tigera-operator`, `traefik`, and `local-path-storage` are `Running`; all six deployments are fully available. `validate.yml` then stopped at `Read Gateway conditions` with `namespaces "milestone2-test" not found`, as expected before the test application is deployed. |
 | 2026-09-24 | `deploy_test_app.yml`, `validate.yml -v`, pod deletion and rollout, then `validate.yml`, through `scripts/run_with_iap.py` | Passed after the permission fix below. Deployment recap: `ok=6 changed=2 failed=0`. Validation recap before and after pod replacement: `ok=10 changed=0 failed=0`. Both nodes were `Ready`; the app pod was `Running` on the worker; the PVC remained `Bound` to the same PV. Gateway `Programmed=True` and HTTPRoute `Accepted=True`. The routed request returned `200` with `milestone2 persistent marker`; the request without the test host returned `404`. The replacement pod had a new name, and the mounted directory mode was `0755`. |
 | 2026-09-24 | `gcloud compute ssh ... --command='sudo systemctl reboot'`, `findmnt /var/lib/k8s-dr`, then `validate.yml -v` through `scripts/run_with_iap.py` | Passed after recovery. `findmnt` showed the worker data disk mounted as `ext4`. The first IAP validation attempt failed scanning the worker SSH host key; a second attempt reached the cluster while several worker pods were `Unknown` and the HTTP check returned connection refused. Follow-up `kubectl get pods --all-namespaces` showed all pods `Running`; `validate.yml -v` then exited `0` with both nodes `Ready`, the PVC bound to the same PV, and HTTP `200` with the same marker plus `404` without the test host. The updated `validate.yml` with readiness waits exited `0` (`ok=12 changed=0 failed=0`). |
-| 2026-09-24 | `terraform plan -out=milestone2-rebuild.tfplan` with two VM `-replace` targets, `terraform apply milestone2-rebuild.tfplan`, inventory regeneration, `bootstrap.yml`, `deploy_test_app.yml`, `validate.yml -v`, and `terraform plan -detailed-exitcode -input=false -no-color -compact-warnings` | Partial gate evidence. Terraform plan and apply excerpts show `3 to add, 0 to change, 3 to destroy` and `3 added, 0 changed, 3 destroyed`. Terraform outputs showed new private node addresses, and the refreshed plan exited `0` with `No changes`. On fresh VMs, the worker storage role found the existing ext4 filesystem and skipped `mkfs`; kubeadm initialized the control plane and joined the worker. The first Calico DaemonSet existence wait retried twice, then passed. The add-on role completed with `ok=28 changed=15 failed=0`. Test-app deployment completed with `ok=6 changed=2 failed=0`; validation completed with `ok=12 changed=0 failed=0`, both nodes `Ready`, PVC `Bound`, app on worker, HTTP `200` with the marker and `404` without the host. A complete `bootstrap.yml` rerun recap is still pending. The milestone gate remains open until that rerun passes. |
+| 2026-09-24 | `terraform plan -out=milestone2-rebuild.tfplan` with two VM `-replace` targets, `terraform apply milestone2-rebuild.tfplan`, inventory regeneration, `bootstrap.yml`, `deploy_test_app.yml`, `validate.yml -v`, and `terraform plan -detailed-exitcode -input=false -no-color -compact-warnings` | Partial gate evidence. Terraform plan and apply excerpts show `3 to add, 0 to change, 3 to destroy` and `3 added, 0 changed, 3 destroyed`. Terraform outputs showed new private node addresses, and the refreshed plan exited `0` with `No changes`. On fresh VMs, the worker storage role found the existing ext4 filesystem and skipped `mkfs`; kubeadm initialized the control plane and joined the worker. The first Calico DaemonSet existence wait retried twice, then passed. The add-on role completed with `ok=28 changed=15 failed=0`. Test-app deployment completed with `ok=6 changed=2 failed=0`; validation completed with `ok=12 changed=0 failed=0`, both nodes `Ready`, PVC `Bound`, app on worker, HTTP `200` with the marker and `404` without the host. The complete `bootstrap.yml` rerun recap is recorded on 2026-09-25. |
+| 2026-09-25 | Inventory regeneration with `scripts/prepare_ansible_inventory.py`, then `bootstrap.yml` twice and `cleanup_test_app.yml` through `scripts/run_with_iap.py` | Inventory regeneration exited without errors. Both `bootstrap.yml` runs on the rebuilt VMs ended with the same recap: control plane `ok=57 changed=9 unreachable=0 failed=0 skipped=8`, worker `ok=52 changed=0 unreachable=0 failed=0 skipped=9`. On both runs, `Pre-pull control-plane images`, `Initialize the control plane`, `Join the worker to the cluster`, `Create ext4 only on a blank worker data device`, `Mount worker data`, `Apply Kubernetes networking sysctls`, and `Restart containerd with the current configuration` were skipped. All nine changed tasks were in `cluster_addons`: the worker label, `kubectl apply` of Calico, Gateway API, and Local Path resources, the StorageClass annotation, and `helm upgrade --install` for Traefik. These report `changed` on every run. Cleanup ended with `ok=2 changed=2 failed=0`. This cleanup ran before a final validation, so the app was redeployed for the next check. |
+| 2026-09-25 | `deploy_test_app.yml`, `validate.yml -v`, then `cleanup_test_app.yml` through `scripts/run_with_iap.py` | Passed. Deployment recap: `ok=6 changed=2 unreachable=0 failed=0`. Validation recap: `ok=12 changed=0 unreachable=0 failed=0`. With `failed=0`, validation confirms that both nodes reached `Ready`, the Calico, CoreDNS, Local Path Provisioner, Traefik, and test-app rollouts completed, the routed request returned `200` with `milestone2 persistent marker`, and the request without the test host returned `404`. Cleanup recap: `ok=2 changed=2 unreachable=0 failed=0`. |
+
+## Gate conclusion
+
+All four gate conditions have evidence:
+
+| Gate condition | Evidence |
+| --- | --- |
+| Both nodes report `Ready` | 2026-09-23 bootstrap and every later `validate.yml` run |
+| A disposable app schedules and is reachable | 2026-09-24 app validation, including pod replacement with the same PV |
+| The worker rejoins after a restart | 2026-09-24 reboot, `findmnt`, and validation without a new join |
+| A fresh rebuild follows the same steps | 2026-09-24 VM replacement and bootstrap, then the 2026-09-25 bootstrap reruns and validation on the rebuilt VMs |
+
+Limits of this evidence:
+
+- The rebuild replaced both VMs and boot disks. It kept the network, buckets, state, and worker data disk by design. A rebuild of the whole environment in another region is milestone 5 work.
+- `validate.yml` asserts node readiness, rollouts, and the HTTP responses. It lists the PVC, Gateway, and HTTPRoute without asserting their status; those were checked by reading the output on 2026-09-24.
+- The reachability check runs inside the VPC. HTTP access from the operator machine is not tested.
 
 ## Selected screenshots
 
-These sanitized excerpts record results from 2026-09-24. The [validation record](#validation-record) supplies their command context and limitations.
+These sanitized excerpts come from the runs on 2026-09-23 to 2026-09-25. The [validation record](#validation-record) supplies their command context and limitations.
 
 ![Initial bootstrap recap with both nodes successful](../images/milestone2-bootstrap-recap.png)
+
+![Worker data disk mounted as ext4 after the reboot](../images/milestone2-worker-restart-mount.png)
 
 ![Validation recap after the worker restart](../images/milestone2-worker-restart-validation.png)
 
@@ -54,7 +75,11 @@ These sanitized excerpts record results from 2026-09-24. The [validation record]
 
 ![VM replacement apply count](../images/milestone2-vm-rebuild-apply.png)
 
-## Failures and remaining work
+![Bootstrap rerun on the rebuilt VMs with no failures and no worker changes](../images/milestone2-rebuilt-bootstrap-rerun.png)
+
+![Final validation recap on the rebuilt VMs](../images/milestone2-final-validation.png)
+
+## Failures and fixes
 
 ### Validation raced worker recovery after reboot
 
@@ -84,6 +109,8 @@ These sanitized excerpts record results from 2026-09-24. The [validation record]
 - **Fix:** Set `kubernetes_deb_version` to `1.36.2-2.1`. The Kubernetes version stays 1.36.2, as decided in ADR 0005.
 - **Verification:** On the next live run, package installation passed on both nodes, and the run continued to the next failure below.
 
+![Package installation failed for the unpublished kubelet revision](../images/milestone2-failure-package-revision.png)
+
 ### Mount check misread the `mountpoint` exit code
 
 - **Symptom:** On the third live `bootstrap.yml` run, task `worker_storage : Check whether worker data is mounted` failed on the worker. `mountpoint -q /var/lib/k8s-dr` returned `rc=32`. Recap: control plane `failed=0`, worker `ok=38 changed=5 failed=1`.
@@ -92,6 +119,8 @@ These sanitized excerpts record results from 2026-09-24. The [validation record]
 - **Fix:** Accept `0` and `32`, and mount only on `32`. Added a contract test that pins both expressions.
 - **Verification:** On the next live run, the worker play finished with `failed=0` (`ok=43`).
 
+![The mount check failed on mountpoint exit code 32](../images/milestone2-failure-mountpoint-exit-32.png)
+
 ### Handlers lost after failed runs
 
 - **Symptom:** On the fourth live `bootstrap.yml` run, `control_plane : Initialize the control plane` failed at kubeadm preflight with `[ERROR FileContent--proc-sys-net-ipv4-ip_forward]: /proc/sys/net/ipv4/ip_forward contents are not set to 1`. Preflight runs before kubeadm writes any state.
@@ -99,6 +128,8 @@ These sanitized excerpts record results from 2026-09-24. The [validation record]
 - **Same cause, not yet observed:** `container_runtime` restarted containerd only through a handler. On the second run, `Configure containerd for Kubernetes` reported `changed`, and the play then failed at package installation. containerd therefore kept running with its package defaults instead of the systemd cgroup configuration. This is inferred from the task sequence, not observed on the node.
 - **Fix:** Removed both handlers. `node_prepare` now reads the three sysctls on every run, runs `sysctl --system` when any is not `1`, and fails if they are still not `1`. `container_runtime` validates the configuration, then restarts containerd when its `ActiveEnterTimestamp` is older than the configuration file's modification time. Contract tests pin both behaviors.
 - **Verification:** Local tests, yamllint, ansible-lint, and syntax checks pass. A local probe of the restart condition returns `True` for a stale or missing start time and `False` for a start after the change. On the fifth live run, the control plane initialized, the worker joined (`ok=58 failed=0`), and the run continued to the next failure below.
+
+![kubeadm preflight failed because ip_forward was not applied](../images/milestone2-failure-ip-forward-preflight.png)
 
 ### Worker label used the inventory name instead of the node name
 
@@ -123,20 +154,10 @@ These sanitized excerpts record results from 2026-09-24. The [validation record]
 - **Fix:** Replaced the interactive forward with two read-only requests in `validate.yml`. They go from the control plane to the worker's private address on NodePort 30080, and expect `200` with the marker when sending `Host: milestone2.local`, and `404` without it. The pod-replacement step now runs through the IAP runner instead of `gcloud compute ssh`. [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-in-cluster-reachability-check) records the change and its trade-off: the check no longer proves access from the operator machine.
 - **Verification:** Local unit tests, yamllint, ansible-lint, and syntax checks pass. Rendering the request URL against the generated inventory gives the worker's private address on port `30080`. The live validation returned `200` with the marker and `404` without the test host, including after the worker restart and VM rebuild.
 
-## Resume here
+## Remaining work
 
-State after the 2026-09-24 rebuild work: the replacement VMs have a running cluster and disposable app. A complete bootstrap rerun recap is still required to prove the documented procedure. Continue in this order:
+These items do not block the gate:
 
-1. Run `bootstrap.yml` from the repository root through `scripts/run_with_iap.py` using the regenerated inventory. Confirm the final recap has `failed=0` and `unreachable=0` for both nodes, with kubeadm init, join, and worker-disk formatting skipped.
-2. Rerun `validate.yml` and confirm both nodes `Ready`, PVC `Bound`, and the same HTTP marker. Then run the [cleanup step](../runbooks/kubernetes-bootstrap.md#restart-the-worker) to remove the disposable app.
-
-Record the sanitized full bootstrap recap and final validation result before updating the Milestone 2 status and checkboxes in `plan.md`.
-
-Known limitations to keep in mind:
-
-- `validate.yml` fails at `Read Gateway conditions` until the test application is deployed. This is expected, but a failed recap does not by itself mean the cluster is unhealthy. Splitting cluster and application checks is a possible follow-up.
-- The reachability check runs inside the VPC. HTTP access from the operator machine is not tested.
+- `validate.yml` fails until the test application is deployed. Splitting cluster and application checks would give recovery drills a cluster-only check.
 - `tigerastatus/tiers` is `Degraded` (see the Calico entry above). Not investigated.
 - Ansible prints `INJECT_FACTS_AS_VARS` deprecation warnings for `ansible_*` facts in `node_prepare`. They do not affect results before ansible-core 2.24.
-
-All milestone 2 plan steps remain open. For join failures, use the [worker join guide](../troubleshooting/01-worker-join-failure.md) and record the observed symptom, confirmed cause, fix, and verification here. Do not paste kubeconfigs, join tokens, or unsanitized command output.

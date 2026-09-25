@@ -6,7 +6,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | --- | --- | --- |
 | 0. Recovery contract | Scope and measurements defined | Complete |
 | 1. Primary infrastructure | Reproducible VMs and network | Complete |
-| 2. Kubernetes bootstrap | Repeatable kubeadm cluster | In progress |
+| 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Complete |
 | 3. Service deployment | Gitea survives pod restarts | Pending |
 | 4. Consistent backups | Offsite data restores successfully | Pending |
 | 5. Cold recovery | Independent service in second region | Pending |
@@ -32,10 +32,10 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 
 ## 2. Kubernetes bootstrap
 
-- [ ] Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible.
-- [ ] Initialize the control plane, join the worker, and install a CNI.
-- [ ] Install the minimum ingress and storage components needed for the service.
-- [ ] Automate a clean rebuild from fresh VMs.
+- [x] Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible.
+- [x] Initialize the control plane, join the worker, and install a CNI.
+- [x] Install the minimum ingress and storage components needed for the service.
+- [x] Automate a clean rebuild from fresh VMs.
 
 **Gate:** Nodes are Ready; a disposable app schedules and is reachable; the worker rejoins after a restart; a fresh rebuild follows the same steps.
 

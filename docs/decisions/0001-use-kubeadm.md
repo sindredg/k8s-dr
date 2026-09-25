@@ -1,6 +1,6 @@
 # 0001: Use kubeadm for cluster bootstrap
 
-Status: Accepted as the design choice in the [project overview](../../README.md) and [plan](../../plan.md). Implementation and validation are pending.
+Status: Accepted as the design choice in the [project overview](../../README.md) and [plan](../../plan.md). Implemented and validated in [milestone 2](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
 
 ## Context
 
@@ -20,4 +20,4 @@ Use kubeadm to initialize the control plane and join workers. Use Ansible to con
 
 ## Consequences
 
-The recovery runbook must account for kubeadm initialization, worker join, CNI setup, certificate and version lifecycle, and verification of node readiness. One control plane and one worker do not provide local high availability; the project tests regional cold recovery. Milestone 2 will test whether the build is repeatable. kubeadm is a learning choice here, not a requirement for DR.
+The recovery runbook must account for kubeadm initialization, worker join, CNI setup, certificate and version lifecycle, and verification of node readiness. One control plane and one worker do not provide local high availability; the project tests regional cold recovery. Milestone 2 showed the build is repeatable on replacement VMs. kubeadm is a learning choice here, not a requirement for DR.
