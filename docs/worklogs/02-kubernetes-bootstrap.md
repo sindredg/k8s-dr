@@ -1,6 +1,6 @@
 # Milestone 2: Kubernetes bootstrap
 
-Status: In progress. Gate checks 1 to 3 passed: both nodes are `Ready`, the disposable app is reachable with persistent content, and the worker recovered after restart. The fresh rebuild check remains open. See [Resume here](#resume-here).
+Status: In progress. Gate checks 1 to 3 passed: both nodes are `Ready`, the disposable app is reachable with persistent content, and the worker recovered after restart. On the rebuilt VMs, two complete `bootstrap.yml` reruns passed. A final `validate.yml` run is still needed to close the fresh rebuild check. See [Resume here](#resume-here).
 
 ## Scope
 
@@ -41,6 +41,7 @@ Do not mark this milestone complete until evidence shows that:
 | 2026-09-24 | `deploy_test_app.yml`, `validate.yml -v`, pod deletion and rollout, then `validate.yml`, through `scripts/run_with_iap.py` | Passed after the permission fix below. Deployment recap: `ok=6 changed=2 failed=0`. Validation recap before and after pod replacement: `ok=10 changed=0 failed=0`. Both nodes were `Ready`; the app pod was `Running` on the worker; the PVC remained `Bound` to the same PV. Gateway `Programmed=True` and HTTPRoute `Accepted=True`. The routed request returned `200` with `milestone2 persistent marker`; the request without the test host returned `404`. The replacement pod had a new name, and the mounted directory mode was `0755`. |
 | 2026-09-24 | `gcloud compute ssh ... --command='sudo systemctl reboot'`, `findmnt /var/lib/k8s-dr`, then `validate.yml -v` through `scripts/run_with_iap.py` | Passed after recovery. `findmnt` showed the worker data disk mounted as `ext4`. The first IAP validation attempt failed scanning the worker SSH host key; a second attempt reached the cluster while several worker pods were `Unknown` and the HTTP check returned connection refused. Follow-up `kubectl get pods --all-namespaces` showed all pods `Running`; `validate.yml -v` then exited `0` with both nodes `Ready`, the PVC bound to the same PV, and HTTP `200` with the same marker plus `404` without the test host. The updated `validate.yml` with readiness waits exited `0` (`ok=12 changed=0 failed=0`). |
 | 2026-09-24 | `terraform plan -out=milestone2-rebuild.tfplan` with two VM `-replace` targets, `terraform apply milestone2-rebuild.tfplan`, inventory regeneration, `bootstrap.yml`, `deploy_test_app.yml`, `validate.yml -v`, and `terraform plan -detailed-exitcode -input=false -no-color -compact-warnings` | Partial gate evidence. Terraform plan and apply excerpts show `3 to add, 0 to change, 3 to destroy` and `3 added, 0 changed, 3 destroyed`. Terraform outputs showed new private node addresses, and the refreshed plan exited `0` with `No changes`. On fresh VMs, the worker storage role found the existing ext4 filesystem and skipped `mkfs`; kubeadm initialized the control plane and joined the worker. The first Calico DaemonSet existence wait retried twice, then passed. The add-on role completed with `ok=28 changed=15 failed=0`. Test-app deployment completed with `ok=6 changed=2 failed=0`; validation completed with `ok=12 changed=0 failed=0`, both nodes `Ready`, PVC `Bound`, app on worker, HTTP `200` with the marker and `404` without the host. A complete `bootstrap.yml` rerun recap is still pending. The milestone gate remains open until that rerun passes. |
+| 2026-09-25 | Inventory regeneration with `scripts/prepare_ansible_inventory.py`, then `bootstrap.yml` twice and `cleanup_test_app.yml` through `scripts/run_with_iap.py` | Inventory regeneration exited without errors. Both `bootstrap.yml` runs on the rebuilt VMs ended with the same recap: control plane `ok=57 changed=9 unreachable=0 failed=0 skipped=8`, worker `ok=52 changed=0 unreachable=0 failed=0 skipped=9`. On both runs, `Pre-pull control-plane images`, `Initialize the control plane`, `Join the worker to the cluster`, `Create ext4 only on a blank worker data device`, `Mount worker data`, `Apply Kubernetes networking sysctls`, and `Restart containerd with the current configuration` were skipped. All nine changed tasks were in `cluster_addons`: the worker label, `kubectl apply` of Calico, Gateway API, and Local Path resources, the StorageClass annotation, and `helm upgrade --install` for Traefik. These report `changed` on every run. Cleanup ended with `ok=2 changed=2 failed=0`. `validate.yml` was not run in this session, so the cleanup removed the test app before a final validation. |
 
 ## Selected screenshots
 
@@ -125,12 +126,13 @@ These sanitized excerpts record results from 2026-09-24. The [validation record]
 
 ## Resume here
 
-State after the 2026-09-24 rebuild work: the replacement VMs have a running cluster and disposable app. A complete bootstrap rerun recap is still required to prove the documented procedure. Continue in this order:
+State after the 2026-09-25 runs: the rebuilt VMs pass two complete `bootstrap.yml` reruns, and the disposable app has been removed. One validation pass on the current cluster remains:
 
-1. Run `bootstrap.yml` from the repository root through `scripts/run_with_iap.py` using the regenerated inventory. Confirm the final recap has `failed=0` and `unreachable=0` for both nodes, with kubeadm init, join, and worker-disk formatting skipped.
-2. Rerun `validate.yml` and confirm both nodes `Ready`, PVC `Bound`, and the same HTTP marker. Then run the [cleanup step](../runbooks/kubernetes-bootstrap.md#restart-the-worker) to remove the disposable app.
+1. Deploy the disposable app with `deploy_test_app.yml`.
+2. Run `validate.yml -v` and confirm both nodes `Ready`, PVC `Bound`, HTTP `200` with the marker, and `404` without the test host.
+3. Remove the app with `cleanup_test_app.yml`.
 
-Record the sanitized full bootstrap recap and final validation result before updating the Milestone 2 status and checkboxes in `plan.md`.
+Record the sanitized validation result before updating the Milestone 2 status and checkboxes in `plan.md`.
 
 Known limitations to keep in mind:
 
