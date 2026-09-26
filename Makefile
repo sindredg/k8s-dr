@@ -7,8 +7,10 @@ TF_DIR ?= infra/primary
 SSH_KEY ?= $$HOME/.ssh/google_compute_engine
 INVENTORY := ansible/inventory/generated/hosts.json
 VENV := .venv
+# CI installs tools into the system Python and runs `make check BIN=`.
+BIN ?= $(VENV)/bin/
 IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
-PLAYBOOK := $(VENV)/bin/ansible-playbook -i $(INVENTORY)
+PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
 PLAYBOOKS := bootstrap deploy_test_app cleanup_test_app validate validate_cluster validate_test_app
 
 .DEFAULT_GOAL := help
@@ -42,12 +44,12 @@ cleanup-test-app: ## Remove the disposable application through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/cleanup_test_app.yml
 
 check: ## Run the local unit tests, linters, and syntax checks
-	$(VENV)/bin/python -m unittest discover -s tests
-	$(VENV)/bin/yamllint -c ansible/.yamllint.yml ansible .github/workflows
-	$(VENV)/bin/ansible-lint ansible
+	$(BIN)python -m unittest discover -s tests
+	$(BIN)yamllint -c ansible/.yamllint.yml ansible .github/workflows
+	$(BIN)ansible-lint ansible
 	for playbook in $(PLAYBOOKS); do \
-		$(VENV)/bin/ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \
+		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \
 	done
 
 pins: ## Check that every pinned artifact still resolves upstream
-	$(VENV)/bin/python scripts/check_pins.py
+	$(BIN)python scripts/check_pins.py
