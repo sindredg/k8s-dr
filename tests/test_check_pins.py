@@ -33,8 +33,9 @@ class FakeUpstream:
         self.missing = set(missing)
         self.requests = []
 
-    def __call__(self, url, method="GET"):
+    def __call__(self, url, method="GET", headers=None):
         self.requests.append((method, url))
+        self.headers = headers
         if url in self.missing:
             raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
         return self.responses.get(url, b"")
@@ -161,6 +162,48 @@ spec: {url: https://charts.jetstack.io}
         self.assertIn(
             ("cert-manager", "https://charts.jetstack.io", "cert-manager", "v1.21.2"), pins
         )
+
+
+class ImageTests(unittest.TestCase):
+    DIGEST = "sha256:" + "a" * 64
+    TOKEN_URL = (
+        "https://auth.docker.io/token?service=registry.docker.io"
+        "&scope=repository:library/postgres:pull"
+    )
+    MANIFEST_URL = f"https://registry-1.docker.io/v2/library/postgres/manifests/{DIGEST}"
+
+    def test_reads_digest_pinned_images_from_the_deploy_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "app.yaml").write_text(
+                f"containers:\n  - image: postgres:18.6-trixie@{self.DIGEST}\n"
+                f"  - image: \"postgres:18.6-trixie@{self.DIGEST}\"\n"
+                "  - image: busybox:1.37.0\n"
+            )
+            self.assertEqual(
+                module.image_pins(Path(directory)), [f"postgres:18.6-trixie@{self.DIGEST}"]
+            )
+
+    def test_image_digest_is_checked_with_a_pull_token(self):
+        upstream = FakeUpstream({self.TOKEN_URL: b'{"token": "t"}'})
+        result = module.check_image(f"postgres:18.6-trixie@{self.DIGEST}", upstream)
+        self.assertTrue(result.ok)
+        self.assertEqual(upstream.requests, [("GET", self.TOKEN_URL), ("HEAD", self.MANIFEST_URL)])
+        self.assertEqual(upstream.headers["Authorization"], "Bearer t")
+        self.assertIn("application/vnd.oci.image.index.v1+json", upstream.headers["Accept"])
+
+    def test_missing_image_digest_fails(self):
+        upstream = FakeUpstream({self.TOKEN_URL: b'{"token": "t"}'}, missing={self.MANIFEST_URL})
+        result = module.check_image(f"postgres:18.6-trixie@{self.DIGEST}", upstream)
+        self.assertFalse(result.ok)
+        self.assertIn("404", result.detail)
+
+    def test_other_registries_fail_instead_of_passing_silently(self):
+        result = module.check_image(f"docker.gitea.com/gitea:1.27.0@{self.DIGEST}", FakeUpstream())
+        self.assertFalse(result.ok)
+
+    def test_repository_deploy_tree_pins_postgresql_18(self):
+        pins = module.image_pins(module.DEFAULT_DEPLOY)
+        self.assertTrue(any(pin.startswith("postgres:18.") for pin in pins))
 
 
 if __name__ == "__main__":

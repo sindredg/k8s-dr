@@ -1,6 +1,6 @@
 # 0006: Service deployment architecture
 
-Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Implementation in progress: Flux, SOPS, and cert-manager are implemented; PostgreSQL, Gitea, and network policies are not.
+Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation). Implementation in progress: Flux, SOPS, and cert-manager are implemented and validated; PostgreSQL, Gitea, the HTTPS listener, and network policies are written but not yet validated on the cluster; fixtures are not started.
 
 Date: 2026-09-25
 
@@ -147,3 +147,20 @@ Date: 2026-09-26.
 [Forgejo](https://forgejo.org/) was considered as an alternative to Gitea. It has been a hard fork since 2024 and has diverged in features and database migrations, so it is no longer a drop-in replacement. Gitea stays: it is actively maintained, this decision uses its official chart, and the recovery method (a PostgreSQL dump plus the repository volume, restored in another region) does not depend on which forge runs.
 
 The PostgreSQL decision is unchanged. Gitea chart 12.7.0, the latest release on 2026-09-26, still declares the Bitnami `postgresql`, `postgresql-ha`, `valkey`, and `valkey-cluster` dependencies from `oci://registry-1.docker.io/bitnamicharts`, so disabling all four remains necessary.
+
+## Amendment: PostgreSQL and Gitea implementation
+
+Date: 2026-09-27.
+
+Implementing PostgreSQL and Gitea settled these details. None changes a decision above except the queue backend.
+
+| Topic | Implementation | Trade-off |
+| --- | --- | --- |
+| Gitea queues | Gitea has no database queue type. Queues use LevelDB (`level`) on the Gitea volume. Sessions use the database and the cache stays in memory. This corrects "database-backed sessions and queues" above. | Queue state lives on the Gitea volume, so the milestone 4 backup must capture that volume with the database. |
+| Volume ownership | Local Path Provisioner creates each volume directory as root with mode `0770`, and the kubelet does not apply `fsGroup` to these host-path volumes. An init container in each pod hands the volume root to the service user (PostgreSQL `999`, Gitea `1000`) with only the `CHOWN` and `FOWNER` capabilities. Both main containers run as non-root. | One short-lived root container per pod start. The alternative, a world-writable `0777` setup script, would let any pod on the worker read every volume. |
+| Per-cluster values | `deploy/clusters/<cluster>/cluster-settings.yaml` holds `git_host` and `git_issuer`. Flux substitutes them into `deploy/certificates/` and `deploy/apps/gitea/`. The `git-tls` Certificate moved from the cluster directory to `deploy/certificates/`. The primary sets `git.sindrg.com` and `letsencrypt-production`. | A recovery cluster adds one ConfigMap and one sync file. A misspelled variable stays as a literal `${...}`; a unit test fails when a substituted variable is not defined. |
+| Gateway | Flux owns a `gitea` Gateway in the `gitea` namespace with an HTTP listener on Traefik's `web` entry point (8000) and an HTTPS listener on `websecure` (8443). HTTP redirects to HTTPS with `301`. The certificate Secret is in the same namespace, so no ReferenceGrant is needed. Traefik's default `traefik-gateway` stays unused. | Traefik owns only the GatewayClass and entry points; the listener hostname and TLS change with Git. |
+| Database connection | Gitea connects with `SSL_MODE=disable` over the pod network. Network policies allow only Gitea pods to reach port 5432. | Plaintext inside the cluster. [Production readiness](../production-readiness.md) would add TLS. |
+| Credentials | The database password is in two SOPS Secrets with the same value, one per namespace, because Secrets cannot cross namespaces. The Gitea administrator uses `passwordMode: keepUpdated`, so the Secret in Git stays authoritative after a database restore. | Rotating the database password needs both files and an `ALTER ROLE`. The image reads `POSTGRES_PASSWORD` only when it creates an empty data directory. |
+| Bootstrap wait | The `flux-system` Kustomization waits for the Kustomizations it applies, including the first Gitea install. Its timeout rose from 5 to 15 minutes and the Ansible wait from 300 to 900 seconds. | A failed Gitea install now holds `make bootstrap` for up to 15 minutes before it fails. |
+| Gitea egress | Mirroring, repository migrations, and the update checker are off, because the network policies block internet egress. | Features that fetch from the internet are unavailable. |

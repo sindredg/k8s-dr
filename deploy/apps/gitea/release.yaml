@@ -1,0 +1,127 @@
+---
+# Gitea from the official chart. Flux substitutes ${git_host} from the
+# cluster-settings ConfigMap. See decision 0006.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  interval: 1h
+  timeout: 10m
+  chart:
+    spec:
+      chart: gitea
+      version: 12.7.0
+      sourceRef:
+        kind: HelmRepository
+        name: gitea
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 1
+    # The ReadWriteOnce volume cannot attach to a surge pod.
+    strategy:
+      type: Recreate
+    nodeSelector:
+      node-role.kubernetes.io/worker: ""
+
+    # Bitnami stopped publishing free versioned images; PostgreSQL runs from
+    # deploy/apps/postgresql instead.
+    postgresql:
+      enabled: false
+    postgresql-ha:
+      enabled: false
+    valkey:
+      enabled: false
+    valkey-cluster:
+      enabled: false
+    test:
+      enabled: false
+
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 10Gi
+
+    podSecurityContext:
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+    # Local Path Provisioner creates volume directories as root with mode
+    # 0770, and the kubelet does not apply fsGroup to them. Hand the volume
+    # root to the rootless Gitea user (1000) before the chart's init scripts.
+    preExtraInitContainers:
+      - name: volume-owner
+        image: busybox:1.37.0
+        command: ["sh", "-c", "chown 1000:1000 /data && chmod 0750 /data"]
+        securityContext:
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+            add: ["CHOWN", "FOWNER"]
+        volumeMounts:
+          - name: data
+            mountPath: /data
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+
+    gitea:
+      admin:
+        existingSecret: gitea-admin
+        email: admin@${git_host}
+      config:
+        server:
+          DOMAIN: ${git_host}
+          ROOT_URL: https://${git_host}/
+          # Git over SSH needs another public TCP port; out of scope.
+          DISABLE_SSH: true
+          START_SSH_SERVER: false
+        database:
+          DB_TYPE: postgres
+          HOST: postgresql.postgresql.svc.cluster.local:5432
+          NAME: gitea
+          USER: gitea
+          # Plaintext on the pod network; network policies limit who can
+          # reach PostgreSQL.
+          SSL_MODE: disable
+        service:
+          DISABLE_REGISTRATION: true
+        # One replica: sessions in the database survive a pod restart, the
+        # cache stays in memory, and queues use LevelDB on the Gitea volume.
+        session:
+          PROVIDER: db
+          COOKIE_SECURE: true
+        cache:
+          ADAPTER: memory
+        queue:
+          TYPE: level
+        # Network policies block internet egress, so turn off the features
+        # that need it.
+        repository:
+          DISABLE_MIGRATIONS: true
+        mirror:
+          ENABLED: false
+        cron.update_checker:
+          ENABLED: false
+      additionalConfigFromEnvs:
+        - name: GITEA__DATABASE__PASSWD
+          valueFrom:
+            secretKeyRef:
+              name: gitea-database
+              key: password

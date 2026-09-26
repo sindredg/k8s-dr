@@ -9,7 +9,9 @@ fail during a drill. Run this in CI on a schedule to find out first.
 
 import argparse
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -21,6 +23,13 @@ DEFAULT_DEPLOY = Path("deploy")
 DOCKER_PACKAGES_URL = "https://download.docker.com/linux/ubuntu/dists/noble/stable/binary-amd64/Packages"
 KUBERNETES_PACKAGES = ("kubelet", "kubeadm", "kubectl")
 TIMEOUT_SECONDS = 60
+IMAGE_DIGEST = re.compile(r"image:\s*[\"']?([^\s\"']+@sha256:[0-9a-f]{64})")
+MANIFEST_TYPES = ", ".join((
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.oci.image.manifest.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+    "application/vnd.docker.distribution.manifest.v2+json",
+))
 
 
 @dataclass(frozen=True)
@@ -76,8 +85,10 @@ def artifact_urls(pins: dict) -> dict[str, str]:
     }
 
 
-def _fetch(url: str, method: str = "GET") -> bytes:
-    request = urllib.request.Request(url, method=method, headers={"User-Agent": "k8s-dr-pin-check"})
+def _fetch(url: str, method: str = "GET", headers: dict | None = None) -> bytes:
+    request = urllib.request.Request(
+        url, method=method, headers={"User-Agent": "k8s-dr-pin-check", **(headers or {})}
+    )
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         return response.read()
 
@@ -168,6 +179,41 @@ def check_chart(name: str, url: str, chart: str, version: str, fetch=_fetch) -> 
     return Result(f"{name} chart", True, f"{chart} {version} in {index_url}")
 
 
+def image_pins(deploy_dir: Path) -> list[str]:
+    """Return every digest-pinned image reference in the deploy tree."""
+    return sorted({
+        match
+        for path in deploy_dir.rglob("*.yaml")
+        for match in IMAGE_DIGEST.findall(path.read_text())
+    })
+
+
+def check_image(reference: str, fetch=_fetch) -> Result:
+    """Check that a Docker Hub image digest still resolves.
+
+    Kubernetes pulls a reference with a digest by the digest alone, so the
+    digest must stay available even if the tag moves.
+    """
+    name, _, digest = reference.partition("@")
+    repository = name.rsplit(":", 1)[0] if ":" in name.rsplit("/", 1)[-1] else name
+    first = repository.split("/", 1)[0]
+    if "/" in repository and ("." in first or ":" in first):
+        return Result(f"{name} image", False, f"{reference}: only Docker Hub images are checked")
+    if "/" not in repository:
+        repository = f"library/{repository}"
+    token_url = (
+        "https://auth.docker.io/token?service=registry.docker.io"
+        f"&scope=repository:{repository}:pull"
+    )
+    manifest_url = f"https://registry-1.docker.io/v2/{repository}/manifests/{digest}"
+    try:
+        token = json.loads(fetch(token_url))["token"]
+        fetch(manifest_url, "HEAD", {"Authorization": f"Bearer {token}", "Accept": MANIFEST_TYPES})
+    except (urllib.error.URLError, TimeoutError, KeyError, ValueError) as error:
+        return Result(f"{name} image", False, f"{reference}: {error}")
+    return Result(f"{name} image", True, reference)
+
+
 def run_checks(pins: dict, fetch=_fetch, deploy_dir: Path | None = None) -> list[Result]:
     results = [
         check_kubernetes_packages(pins, fetch),
@@ -177,6 +223,7 @@ def run_checks(pins: dict, fetch=_fetch, deploy_dir: Path | None = None) -> list
     results += [check_url(name, url, fetch) for name, url in artifact_urls(pins).items()]
     if deploy_dir is not None:
         results += [check_chart(*pin, fetch=fetch) for pin in flux_chart_pins(deploy_dir)]
+        results += [check_image(reference, fetch) for reference in image_pins(deploy_dir)]
     return results
 
 

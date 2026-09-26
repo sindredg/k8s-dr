@@ -150,7 +150,7 @@ class DeployTreeTests(unittest.TestCase):
         self.assertFalse(certificates["wait"])
 
     def test_issuers_use_the_cloudflare_token_and_no_email(self):
-        issuers = list(yaml.safe_load_all(Path("deploy/issuers/cluster-issuers.yaml").read_text()))
+        issuers = list(yaml.safe_load_all(Path("deploy/certificates/cluster-issuers.yaml").read_text()))
         self.assertEqual(
             {issuer["metadata"]["name"] for issuer in issuers},
             {"letsencrypt-staging", "letsencrypt-production"},

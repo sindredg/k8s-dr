@@ -82,9 +82,10 @@
     --namespace flux-system --timeout=180s
   changed_when: false
 
+# Matches the flux-system Kustomization timeout in flux-sync.yml.j2.
 - name: Wait for Flux to apply the cluster configuration
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf
     wait --for=condition=Ready kustomization/flux-system
-    --namespace flux-system --timeout=300s
+    --namespace flux-system --timeout=900s
   changed_when: false
