@@ -1,0 +1,48 @@
+---
+# Read-only checks of the Flux-owned service layer. Run after
+# validate_cluster.yml passes.
+- name: Collect read-only service validation evidence
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Wait for the Flux service Kustomizations
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready kustomization/{{ item }}
+        --namespace flux-system --timeout=300s
+      loop:
+        - infrastructure
+        - certificates
+      changed_when: false
+
+    - name: Wait for the cert-manager release
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready helmrelease/cert-manager
+        --namespace cert-manager --timeout=300s
+      changed_when: false
+
+    - name: Wait for the ACME accounts of both issuers
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready clusterissuer/{{ item }} --timeout=180s
+      loop:
+        - letsencrypt-staging
+        - letsencrypt-production
+      changed_when: false
+
+    # A first DNS-01 order waits for Cloudflare propagation.
+    - name: Wait for the Gitea certificate
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready certificate/git-tls
+        --namespace gitea --timeout=600s
+      changed_when: false
+
+    - name: Show the Gitea certificate issuer, names, and expiry
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get certificate/git-tls --namespace gitea
+        --output=custom-columns=ISSUER:.spec.issuerRef.name,NAMES:.spec.dnsNames,EXPIRES:.status.notAfter
+      changed_when: false

@@ -17,6 +17,7 @@ import urllib.request
 import yaml
 
 DEFAULT_VARIABLES = Path("ansible/playbooks/group_vars/all.yml")
+DEFAULT_DEPLOY = Path("deploy")
 DOCKER_PACKAGES_URL = "https://download.docker.com/linux/ubuntu/dists/noble/stable/binary-amd64/Packages"
 KUBERNETES_PACKAGES = ("kubelet", "kubeadm", "kubectl")
 TIMEOUT_SECONDS = 60
@@ -131,22 +132,61 @@ def check_traefik_chart(pins: dict, fetch=_fetch) -> Result:
     return Result("Traefik chart", True, f"{wanted} in {url}")
 
 
-def run_checks(pins: dict, fetch=_fetch) -> list[Result]:
+def flux_chart_pins(deploy_dir: Path) -> list[tuple[str, str, str, str]]:
+    """Return (release, repository URL, chart, version) for each Flux HelmRelease."""
+    documents = [
+        document
+        for path in sorted(deploy_dir.rglob("*.yaml"))
+        for document in yaml.safe_load_all(path.read_text())
+        if isinstance(document, dict)
+    ]
+    repositories = {
+        (document["metadata"].get("namespace"), document["metadata"]["name"]): document["spec"]["url"]
+        for document in documents
+        if document.get("kind") == "HelmRepository"
+    }
+    pins = []
+    for document in documents:
+        if document.get("kind") != "HelmRelease":
+            continue
+        namespace = document["metadata"].get("namespace")
+        spec = document["spec"]["chart"]["spec"]
+        source = spec["sourceRef"]
+        url = repositories[(source.get("namespace", namespace), source["name"])]
+        pins.append((document["metadata"]["name"], url, spec["chart"], str(spec["version"])))
+    return pins
+
+
+def check_chart(name: str, url: str, chart: str, version: str, fetch=_fetch) -> Result:
+    index_url = f"{url.rstrip('/')}/index.yaml"
+    try:
+        versions = chart_versions(fetch(index_url).decode(), chart)
+    except (urllib.error.URLError, TimeoutError) as error:
+        return Result(f"{name} chart", False, f"{index_url}: {error}")
+    if version not in versions:
+        return Result(f"{name} chart", False, f"{chart} {version} not in {index_url}")
+    return Result(f"{name} chart", True, f"{chart} {version} in {index_url}")
+
+
+def run_checks(pins: dict, fetch=_fetch, deploy_dir: Path | None = None) -> list[Result]:
     results = [
         check_kubernetes_packages(pins, fetch),
         check_containerd(pins, fetch),
         check_traefik_chart(pins, fetch),
     ]
     results += [check_url(name, url, fetch) for name, url in artifact_urls(pins).items()]
+    if deploy_dir is not None:
+        results += [check_chart(*pin, fetch=fetch) for pin in flux_chart_pins(deploy_dir)]
     return results
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--variables", type=Path, default=DEFAULT_VARIABLES)
+    parser.add_argument("--deploy", type=Path, default=DEFAULT_DEPLOY)
     args = parser.parse_args(argv)
     pins = yaml.safe_load(args.variables.read_text())
-    results = run_checks(pins)
+    results = run_checks(pins, deploy_dir=args.deploy)
     for result in results:
         print(f"{'ok  ' if result.ok else 'FAIL'} {result.name}: {result.detail}")
     return 0 if all(result.ok for result in results) else 1

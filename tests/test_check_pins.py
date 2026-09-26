@@ -1,3 +1,5 @@
+from pathlib import Path
+import tempfile
 import unittest
 import urllib.error
 
@@ -120,6 +122,46 @@ class CheckTests(unittest.TestCase):
         versions = {name for name in variables if name.endswith(("_version", "_minor"))}
         # kubernetes_version is the kubeadm target; the package revision covers it.
         self.assertEqual(versions - pins.read, {"kubernetes_version"})
+
+class FluxChartTests(unittest.TestCase):
+    RELEASE = """
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata: {name: cert-manager, namespace: cert-manager}
+spec:
+  chart:
+    spec:
+      chart: cert-manager
+      version: v1.21.2
+      sourceRef: {kind: HelmRepository, name: jetstack}
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata: {name: jetstack, namespace: cert-manager}
+spec: {url: https://charts.jetstack.io}
+"""
+
+    def test_reads_release_pins_from_the_deploy_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "release.yaml").write_text(self.RELEASE)
+            pins = module.flux_chart_pins(Path(directory))
+        self.assertEqual(pins, [("cert-manager", "https://charts.jetstack.io", "cert-manager", "v1.21.2")])
+
+    def test_chart_check_fails_when_the_version_is_gone(self):
+        url = "https://charts.jetstack.io/index.yaml"
+        index = b"entries:\n  cert-manager:\n    - version: v1.21.1\n"
+        result = module.check_chart(
+            "cert-manager", "https://charts.jetstack.io", "cert-manager", "v1.21.2",
+            FakeUpstream({url: index}),
+        )
+        self.assertFalse(result.ok)
+
+    def test_repository_deploy_tree_pins_cert_manager(self):
+        pins = module.flux_chart_pins(module.DEFAULT_DEPLOY)
+        self.assertIn(
+            ("cert-manager", "https://charts.jetstack.io", "cert-manager", "v1.21.2"), pins
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,8 @@
 ---
 extends: default
+# SOPS writes encrypted files with long lines that it owns.
+ignore: |
+  *.sops.yaml
 rules:
   line-length:
     max: 100

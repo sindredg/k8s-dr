@@ -119,19 +119,47 @@ class FluxBootstrapTests(unittest.TestCase):
 
 
 class DeployTreeTests(unittest.TestCase):
-    def test_every_cluster_directory_builds_from_existing_files(self):
-        clusters = sorted(Path("deploy/clusters").iterdir())
-        self.assertTrue(clusters)
-        pending = list(clusters)
-        while pending:
-            directory = pending.pop()
-            kustomization = yaml.safe_load((directory / "kustomization.yaml").read_text())
-            for resource in kustomization.get("resources", []):
-                target = (directory / resource).resolve()
-                with self.subTest(directory=str(directory), resource=resource):
-                    self.assertTrue(target.exists())
-                if target.is_dir():
-                    pending.append(target)
+    def test_every_kustomization_lists_existing_files(self):
+        kustomizations = sorted(Path("deploy").rglob("kustomization.yaml"))
+        self.assertTrue(kustomizations)
+        for path in kustomizations:
+            for resource in yaml.safe_load(path.read_text()).get("resources", []):
+                with self.subTest(kustomization=str(path), resource=resource):
+                    self.assertTrue((path.parent / resource).exists())
+
+    def test_every_flux_kustomization_path_has_a_kustomization_file(self):
+        for path in Path("deploy/clusters").rglob("*.yaml"):
+            for document in yaml.safe_load_all(path.read_text()):
+                if document and document.get("apiVersion", "").startswith("kustomize.toolkit.fluxcd.io/"):
+                    with self.subTest(path=str(path), name=document["metadata"]["name"]):
+                        self.assertTrue((Path(document["spec"]["path"]) / "kustomization.yaml").is_file())
+
+    def test_certificates_wait_for_cert_manager_and_decrypt_secrets(self):
+        documents = {
+            document["metadata"]["name"]: document
+            for document in yaml.safe_load_all(Path("deploy/clusters/primary/sync.yaml").read_text())
+        }
+        infrastructure = documents["infrastructure"]["spec"]
+        self.assertTrue(infrastructure["wait"])
+        certificates = documents["certificates"]["spec"]
+        self.assertEqual(certificates["dependsOn"], [{"name": "infrastructure"}])
+        self.assertEqual(
+            certificates["decryption"], {"provider": "sops", "secretRef": {"name": "sops-age"}}
+        )
+        # A slow ACME order must not fail the bootstrap wait on flux-system.
+        self.assertFalse(certificates["wait"])
+
+    def test_issuers_use_the_cloudflare_token_and_no_email(self):
+        issuers = list(yaml.safe_load_all(Path("deploy/issuers/cluster-issuers.yaml").read_text()))
+        self.assertEqual(
+            {issuer["metadata"]["name"] for issuer in issuers},
+            {"letsencrypt-staging", "letsencrypt-production"},
+        )
+        for issuer in issuers:
+            acme = issuer["spec"]["acme"]
+            self.assertNotIn("email", acme)
+            token = acme["solvers"][0]["dns01"]["cloudflare"]["apiTokenSecretRef"]
+            self.assertEqual(token, {"name": "cloudflare-api-token", "key": "api-token"})
 
     def test_data_namespaces_are_never_pruned(self):
         documents = yaml.safe_load_all(Path("deploy/base/namespaces.yaml").read_text())

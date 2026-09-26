@@ -1,0 +1,15 @@
+---
+# The Gitea Gateway listener will reference this Secret. Switch the issuer to
+# letsencrypt-production once staging issuance is proven.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: git-tls
+  namespace: gitea
+spec:
+  secretName: git-tls
+  dnsNames:
+    - git.sindrg.com
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-staging
