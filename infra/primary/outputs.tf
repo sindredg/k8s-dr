@@ -42,3 +42,8 @@ output "network_name" {
   description = "Primary VPC network."
   value       = module.primary_cluster.network_name
 }
+
+output "public_web_address" {
+  description = "Primary public address for the git.sindrg.com DNS record."
+  value       = module.primary_cluster.public_web_address
+}

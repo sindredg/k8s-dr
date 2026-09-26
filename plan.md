@@ -7,7 +7,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | 0. Recovery contract | Scope and measurements defined | Complete |
 | 1. Primary infrastructure | Reproducible VMs and network | Complete |
 | 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Complete |
-| 3. Service deployment | Gitea survives pod restarts | Pending |
+| 3. Service deployment | Gitea survives pod restarts | In progress |
 | 4. Consistent backups | Offsite data restores successfully | Pending |
 | 5. Cold recovery | Independent service in second region | Pending |
 | 6. Disaster drill | Measured RTO and RPO | Pending |

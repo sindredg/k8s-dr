@@ -155,11 +155,12 @@ Prices vary by billing currency, discounts, and traffic. Use the [Google Cloud p
 | Compute Engine | Finland `europe-north1`, 2 `e2-custom-2-4096` VMs, Linux/Ubuntu, 730 hours/month, on-demand, no committed-use discount |
 | Persistent Disk | Finland, Balanced, 2 boot disks at 30 GiB and 1 worker data disk at 50 GiB, 730 hours/month |
 | Cloud NAT | Finland, 1 public NAT gateway serving 2 VMs, 1 ephemeral NAT IP, 730 hours/month, assume 40 GiB processed/month (20 GiB outbound and 20 GiB inbound) |
+| Cloud Load Balancing | Finland, 1 regional external passthrough forwarding rule and 1 in-use static external IPv4 address, 730 hours/month. Added in milestone 3 |
 | Internet data transfer | Assume 20 GiB/month from Finland to the internet; replace with expected workload traffic |
 | Cloud Storage state | Belgium `europe-west1`, Standard, 1 GiB including object versions |
 | Cloud Storage backups | Belgium `europe-west1`, Standard, 20 GiB including object versions; no backup objects exist yet |
 
-The calculator may show NAT and egress outside the Compute Engine section. Include them once. Exclude tax and promotional credits from the estimate, and note your billing account's actual currency. Backup volume, state versions, snapshots, storage operations, public ingress, and future recovery drills can increase cost. The buckets remain billable after the VMs stop.
+The calculator may show NAT and egress outside the Compute Engine section. Include them once. Exclude tax and promotional credits from the estimate, and note your billing account's actual currency. Backup volume, state versions, snapshots, storage operations, load balancer data processing, and future recovery drills can increase cost. The buckets remain billable after the VMs stop.
 
 ## Future Belgium cluster
 

@@ -2,6 +2,15 @@
 deployment:
   replicas: 1
 
+# The public load balancer passes 80 and 443 through unchanged, so Traefik
+# binds those host ports on the worker. A surge pod could never schedule next
+# to the old one, so replace the pod instead.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0
+
 nodeSelector:
   node-role.kubernetes.io/worker: ""
 
@@ -26,8 +35,10 @@ service:
 
 ports:
   web:
+    hostPort: 80
     nodePort: {{ traefik_http_node_port }}
   websecure:
+    hostPort: 443
     expose:
       default: false
 

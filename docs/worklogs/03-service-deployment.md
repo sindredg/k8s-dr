@@ -1,6 +1,6 @@
 # Milestone 3: Service deployment
 
-Status: Pending. The preparation gate passed on 2026-09-25; milestone 3 implementation has not started.
+Status: In progress. The preparation gate passed on 2026-09-25. Implementation started on 2026-09-26.
 
 ## Scope
 
@@ -66,3 +66,19 @@ The preparation gate passed on 2026-09-25: both roots plan with no changes, IAP 
 ![Helm 4 bootstrap recap: failed=0 on both hosts](../images/helm4-bootstrap-recap.png)
 
 ![Cluster validation recap after Helm 4: failed=0](../images/helm4-validate-cluster-recap.png)
+
+## Implementation
+
+Follow the [service deployment procedure](../runbooks/service-deployment.md).
+
+### Work completed
+
+| Area | Files | Summary |
+| --- | --- | --- |
+| Public endpoint | `infra/modules/regional_cluster/`, `infra/primary/outputs.tf`, `ansible/roles/cluster_addons/templates/traefik-values.yml.j2`, `tests/test_cluster_manifests.py` | A static external address, a regional external passthrough load balancer to an unmanaged worker instance group, a TCP health check on port 80, and one firewall rule for TCP 80 and 443 on a worker-only tag. The rule allows `0.0.0.0/0` because the load balancer keeps client addresses; that range covers the health-check probes, so decision 0006's separate health-check rule is not needed. Traefik binds host ports 80 and 443 and replaces its pod instead of surging, because a surge pod cannot bind the same host ports on one worker. The module serves the recovery region unchanged. Not yet applied. |
+
+Local checks: `terraform fmt -check` and `terraform validate` pass for the module and the primary root. `make check` passes: 77 tests, yamllint, ansible-lint, and syntax checks. These checks are not gate evidence.
+
+### Validation record
+
+No results recorded yet.
