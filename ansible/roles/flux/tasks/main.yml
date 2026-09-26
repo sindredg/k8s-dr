@@ -64,6 +64,17 @@
     apply -f /etc/kubernetes/flux-sync.yml
   changed_when: true
 
+# Flux does not watch the key Secret, and reapplying an unchanged spec does not
+# trigger a reconcile. Without this request, a failure recorded before the
+# Secret was replaced stays until the next interval.
+- name: Request an immediate Flux reconcile
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    annotate --overwrite --namespace flux-system
+    gitrepository/flux-system kustomization/flux-system
+    reconcile.fluxcd.io/requestedAt={{ now(utc=true).isoformat() }}
+  changed_when: true
+
 - name: Wait for Flux to fetch the repository
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf

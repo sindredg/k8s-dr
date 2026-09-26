@@ -82,6 +82,15 @@ class FluxBootstrapTests(unittest.TestCase):
         self.assertEqual(secret["stringData"]["age.agekey"], key)
         self.assertEqual(secret["metadata"], {"name": "sops-age", "namespace": "flux-system"})
 
+    def test_reconcile_is_requested_after_the_secret_and_sync_are_applied(self):
+        names = list(_tasks_by_name())
+        request = names.index("Request an immediate Flux reconcile")
+        self.assertGreater(request, names.index("Reconcile the SOPS age key Secret"))
+        self.assertGreater(request, names.index("Apply the Flux Git source and cluster Kustomization"))
+        self.assertLess(request, names.index("Wait for Flux to apply the cluster configuration"))
+        command = _tasks_by_name()["Request an immediate Flux reconcile"]["ansible.builtin.command"]
+        self.assertIn("reconcile.fluxcd.io/requestedAt=", command)
+
     def test_sync_reads_the_cluster_directory_and_decrypts_with_sops(self):
         documents = _sync_documents()
         self.assertEqual(documents["GitRepository"]["spec"]["ref"], {"branch": "main"})
