@@ -3,6 +3,7 @@
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -227,14 +228,35 @@ def parse_cli(argv: list[str]):
     return args, command
 
 
+def format_run_summary(started: datetime, finished: datetime, elapsed: float, returncode: int) -> str:
+    """Describe one run for drill timelines and bootstrap duration baselines."""
+    return (
+        f"run_with_iap: started {started:%Y-%m-%dT%H:%M:%SZ}, "
+        f"finished {finished:%Y-%m-%dT%H:%M:%SZ}, "
+        f"elapsed {elapsed:.0f}s, exit {returncode}"
+    )
+
+
 def main(argv=None) -> int:
     args, command = parse_cli(list(sys.argv[1:] if argv is None else argv))
     targets = load_targets(args.inventory)
-    return run_with_tunnels(
+    started = datetime.now(timezone.utc)
+    start_clock = time.monotonic()
+    returncode = run_with_tunnels(
         targets,
         command,
         known_hosts_path=args.inventory.with_name("known_hosts"),
     )
+    print(
+        format_run_summary(
+            started,
+            datetime.now(timezone.utc),
+            time.monotonic() - start_clock,
+            returncode,
+        ),
+        file=sys.stderr,
+    )
+    return returncode
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Regional infrastructure and state](decisions/0003-regional-infrastructure-and-state.md) | Explain the reusable module and offsite state decisions. |
 | [Remove budget alert](decisions/0004-remove-budget-alert.md) | Record the operator's decision to remove automated spend alerts from Terraform. |
 | [Kubernetes bootstrap architecture](decisions/0005-kubernetes-bootstrap-architecture.md) | Define the Milestone 2 automation, networking, storage, access, and validation design. |
+| [Service deployment architecture](decisions/0006-service-deployment-architecture.md) | Define Flux, secrets, PostgreSQL, Gitea, and public exposure for milestone 3. |
+| [Production readiness](production-readiness.md) | List what a production deployment adds to this lab. |
 | [Kubernetes bootstrap implementation plan](plans/2026-09-23-kubernetes-bootstrap.md) | Break Milestone 2 implementation into tested, reviewable tasks. |
 | [Primary infrastructure procedure](runbooks/primary-infrastructure.md) | Bootstrap state, apply the primary root, and check the milestone 1 gate. |
 | [Terraform shared-root migration](runbooks/terraform-shared-root-migration.md) | Move the backup bucket and project IAM into `infra/shared` once, without recreating resources. |

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+import io
 import json
 from pathlib import Path
 import socket
@@ -215,6 +217,28 @@ class RunWithIapTests(unittest.TestCase):
     def test_cli_rejects_empty_command(self):
         with self.assertRaisesRegex(ValueError, "command"):
             module.main(["--inventory", "hosts.json", "--"])
+
+    def test_run_summary_uses_utc_timestamps_and_whole_seconds(self):
+        summary = module.format_run_summary(
+            datetime(2026, 9, 25, 8, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 9, 25, 8, 7, 30, tzinfo=timezone.utc),
+            450.4,
+            0,
+        )
+        self.assertEqual(
+            summary,
+            "run_with_iap: started 2026-09-25T08:00:00Z, "
+            "finished 2026-09-25T08:07:30Z, elapsed 450s, exit 0",
+        )
+
+    @mock.patch("scripts.run_with_iap.run_with_tunnels", return_value=2)
+    @mock.patch("scripts.run_with_iap.load_targets")
+    def test_main_reports_timing_and_returns_the_command_exit_code(self, load, run):
+        stderr = io.StringIO()
+        with mock.patch("sys.stderr", stderr):
+            result = module.main(["--inventory", "hosts.json", "--", "ansible-playbook"])
+        self.assertEqual(result, 2)
+        self.assertRegex(stderr.getvalue(), r"^run_with_iap: started \S+Z, finished \S+Z, elapsed \d+s, exit 2\n$")
 
     @staticmethod
     def _process():
