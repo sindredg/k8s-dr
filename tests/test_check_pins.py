@@ -1,4 +1,3 @@
-import gzip
 import unittest
 import urllib.error
 
@@ -7,7 +6,7 @@ from scripts import check_pins as module
 PINS = {
     "kubernetes_minor": "v1.36",
     "kubernetes_deb_version": "1.36.2-2.1",
-    "containerd_deb_version": "2.2.1-0ubuntu1~24.04.3",
+    "containerd_deb_version": "2.3.6-1~ubuntu.24.04~noble",
     "helm_version": "4.3.0",
     "calico_version": "3.32.2",
     "gateway_api_version": "1.6.1",
@@ -21,8 +20,8 @@ KUBERNETES_INDEX = "\n\n".join(
 )
 
 
-def packages_index(*versions):
-    return "\n\n".join(f"Package: containerd\nVersion: {version}" for version in versions)
+def packages_index(*versions, package="containerd.io"):
+    return "\n\n".join(f"Package: {package}\nVersion: {version}" for version in versions)
 
 
 class FakeUpstream:
@@ -67,30 +66,23 @@ class CheckTests(unittest.TestCase):
         result = module.check_kubernetes_packages(PINS, FakeUpstream({url: KUBERNETES_INDEX.encode()}))
         self.assertTrue(result.ok)
 
-    def test_containerd_passes_from_any_pocket(self):
-        security = "http://archive.ubuntu.com/ubuntu/dists/noble-security/main/binary-amd64/Packages.gz"
-        responses = {
-            url: gzip.compress(packages_index("1.7.12").encode())
-            for url in (
-                f"http://archive.ubuntu.com/ubuntu/dists/{pocket}/main/binary-amd64/Packages.gz"
-                for pocket in module.UBUNTU_POCKETS
-            )
-        }
-        responses[security] = gzip.compress(packages_index(PINS["containerd_deb_version"]).encode())
-        result = module.check_containerd(PINS, FakeUpstream(responses))
+    def test_containerd_passes_when_docker_publishes_the_pin(self):
+        index = packages_index("2.3.5-1~ubuntu.24.04~noble", PINS["containerd_deb_version"])
+        result = module.check_containerd(PINS, FakeUpstream({module.DOCKER_PACKAGES_URL: index.encode()}))
         self.assertTrue(result.ok)
-        self.assertIn("noble-security", result.detail)
+        self.assertIn("containerd.io", result.detail)
 
-    def test_superseded_containerd_fails_and_lists_available_versions(self):
-        responses = {
-            f"http://archive.ubuntu.com/ubuntu/dists/{pocket}/main/binary-amd64/Packages.gz": gzip.compress(
-                packages_index("2.2.1-0ubuntu1~24.04.4").encode()
-            )
-            for pocket in module.UBUNTU_POCKETS
-        }
-        result = module.check_containerd(PINS, FakeUpstream(responses))
+    def test_containerd_fails_and_lists_available_versions(self):
+        index = packages_index("2.3.5-1~ubuntu.24.04~noble")
+        result = module.check_containerd(PINS, FakeUpstream({module.DOCKER_PACKAGES_URL: index.encode()}))
         self.assertFalse(result.ok)
-        self.assertIn("2.2.1-0ubuntu1~24.04.4", result.detail)
+        self.assertIn("2.3.5-1~ubuntu.24.04~noble", result.detail)
+
+    def test_containerd_ignores_ubuntu_package_name(self):
+        # The pin is for containerd.io; a same-version `containerd` entry must not count.
+        index = packages_index(PINS["containerd_deb_version"], package="containerd")
+        result = module.check_containerd(PINS, FakeUpstream({module.DOCKER_PACKAGES_URL: index.encode()}))
+        self.assertFalse(result.ok)
 
     def test_missing_file_fails_without_raising(self):
         url = "https://example.invalid/file.yaml"

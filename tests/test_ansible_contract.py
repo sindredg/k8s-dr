@@ -9,7 +9,7 @@ class AnsibleContractTests(unittest.TestCase):
         values = yaml.safe_load(Path("ansible/playbooks/group_vars/all.yml").read_text())
         self.assertEqual(values["kubernetes_version"], "1.36.2")
         self.assertEqual(values["kubernetes_deb_version"], "1.36.2-2.1")
-        self.assertEqual(values["containerd_deb_version"], "2.2.1-0ubuntu1~24.04.3")
+        self.assertEqual(values["containerd_deb_version"], "2.3.6-1~ubuntu.24.04~noble")
         self.assertEqual(values["helm_version"], "4.3.0")
 
     def test_network_and_storage_values_are_exact(self):
@@ -23,6 +23,18 @@ class AnsibleContractTests(unittest.TestCase):
         config = Path("ansible/roles/container_runtime/templates/config.toml.j2").read_text()
         self.assertIn("SystemdCgroup = true", config)
         self.assertNotIn('disabled_plugins = ["cri"]', config)
+
+    def test_containerd_comes_from_a_repository_that_keeps_old_versions(self):
+        # Ubuntu's archive drops superseded builds, so an exact Ubuntu pin breaks.
+        tasks = yaml.safe_load(
+            Path("ansible/roles/container_runtime/tasks/main.yml").read_text()
+        )
+        by_name = {task["name"]: task for task in tasks}
+        repository = by_name["Configure the Docker package repository"]["ansible.builtin.deb822_repository"]
+        self.assertEqual(repository["uris"], ["https://download.docker.com/linux/ubuntu"])
+        self.assertEqual(repository["signed_by"], "/etc/apt/keyrings/docker.asc")
+        install = by_name["Install the pinned containerd package"]["ansible.builtin.apt"]
+        self.assertEqual(install["name"], "containerd.io={{ containerd_deb_version }}")
 
     def test_containerd_restarts_when_running_config_is_stale(self):
         # A handler is lost when a later task fails, so compare the service start

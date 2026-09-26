@@ -1,6 +1,6 @@
 # 0005: Kubernetes bootstrap architecture
 
-Status: Accepted. Amended on 2026-09-23 for the ingress reachability check and on 2026-09-26 for Helm 4; see the [Helm 4 amendment](#amendment-helm-4). Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
+Status: Accepted. Amended on 2026-09-23 for the ingress reachability check and on 2026-09-26 for Helm 4 and the containerd source; see the [Helm 4](#amendment-helm-4) and [containerd](#amendment-containerd-from-dockers-repository) amendments. Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
 
 Date: 2026-09-23
 
@@ -95,6 +95,31 @@ Date: 2026-09-26.
 - Primary and recovery use different apply methods for Traefik until the primary is rebuilt or explicitly switched.
 
 References: [Helm 4 overview](https://helm.sh/docs/overview/), [Helm 4.3.0 release](https://github.com/helm/helm/releases/tag/v4.3.0).
+
+### Amendment: containerd from Docker's repository
+
+Date: 2026-09-26.
+
+**Problem:** the containerd pin `2.2.1-0ubuntu1~24.04.3` came from Ubuntu's archive, whose index lists only the newest build of each package. When Ubuntu publishes the next build, the exact pin stops installing on a fresh node, so a recovery drill would fail during host preparation. runc came in unpinned as a dependency. containerd 2.2 also reaches end of life on 2026-11-06.
+
+**Decision:** install `containerd.io` `2.3.6-1~ubuntu.24.04~noble` from Docker's apt repository, with the same exact-pin pattern as the Kubernetes packages.
+
+| Option | Trade-off |
+| --- | --- |
+| Docker `containerd.io` repository (selected) | The noble index kept 31 `containerd.io` versions on 2026-09-26. The package bundles runc, so one pin covers both. Adds a third-party repository and signing key. |
+| Upstream GitHub release archive | Immutable and checksum-verified, like Helm. runc and the systemd unit need separate pins and tasks. |
+| Ubuntu snapshot service | Keeps Ubuntu's package. Recovery then also depends on `snapshot.ubuntu.com`. |
+| Keep Ubuntu and update the pin when the check fails | No change, but a drill can fail in the gap before the weekly pin check runs. |
+
+containerd 2.3 is a long-term stable release supported until 2028-04-30, and containerd lists it as compatible with Kubernetes 1.36 and 1.37 ([containerd releases](https://github.com/containerd/containerd/blob/main/RELEASES.md)). The package declares `Conflicts` and `Replaces` for Ubuntu's `containerd` and `runc`, so apt swaps them in one transaction on nodes built before this change. The tracked `config.toml` does not change: containerd 2.3 migrates configuration version 2 at startup.
+
+**Trade-offs:**
+
+- Package installation now depends on `download.docker.com` in addition to the Ubuntu archive and `pkgs.k8s.io`.
+- The signing key is downloaded at bootstrap without a fingerprint check, the same as the Kubernetes repository key.
+- Switching packages on a running node stops containerd briefly. Running containers continue under their shims, and kubelet reconnects when containerd starts.
+- The `cni.bin_dir` setting is deprecated since containerd 2.1 and removed in 2.4. Moving to 2.4 requires migrating it to `bin_dirs`.
+- `pkgs.k8s.io` can also drop a package revision, as the milestone 2 worklog records. `scripts/check_pins.py` detects that; this amendment does not change it.
 
 ### Use Calico VXLAN on non-overlapping configurable networks
 

@@ -26,6 +26,7 @@ The [pre-milestone 3 steps](../../plan.md#before-milestone-3-recovery-readiness)
 | Decision notes | `plan.md`, `docs/decisions/0006-service-deployment-architecture.md`, `docs/production-readiness.md` | Milestone 4 backup bucket hardening: a writer that cannot delete or overwrite, a retention policy with a recorded lock decision, explicit soft delete, and noncurrent-version expiry. A decision 0006 amendment records why Gitea stays over Forgejo and confirms that Gitea chart 12.7.0 still declares the Bitnami subcharts. Documentation only; no Terraform change. |
 | Make targets | `Makefile`, `tests/test_makefile.py`, `docs/runbooks/kubernetes-bootstrap.md` | Short names for the inventory, bootstrap, validation, test-app, local check, and pin check commands. The runbook uses the targets, and `make -n <target>` prints the full command. `make` ships with Ubuntu, so the recovery path gains no dependency. A test fails when a playbook is missing from the `make check` syntax checks. |
 | CI uses `make check` | `.github/workflows/ansible.yml`, `Makefile` | CI runs `make check BIN=` instead of its own copy of the test, lint, and syntax-check steps, so the playbook list exists once. `BIN` defaults to `.venv/bin/`; CI clears it because it installs tools into the system Python. |
+| containerd source | `ansible/roles/container_runtime/tasks/main.yml`, `group_vars/all.yml`, `scripts/check_pins.py`, `tests/` | Installs `containerd.io` `2.3.6-1~ubuntu.24.04~noble` from Docker's repository instead of Ubuntu's `containerd`. The pin check reads Docker's noble index. A contract test fails if the role installs from another source. Not yet validated on the cluster. |
 
 Local checks: `terraform fmt -check -recursive` and `terraform validate` pass for the bootstrap, shared, and primary roots. `python3 -m unittest discover -s tests`, yamllint, ansible-lint, and syntax checks for all six playbooks pass. These checks are not gate evidence.
 
@@ -35,6 +36,7 @@ Local checks: `terraform fmt -check -recursive` and `terraform validate` pass fo
 
 - `scripts/check_pins.py` detects this. Run against a copy of the variables with `~24.04.2`, it exits `1` with `2.2.1-0ubuntu1~24.04.2 is no longer published`. With the Kubernetes revision `1.36.2-1.1` from the milestone 2 failure, it exits `1` with `1.36.2-1.1 not published for kubelet, kubeadm, kubectl`.
 - Options, not yet decided: install containerd from a source that keeps old versions, such as Docker's `containerd.io` repository or the upstream release archive with a checksum; or accept the risk and update the pin whenever the check fails. Either change needs the milestone 2 bootstrap validation again.
+- Resolved on 2026-09-26: containerd now comes from Docker's `containerd.io` repository, pinned to `2.3.6-1~ubuntu.24.04~noble`. See the [decision 0005 amendment](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-containerd-from-dockers-repository). Not yet validated on the cluster.
 
 ### Validation record
 
