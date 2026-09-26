@@ -4,6 +4,8 @@ Status: Validated. The Milestone 2 gate passed on 2026-09-25 after a VM rebuild,
 
 Run every command from the repository root on the external operator machine unless a step says otherwise. Both VMs stay private. Ansible reaches them only through IAP and OS Login.
 
+The `make` targets wrap the commands in the repository `Makefile`. Run `make` to list them, and `make -n <target>` to print a command without running it. `make inventory` reads the OS Login user from `gcloud` and the node values from `TF_DIR`, which defaults to `infra/primary`. The Makefile stores no real identifiers.
+
 Do not commit or share the generated inventory, the generated `known_hosts` file, kubeconfigs, join tokens, Terraform plans, real project IDs, private addresses, or complete logs. When you report evidence, send the command, exit code, expected and observed results, and relevant excerpts with identifiers replaced.
 
 ## Gate checks
@@ -20,8 +22,7 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
 1. Install the pinned controller toolchain.
 
    ```bash
-   python3 -m venv .venv
-   .venv/bin/pip install -r ansible/requirements.txt
+   make venv
    ```
 
    Expected: pip installs the exact versions in `ansible/requirements.txt` without errors.
@@ -34,10 +35,9 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
    export PRIMARY_ZONE="$(terraform output -raw zone)"
    export CONTROL_PLANE_NAME="$(terraform output -json instance_names | python3 -c 'import json,sys; print(json.load(sys.stdin)["control-plane"])')"
    export WORKER_NAME="$(terraform output -raw worker_name)"
-   export OS_LOGIN_USER="$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')"
    ```
 
-   Expected: all five variables are nonempty.
+   Expected: all four variables are nonempty.
 
 3. Confirm IAP and OS Login access to both nodes.
 
@@ -52,7 +52,7 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
 4. Generate the inventory from Terraform outputs.
 
    ```bash
-   python3 scripts/prepare_ansible_inventory.py --terraform-dir infra/primary --ssh-user "$OS_LOGIN_USER" --ssh-key "$HOME/.ssh/google_compute_engine" --output ansible/inventory/generated/hosts.json
+   make inventory
    git status --short ansible/inventory
    ```
 
@@ -90,7 +90,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 1. Run the bootstrap playbook through the IAP runner.
 
    ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/bootstrap.yml
+   make bootstrap
    ```
 
    Expected: the play recap shows `failed=0` and `unreachable=0` for both hosts. The runner closes both tunnels when Ansible exits.
@@ -102,7 +102,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 3. Check the cluster without an application.
 
    ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate_cluster.yml -v
+   make validate-cluster
    ```
 
    Expected: `failed=0`. Both nodes are `Ready`; the Calico, CoreDNS, Local Path Provisioner, and Traefik rollouts complete; and the `traefik` GatewayClass is `Accepted`. `validate.yml` runs this playbook and then `validate_test_app.yml`, which needs the disposable application.
@@ -114,8 +114,8 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 1. Deploy the application and rerun validation.
 
    ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/deploy_test_app.yml
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
+   make deploy-test-app
+   make validate
    ```
 
    Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Inspect its output: both nodes must be `Ready` on Kubernetes `v1.36.2`; the Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods must be `Running`; the PVC must be `Bound` with StorageClass `local-path`, with a matching PV; and the application pod must be `Running` on the worker. The playbook fails unless the Gateway is `Programmed`, the HTTPRoute is `Accepted`, and the PVC is `Bound`. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
@@ -129,7 +129,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 
    ```bash
    python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible control-plane -i ansible/inventory/generated/hosts.json --become -m ansible.builtin.shell -a 'kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test delete pod -l app=milestone2-app --wait=true && kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test rollout status deployment/milestone2-app --timeout=180s'
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
+   make validate
    ```
 
    Expected: the rollout completes, the application pod has a new name in the second validation output, and validation ends with `failed=0` with the same marker. Compare pod names and the PVC-to-PV binding in the validation output before and after deletion. The replacement pod read the file that the first pod wrote to the persistent volume.
@@ -148,7 +148,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 2. Rerun validation.
 
    ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/validate.yml -v
+   make validate
    ```
 
    Expected: validation waits up to five minutes for both nodes and the Calico, CoreDNS, Local Path Provisioner, Traefik, and test-app rollouts. The IAP runner also retries a temporary SSH host-key scan failure for up to 30 seconds. Validation then ends with `failed=0`. Inspect the node and pod output to confirm the worker is `Ready` again without a new join. Compare the PVC-to-PV binding with the output before the restart, and confirm the application request returns the same marker. If a wait times out, inspect the named workload and its events before retrying.
@@ -156,7 +156,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 3. Remove the disposable application.
 
    ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible-playbook -i ansible/inventory/generated/hosts.json ansible/playbooks/cleanup_test_app.yml
+   make cleanup-test-app
    ```
 
    Expected: `failed=0`. The namespace `milestone2-test` no longer exists, and the provisioner deletes the PV directory because the `local-path` reclaim policy is `Delete`.
