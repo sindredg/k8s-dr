@@ -98,6 +98,8 @@ Local checks for Flux and SOPS: `make check` passes: 89 tests, yamllint (now inc
 | 2026-09-26 | Same command at `ba1d5ce` (reconcile request) | Passed. Control plane `ok=70 changed=13 unreachable=0 failed=0 skipped=8`; worker `ok=55 changed=0 unreachable=0 failed=0 skipped=9`. `run_with_iap: started 2026-09-26T19:03:07Z, finished 2026-09-26T19:05:10Z, elapsed 122s, exit 0`. |
 | 2026-09-26 | `make validate-cluster` | Passed. Control plane `ok=10 changed=0 unreachable=0 failed=0`; `elapsed 20s, exit 0`. Applied revision `feat/flux-bootstrap@sha1:ba1d5ce`; `secret/sops-age` present. |
 | 2026-09-26 | `kubectl get namespaces gitea postgresql -L kustomize.toolkit.fluxcd.io/name` on the control plane through IAP | Both `Active`, label value `flux-system`. |
+| 2026-09-26 | `make bootstrap` from `main` at `4e63e52` after merging PR #17 | Passed. Control plane `ok=70 changed=14 unreachable=0 failed=0 skipped=8`; worker `ok=55 changed=0 unreachable=0 failed=0 skipped=9`. `run_with_iap: started 2026-09-26T22:29:04Z, finished 2026-09-26T22:32:09Z, elapsed 181s, exit 0`. |
+| 2026-09-26 | `make validate-cluster` | Passed. Control plane `ok=10 changed=0 unreachable=0 failed=0`; `elapsed 23s, exit 0`. Applied revision `main@sha1:4e63e52d44985431733089ac4e92e0a4307da675`, equal to `git rev-parse origin/main`. Flux now tracks `main`. |
 
 ![Public endpoint plan: 6 to add, 1 to change, 0 to destroy](../images/public-lb-plan.png)
 
