@@ -103,6 +103,9 @@ Local checks for cert-manager: `make check` passes: 95 tests, yamllint (SOPS-enc
 | 2026-09-26 | `kubectl get namespaces gitea postgresql -L kustomize.toolkit.fluxcd.io/name` on the control plane through IAP | Both `Active`, label value `flux-system`. |
 | 2026-09-26 | `make bootstrap` from `main` at `4e63e52` after merging PR #17 | Passed. Control plane `ok=70 changed=14 unreachable=0 failed=0 skipped=8`; worker `ok=55 changed=0 unreachable=0 failed=0 skipped=9`. `run_with_iap: started 2026-09-26T22:29:04Z, finished 2026-09-26T22:32:09Z, elapsed 181s, exit 0`. |
 | 2026-09-26 | `make validate-cluster` | Passed. Control plane `ok=10 changed=0 unreachable=0 failed=0`; `elapsed 23s, exit 0`. Applied revision `main@sha1:4e63e52d44985431733089ac4e92e0a4307da675`, equal to `git rev-parse origin/main`. Flux now tracks `main`. |
+| 2026-09-26 | `make bootstrap FLUX_GIT_BRANCH=feat/cert-manager` at `8dfadee` | Passed. Control plane `ok=70 changed=14 unreachable=0 failed=0 skipped=8`; worker `ok=55 changed=0 unreachable=0 failed=0 skipped=9`. `run_with_iap: started 2026-09-26T22:46:22Z, finished 2026-09-26T22:50:05Z, elapsed 213s, exit 0`. |
+| 2026-09-26 | `make validate-cluster` | Passed. Control plane `ok=10 changed=0 unreachable=0 failed=0`; `elapsed 23s, exit 0`. Applied revision `feat/cert-manager@sha1:8dfadee`. |
+| 2026-09-26 | `make validate-services` | Passed. Control plane `ok=5 changed=0 unreachable=0 failed=0`; `run_with_iap: started 2026-09-26T22:50:35Z, finished 2026-09-26T22:51:27Z, elapsed 49s, exit 0`. The `infrastructure` and `certificates` Kustomizations, the `cert-manager` HelmRelease, and both ClusterIssuers are `Ready`. `certificate/git-tls`: issuer `letsencrypt-staging`, names `[git.sindrg.com]`, expires `2026-12-25T21:52:55Z`. Issuance proves in-cluster SOPS decryption of the Cloudflare token and DNS-01 through Cloudflare. |
 
 ![Public endpoint plan: 6 to add, 1 to change, 0 to destroy](../images/public-lb-plan.png)
 
