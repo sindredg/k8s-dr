@@ -26,7 +26,7 @@ The [pre-milestone 3 steps](../../plan.md#before-milestone-3-recovery-readiness)
 | Decision notes | `plan.md`, `docs/decisions/0006-service-deployment-architecture.md`, `docs/production-readiness.md` | Milestone 4 backup bucket hardening: a writer that cannot delete or overwrite, a retention policy with a recorded lock decision, explicit soft delete, and noncurrent-version expiry. A decision 0006 amendment records why Gitea stays over Forgejo and confirms that Gitea chart 12.7.0 still declares the Bitnami subcharts. Documentation only; no Terraform change. |
 | Make targets | `Makefile`, `tests/test_makefile.py`, `docs/runbooks/kubernetes-bootstrap.md` | Short names for the inventory, bootstrap, validation, test-app, local check, and pin check commands. The runbook uses the targets, and `make -n <target>` prints the full command. `make` ships with Ubuntu, so the recovery path gains no dependency. A test fails when a playbook is missing from the `make check` syntax checks. |
 | CI uses `make check` | `.github/workflows/ansible.yml`, `Makefile` | CI runs `make check BIN=` instead of its own copy of the test, lint, and syntax-check steps, so the playbook list exists once. `BIN` defaults to `.venv/bin/`; CI clears it because it installs tools into the system Python. |
-| containerd source | `ansible/roles/container_runtime/tasks/main.yml`, `group_vars/all.yml`, `scripts/check_pins.py`, `tests/` | Installs `containerd.io` `2.3.6-1~ubuntu.24.04~noble` from Docker's repository instead of Ubuntu's `containerd`. The pin check reads Docker's noble index. A contract test fails if the role installs from another source. Not yet validated on the cluster. |
+| containerd source | `ansible/roles/container_runtime/tasks/main.yml`, `group_vars/all.yml`, `scripts/check_pins.py`, `tests/` | Installs `containerd.io` `2.3.6-1~ubuntu.24.04~noble` from Docker's repository instead of Ubuntu's `containerd`. The pin check reads Docker's noble index. A contract test fails if the role installs from another source. Validated on the cluster on 2026-09-26 during the public endpoint bootstrap. |
 
 Local checks: `terraform fmt -check -recursive` and `terraform validate` pass for the bootstrap, shared, and primary roots. `python3 -m unittest discover -s tests`, yamllint, ansible-lint, and syntax checks for all six playbooks pass. These checks are not gate evidence.
 
@@ -36,7 +36,7 @@ Local checks: `terraform fmt -check -recursive` and `terraform validate` pass fo
 
 - `scripts/check_pins.py` detects this. Run against a copy of the variables with `~24.04.2`, it exits `1` with `2.2.1-0ubuntu1~24.04.2 is no longer published`. With the Kubernetes revision `1.36.2-1.1` from the milestone 2 failure, it exits `1` with `1.36.2-1.1 not published for kubelet, kubeadm, kubectl`.
 - Options, not yet decided: install containerd from a source that keeps old versions, such as Docker's `containerd.io` repository or the upstream release archive with a checksum; or accept the risk and update the pin whenever the check fails. Either change needs the milestone 2 bootstrap validation again.
-- Resolved on 2026-09-26: containerd now comes from Docker's `containerd.io` repository, pinned to `2.3.6-1~ubuntu.24.04~noble`. See the [decision 0005 amendment](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-containerd-from-dockers-repository). Not yet validated on the cluster.
+- Resolved on 2026-09-26: containerd now comes from Docker's `containerd.io` repository, pinned to `2.3.6-1~ubuntu.24.04~noble`. See the [decision 0005 amendment](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-containerd-from-dockers-repository). Validated on the cluster on 2026-09-26.
 
 ### Validation record
 
@@ -75,10 +75,32 @@ Follow the [service deployment procedure](../runbooks/service-deployment.md).
 
 | Area | Files | Summary |
 | --- | --- | --- |
-| Public endpoint | `infra/modules/regional_cluster/`, `infra/primary/outputs.tf`, `ansible/roles/cluster_addons/templates/traefik-values.yml.j2`, `tests/test_cluster_manifests.py` | A static external address, a regional external passthrough load balancer to an unmanaged worker instance group, a TCP health check on port 80, and one firewall rule for TCP 80 and 443 on a worker-only tag. The rule allows `0.0.0.0/0` because the load balancer keeps client addresses; that range covers the health-check probes, so decision 0006's separate health-check rule is not needed. Traefik binds host ports 80 and 443 and replaces its pod instead of surging, because a surge pod cannot bind the same host ports on one worker. The module serves the recovery region unchanged. Not yet applied. |
+| Public endpoint | `infra/modules/regional_cluster/`, `infra/primary/outputs.tf`, `ansible/roles/cluster_addons/templates/traefik-values.yml.j2`, `tests/test_cluster_manifests.py` | A static external address, a regional external passthrough load balancer to an unmanaged worker instance group, a TCP health check on port 80, and one firewall rule for TCP 80 and 443 on a worker-only tag. The rule allows `0.0.0.0/0` because the load balancer keeps client addresses; that range covers the health-check probes, so decision 0006's separate health-check rule is not needed. Traefik binds host ports 80 and 443 and replaces its pod instead of surging, because a surge pod cannot bind the same host ports on one worker. The module serves the recovery region unchanged. Applied on 2026-09-26. |
 
 Local checks: `terraform fmt -check` and `terraform validate` pass for the module and the primary root. `make check` passes: 77 tests, yamllint, ansible-lint, and syntax checks. These checks are not gate evidence.
 
 ### Validation record
 
-No results recorded yet.
+| Date | Check and command | Result and sanitized evidence |
+| --- | --- | --- |
+| 2026-09-26 | `terraform plan -out=public-web.tfplan` in `infra/primary` | `Plan: 6 to add, 1 to change, 0 to destroy.` Output `public_web_address` known after apply. |
+| 2026-09-26 | `terraform apply public-web.tfplan` | `Apply complete! Resources: 6 added, 1 changed, 0 destroyed.` `terraform output -raw public_web_address` returned the new static address, referred to here as `<public_web_address>`. |
+| 2026-09-26 | `make bootstrap`, then `make validate-cluster` | Both passed with `failed=0`. The bootstrap replaced Ubuntu's `containerd` with `containerd.io` on both nodes and reconciled Traefik onto host ports 80 and 443. Recaps and timing lines were not captured. |
+| 2026-09-26 | `gcloud compute backend-services get-health <name_prefix>-public-web --region=europe-north1` | `HEALTHY`. |
+| 2026-09-26 | `curl` to `http://<public_web_address>/` and `https://<public_web_address>/` with `-k` | `404` for both. Traefik answers through the load balancer; no route exists yet. |
+| 2026-09-26 | `make deploy-test-app`, then `curl -H 'Host: milestone2.local' http://<public_web_address>/` | Deploy recap: control plane `ok=6 changed=2 unreachable=0 failed=0`; `run_with_iap: started 2026-09-26T17:55:09Z, finished 2026-09-26T17:55:28Z, elapsed 19s, exit 0`. Response: `milestone2 persistent marker`. |
+| 2026-09-26 | Cloudflare `A` record `git.sindrg.com`, DNS only, TTL 1 min; `dig +short git.sindrg.com @1.1.1.1` and `curl http://git.sindrg.com/` | `dig` returned `<public_web_address>`. `curl` returned `404`. |
+
+![Public endpoint plan: 6 to add, 1 to change, 0 to destroy](../images/public-lb-plan.png)
+
+![Public endpoint apply: 6 added, 1 changed, 0 destroyed](../images/public-lb-apply.png)
+
+![Load balancer backend health: HEALTHY](../images/public-lb-backend-health.png)
+
+![Traefik answers 404 over HTTP and HTTPS through the public address](../images/public-lb-traefik-404.png)
+
+![Test application reached through the public address](../images/public-lb-test-app-route.png)
+
+![git.sindrg.com resolves to the public address and returns 404](../images/public-lb-dns-resolve.png)
+
+![Cloudflare A record for git.sindrg.com, DNS only, TTL 1 min](../images/public-lb-cloudflare-record.png)
