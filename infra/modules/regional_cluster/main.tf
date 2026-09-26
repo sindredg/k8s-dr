@@ -2,6 +2,8 @@ locals {
   node_roles = toset(["control-plane", "worker"])
   node_tag   = "${var.name_prefix}-node"
   iap_tag    = "${var.name_prefix}-iap-ssh"
+  web_tag    = "${var.name_prefix}-public-web"
+  web_ports  = ["80", "443"]
 }
 
 resource "google_compute_network" "cluster" {
@@ -88,7 +90,7 @@ resource "google_compute_instance" "node" {
   name         = "${var.name_prefix}-${each.key}"
   zone         = var.zone
   machine_type = var.machine_type
-  tags         = [local.node_tag, local.iap_tag]
+  tags         = concat([local.node_tag, local.iap_tag], each.key == "worker" ? [local.web_tag] : [])
   labels       = merge(var.labels, { role = each.key == "control-plane" ? "control-plane" : "worker" })
 
   boot_disk {
@@ -136,4 +138,75 @@ resource "google_compute_attached_disk" "worker_data" {
   disk        = var.worker_data_disk_id
   instance    = google_compute_instance.node["worker"].id
   device_name = "worker-data"
+}
+
+# Public HTTP and HTTPS reach Traefik on the worker through a regional external
+# passthrough load balancer. TLS terminates in the cluster, and the VMs keep no
+# external addresses. See decision 0006.
+resource "google_compute_address" "public_web" {
+  project = var.project_id
+  name    = "${var.name_prefix}-public-web"
+  region  = var.region
+  labels  = var.labels
+}
+
+resource "google_compute_instance_group" "worker" {
+  project   = var.project_id
+  name      = "${var.name_prefix}-worker"
+  zone      = var.zone
+  network   = google_compute_network.cluster.id
+  instances = [google_compute_instance.node["worker"].self_link]
+}
+
+resource "google_compute_region_health_check" "public_web" {
+  project = var.project_id
+  name    = "${var.name_prefix}-public-web"
+  region  = var.region
+
+  tcp_health_check {
+    port = 80
+  }
+}
+
+resource "google_compute_region_backend_service" "public_web" {
+  project               = var.project_id
+  name                  = "${var.name_prefix}-public-web"
+  region                = var.region
+  load_balancing_scheme = "EXTERNAL"
+  protocol              = "TCP"
+  health_checks         = [google_compute_region_health_check.public_web.id]
+
+  backend {
+    group          = google_compute_instance_group.worker.id
+    balancing_mode = "CONNECTION"
+  }
+}
+
+resource "google_compute_forwarding_rule" "public_web" {
+  project               = var.project_id
+  name                  = "${var.name_prefix}-public-web"
+  region                = var.region
+  load_balancing_scheme = "EXTERNAL"
+  ip_protocol           = "TCP"
+  ip_address            = google_compute_address.public_web.address
+  ports                 = local.web_ports
+  backend_service       = google_compute_region_backend_service.public_web.id
+  labels                = var.labels
+}
+
+# A passthrough load balancer keeps the client source address, so the rule
+# allows the internet. That range also covers the health-check probes from
+# 35.191.0.0/16, 209.85.152.0/22, and 209.85.204.0/22.
+resource "google_compute_firewall" "public_web" {
+  project       = var.project_id
+  name          = "${var.name_prefix}-public-web"
+  network       = google_compute_network.cluster.name
+  direction     = "INGRESS"
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = [local.web_tag]
+
+  allow {
+    protocol = "tcp"
+    ports    = local.web_ports
+  }
 }

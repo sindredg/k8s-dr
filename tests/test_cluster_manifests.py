@@ -26,6 +26,19 @@ class ClusterManifestTests(unittest.TestCase):
         self.assertIn("kubernetesGateway", values)
         self.assertNotIn("LoadBalancer", values)
 
+    def test_traefik_binds_public_host_ports_on_the_worker(self):
+        values = yaml.safe_load(
+            Path("ansible/roles/cluster_addons/templates/traefik-values.yml.j2")
+            .read_text()
+            .replace("{{ traefik_http_node_port }}", "30080")
+        )
+        self.assertEqual(values["ports"]["web"]["hostPort"], 80)
+        self.assertEqual(values["ports"]["websecure"]["hostPort"], 443)
+        self.assertEqual(values["nodeSelector"], {"node-role.kubernetes.io/worker": ""})
+        self.assertEqual(
+            values["updateStrategy"]["rollingUpdate"], {"maxUnavailable": 1, "maxSurge": 0}
+        )
+
     def test_disposable_app_uses_worker_pvc_and_http_route(self):
         text = Path("ansible/manifests/milestone2-app.yml").read_text()
         documents = [document for document in yaml.safe_load_all(text) if document]
