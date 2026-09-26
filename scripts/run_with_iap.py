@@ -205,9 +205,12 @@ def run_with_tunnels(
         write_known_hosts(targets, known_hosts_path)
         environment = os.environ.copy()
         known_hosts_option = shlex.quote(str(Path(known_hosts_path).resolve()))
+        # Keepalives stop a long, silent remote command such as `kubectl wait`
+        # from leaving the SSH session idle inside the IAP tunnel.
         environment["ANSIBLE_SSH_COMMON_ARGS"] = (
             "-o StrictHostKeyChecking=yes "
-            f"-o UserKnownHostsFile={known_hosts_option}"
+            f"-o UserKnownHostsFile={known_hosts_option} "
+            "-o ServerAliveInterval=30 -o ServerAliveCountMax=4"
         )
         completed = subprocess.run(command, check=False, env=environment)
         return completed.returncode

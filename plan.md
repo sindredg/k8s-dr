@@ -58,6 +58,8 @@ These changes are easier before the worker disk holds service data. See the [pre
 
 **Gate:** Git changes reconcile; Gitea works after its pods restart; all fixture data remains.
 
+**Deferred until needed:** Local `kubectl` access through an IAP tunnel to the API server on port 6443. It needs a firewall rule for the IAP range on 6443 and a local kubeconfig that targets `localhost` with `tls-server-name: kubernetes`. Until then, run `kubectl` on the control plane over IAP SSH.
+
 ## 4. Consistent backups
 
 - [ ] Capture PostgreSQL and Gitea repository and configuration data at a consistent point.

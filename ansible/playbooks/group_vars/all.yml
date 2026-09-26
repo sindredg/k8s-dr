@@ -8,9 +8,22 @@ calico_version: "3.32.2"
 gateway_api_version: "1.6.1"
 traefik_chart_version: "41.6.0"
 local_path_provisioner_version: "0.0.36"
+flux_version: "2.9.5"
 pod_cidr: "192.168.0.0/16"
 service_cidr: "10.96.0.0/12"
 worker_data_device: "/dev/disk/by-id/google-worker-data"
 worker_data_mount: "/var/lib/k8s-dr"
 local_path_root: "/var/lib/k8s-dr/local-path"
 traefik_http_node_port: 30080
+# Flux reads this public repository anonymously; see decision 0006.
+flux_git_url: "https://github.com/sindredg/k8s-dr.git"
+flux_git_branch: "main"
+# Selects deploy/clusters/<name>. The recovery cluster overrides it.
+flux_cluster: "primary"
+# The Flux controllers this project uses. install.yaml also ships the idle
+# image automation controllers.
+flux_controllers:
+  - source-controller
+  - kustomize-controller
+  - helm-controller
+  - notification-controller

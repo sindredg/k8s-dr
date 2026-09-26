@@ -87,7 +87,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 
 ## Bootstrap the cluster
 
-1. Run the bootstrap playbook through the IAP runner.
+1. Run the bootstrap playbook through the IAP runner. The last play installs Flux, so the SOPS age private key must be at `FLUX_AGE_KEY_FILE` (default `~/.config/k8s-dr/age.agekey`). See [Flux and SOPS](service-deployment.md#flux-and-sops).
 
    ```bash
    make bootstrap
@@ -105,7 +105,7 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
    make validate-cluster
    ```
 
-   Expected: `failed=0`. Both nodes are `Ready`; the Calico, CoreDNS, Local Path Provisioner, and Traefik rollouts complete; and the `traefik` GatewayClass is `Accepted`. `validate.yml` runs this playbook and then `validate_test_app.yml`, which needs the disposable application.
+   Expected: `failed=0`. Both nodes are `Ready`; the Calico, CoreDNS, Local Path Provisioner, Traefik, and Flux rollouts complete; the `traefik` GatewayClass is `Accepted`; and the Flux Git source and cluster Kustomization are `Ready`. `validate.yml` runs this playbook and then `validate_test_app.yml`, which needs the disposable application.
 
    The IAP runner prints a final line such as `run_with_iap: started 2026-09-25T08:00:00Z, finished 2026-09-25T08:07:30Z, elapsed 450s, exit 0` for every command. Include it in evidence for bootstrap runs; it is the baseline for recovery timing.
 
