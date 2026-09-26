@@ -1,0 +1,7 @@
+---
+# SOPS encrypts secrets under deploy/ for the operator's age public key.
+# Flux decrypts them with the matching private key in flux-system/sops-age.
+creation_rules:
+  - path_regex: ^deploy/.*\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1cxdnhpr5c2nt2j7jncce24vaa3r55kjzej4x9x74h2f08janvaps2xfgr4

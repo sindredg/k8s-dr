@@ -66,6 +66,10 @@ def artifact_urls(pins: dict) -> dict[str, str]:
             f"v{pins['gateway_api_version']}/standard-install.yaml"
         ),
         "Local Path Provisioner": f"{local_path}/deploy/local-path-storage.yaml",
+        "Flux release manifest": (
+            "https://github.com/fluxcd/flux2/releases/download/"
+            f"v{pins['flux_version']}/install.yaml"
+        ),
         "Helm archive": helm,
         "Helm checksum": f"{helm}.sha256sum",
     }

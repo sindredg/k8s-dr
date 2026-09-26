@@ -1,0 +1,78 @@
+---
+- name: Require the SOPS age key file on the operator machine
+  ansible.builtin.assert:
+    that:
+      - sops_age_key_file is defined
+      - sops_age_key_file is file
+    fail_msg: >-
+      Set sops_age_key_file to the age private key file on the operator
+      machine. See docs/runbooks/service-deployment.md.
+    quiet: true
+
+# no_log hides the file content if the assertion prints it.
+- name: Require an age private key in the key file
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.file', sops_age_key_file) is search('AGE-SECRET-KEY-')
+    quiet: true
+  no_log: true
+
+- name: Apply the pinned Flux release manifest
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    -f https://github.com/fluxcd/flux2/releases/download/v{{ flux_version }}/install.yaml
+  changed_when: true
+
+- name: Wait for the Flux controllers
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    rollout status deployment/{{ item }} --namespace flux-system --timeout=300s
+  loop: "{{ flux_controllers }}"
+  changed_when: false
+
+# The key is read on the operator machine and sent on stdin, so it is never
+# written to disk on the node or shown in logs.
+- name: Reconcile the SOPS age key Secret
+  ansible.builtin.command:
+    cmd: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -
+    stdin: >-
+      {{ {
+        'apiVersion': 'v1',
+        'kind': 'Secret',
+        'metadata': {'name': 'sops-age', 'namespace': 'flux-system'},
+        'type': 'Opaque',
+        'stringData': {
+          'age.agekey': lookup('ansible.builtin.file', sops_age_key_file) ~ '\n'
+        }
+      } | to_json }}
+  register: flux_sops_secret
+  changed_when: "'unchanged' not in flux_sops_secret.stdout"
+  no_log: true
+
+- name: Render the Flux Git source and cluster Kustomization
+  ansible.builtin.template:
+    src: flux-sync.yml.j2
+    dest: /etc/kubernetes/flux-sync.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Apply the Flux Git source and cluster Kustomization
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    apply -f /etc/kubernetes/flux-sync.yml
+  changed_when: true
+
+- name: Wait for Flux to fetch the repository
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    wait --for=condition=Ready gitrepository/flux-system
+    --namespace flux-system --timeout=180s
+  changed_when: false
+
+- name: Wait for Flux to apply the cluster configuration
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    wait --for=condition=Ready kustomization/flux-system
+    --namespace flux-system --timeout=300s
+  changed_when: false

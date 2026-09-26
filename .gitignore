@@ -34,6 +34,7 @@ kubeconfig.*
 *.crt
 *.csr
 *.sops.yaml.dec
+*.agekey
 secrets.local.*
 
 # Generated inventories, backups, and logs

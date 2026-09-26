@@ -1,0 +1,16 @@
+---
+# These namespaces hold the recovery data volumes. Pruning is disabled so
+# that removing them from Git cannot delete their PersistentVolumeClaims.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgresql
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled

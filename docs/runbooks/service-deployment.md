@@ -93,4 +93,57 @@ The load balancer bills a forwarding rule and a static address every hour while 
 
    Expected: the public address, then `404`.
 
+## Flux and SOPS
+
+`make bootstrap` ends by installing the pinned Flux release, creating the `flux-system/sops-age` Secret from the operator's age private key, and applying one `GitRepository` and one `Kustomization`. Flux then reads this public repository anonymously and applies `deploy/clusters/primary`. Secrets in `deploy/` are committed encrypted with SOPS for the age public key in `.sops.yaml`.
+
+The age private key is a recovery credential. Without it, a recovered cluster cannot decrypt any secret in Git.
+
+1. Create the age key once. Skip this step if the key file already exists: a new key cannot decrypt secrets encrypted for the old one.
+
+   ```bash
+   mkdir -p ~/.config/k8s-dr
+   age-keygen -o ~/.config/k8s-dr/age.agekey
+   chmod 600 ~/.config/k8s-dr/age.agekey
+   age-keygen -y ~/.config/k8s-dr/age.agekey
+   ```
+
+   Expected: the last command prints one public key that starts with `age1`. The public key is not secret; `.sops.yaml` lists it.
+
+2. Store the private key file in the external credential store. Retrieve the stored copy to a temporary path and compare its public key.
+
+   ```bash
+   age-keygen -y <retrieved_copy>
+   ```
+
+   Expected: the same `age1` public key as step 1. Delete the retrieved copy.
+
+3. Optional: test a pushed branch before merging. Flux reads the branch from GitHub, not the local checkout.
+
+   ```bash
+   make bootstrap FLUX_GIT_BRANCH=<branch>
+   ```
+
+   After the merge, run step 4 so Flux tracks `main` again.
+
+4. Bootstrap from `main` and validate.
+
+   ```bash
+   make bootstrap
+   make validate-cluster
+   ```
+
+   Expected: both recaps end with `failed=0`. The four Flux controller rollouts complete, `gitrepository/flux-system` and `kustomization/flux-system` are `Ready`, and the task `Show the Git revision Flux last applied` prints `main@sha1:<commit>`. Compare it with `git rev-parse origin/main`.
+
+5. Confirm Flux created the service namespaces.
+
+   ```bash
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap \
+     --command='sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get namespaces gitea postgresql -L kustomize.toolkit.fluxcd.io/name'
+   ```
+
+   Expected: both namespaces are `Active` with the label value `flux-system`.
+
+To encrypt a new secret, write it as `<name>.sops.yaml` under `deploy/` and run `sops --encrypt --in-place <file>` before `git add`. SOPS reads the recipient from `.sops.yaml`. To rotate the key, add the new public key to `.sops.yaml`, run `sops updatekeys` on every encrypted file, rerun `make bootstrap` with the new key file, and then remove the old public key.
+
 If a check fails, send the failing command, its exit code, and the relevant error text. Do not send state, plan files, or credentials.

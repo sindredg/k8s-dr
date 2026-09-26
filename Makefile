@@ -5,6 +5,11 @@
 
 TF_DIR ?= infra/primary
 SSH_KEY ?= $$HOME/.ssh/google_compute_engine
+# Age private key that Flux uses to decrypt SOPS secrets. Keep it outside the
+# repository and in the recovery credential store.
+FLUX_AGE_KEY_FILE ?= $(HOME)/.config/k8s-dr/age.agekey
+# Branch Flux reconciles. Override it to test a pushed branch before merging.
+FLUX_GIT_BRANCH ?= main
 INVENTORY := ansible/inventory/generated/hosts.json
 VENV := .venv
 # CI installs tools into the system Python and runs `make check BIN=`.
@@ -29,7 +34,9 @@ inventory: ## Generate the ignored inventory from TF_DIR outputs
 		--ssh-key "$(SSH_KEY)" --output $(INVENTORY)
 
 bootstrap: ## Run bootstrap.yml through IAP
-	$(IAP) $(PLAYBOOK) ansible/playbooks/bootstrap.yml
+	@test -r "$(FLUX_AGE_KEY_FILE)" || { echo "FLUX_AGE_KEY_FILE not readable: $(FLUX_AGE_KEY_FILE)" >&2; exit 1; }
+	$(IAP) $(PLAYBOOK) ansible/playbooks/bootstrap.yml \
+		-e sops_age_key_file="$(FLUX_AGE_KEY_FILE)" -e flux_git_branch="$(FLUX_GIT_BRANCH)"
 
 validate-cluster: ## Run validate_cluster.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/validate_cluster.yml -v
@@ -45,7 +52,7 @@ cleanup-test-app: ## Remove the disposable application through IAP
 
 check: ## Run the local unit tests, linters, and syntax checks
 	$(BIN)python -m unittest discover -s tests
-	$(BIN)yamllint -c ansible/.yamllint.yml ansible .github/workflows
+	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy .sops.yaml .github/workflows
 	$(BIN)ansible-lint ansible
 	for playbook in $(PLAYBOOKS); do \
 		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \

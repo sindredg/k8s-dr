@@ -28,6 +28,35 @@
           resource: deployment/traefik
       changed_when: false
 
+    - name: Wait for the Flux controllers
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        rollout status deployment/{{ item }} --namespace flux-system --timeout=300s
+      loop: "{{ flux_controllers }}"
+      changed_when: false
+
+    - name: Wait for the Flux Git source and cluster Kustomization
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Ready {{ item }} --namespace flux-system --timeout=300s
+      loop:
+        - gitrepository/flux-system
+        - kustomization/flux-system
+      changed_when: false
+
+    - name: Show the Git revision Flux last applied
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get kustomization/flux-system --namespace flux-system
+        --output=jsonpath={.status.lastAppliedRevision}
+      changed_when: false
+
+    - name: Require the SOPS age key Secret without reading it
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get secret/sops-age --namespace flux-system --output=name
+      changed_when: false
+
     - name: Wait for the Traefik GatewayClass
       ansible.builtin.command: >-
         kubectl --kubeconfig /etc/kubernetes/admin.conf

@@ -12,6 +12,7 @@ PINS = {
     "gateway_api_version": "1.6.1",
     "traefik_chart_version": "41.6.0",
     "local_path_provisioner_version": "0.0.36",
+    "flux_version": "2.9.5",
 }
 
 KUBERNETES_INDEX = "\n\n".join(
@@ -97,6 +98,9 @@ class CheckTests(unittest.TestCase):
         self.assertTrue(all(method == "HEAD" for method, _ in upstream.requests))
         urls = [url for _, url in upstream.requests]
         self.assertIn("https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz", urls)
+        self.assertIn(
+            "https://github.com/fluxcd/flux2/releases/download/v2.9.5/install.yaml", urls
+        )
         self.assertTrue(all("latest" not in url and "master" not in url for url in urls))
 
     def test_every_pinned_version_variable_is_checked(self):

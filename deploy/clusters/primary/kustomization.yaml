@@ -1,0 +1,7 @@
+---
+# Flux applies this directory as the flux-system Kustomization. Ansible
+# creates that Kustomization; see ansible/roles/flux.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
