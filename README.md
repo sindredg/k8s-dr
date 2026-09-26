@@ -41,4 +41,4 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 
 The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds.
 
-See [plan.md](plan.md) for milestones and validation gates, and [docs](docs/README.md) for worklogs, decisions, troubleshooting, and the recovery runbook. The project does not depend on Gitea to store its own recovery configuration.
+See [plan.md](plan.md) for milestones and validation gates, and [docs](docs/README.md) for worklogs, decisions, troubleshooting, and the recovery runbook. Run `make` from the repository root to list the operator commands; the [bootstrap runbook](docs/runbooks/kubernetes-bootstrap.md) shows when to use each one. The project does not depend on Gitea to store its own recovery configuration.
