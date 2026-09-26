@@ -22,6 +22,8 @@ The [pre-milestone 3 steps](../../plan.md#before-milestone-3-recovery-readiness)
 | Run timing | `scripts/run_with_iap.py` | Prints UTC start and finish times, elapsed seconds, and the exit code after each command. No new dependency. Per-task timing through the `ansible.posix.profile_tasks` callback would add a Galaxy collection download to the recovery path, so it is deferred until milestone 7 needs task-level bottlenecks. |
 | Pin check | `scripts/check_pins.py`, `.github/workflows/pins.yml` | Confirms every pinned artifact in `group_vars/all.yml` still resolves: the Kubernetes package revision, the containerd build, the Traefik chart, and the Calico, Gateway API, Local Path, and Helm files. Runs on pull requests, on `main`, and weekly. A unit test fails when a new version pin is not checked. |
 | Service architecture | `docs/decisions/0006-service-deployment-architecture.md`, `docs/production-readiness.md`, `docs/decisions/0001-use-kubeadm.md` | Decisions for Flux, the Ansible and Flux ownership boundary, SOPS secrets, PostgreSQL 18, Gitea, public exposure through a passthrough load balancer (option A), and network policies. Accepted on 2026-09-25. Records the regulatory VM rationale and the production gap. |
+| Helm 4 | `ansible/playbooks/group_vars/all.yml`, `tests/`, `docs/decisions/0005-kubernetes-bootstrap-architecture.md` | Helm CLI pin moved from 3.22.0 to 4.3.0 on 2026-09-26 because Helm 3 security fixes end on 2027-02-10. The Traefik install tasks and flags are unchanged. See the [decision 0005 amendment](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-helm-4). Validated on the cluster on 2026-09-26. |
+| Decision notes | `plan.md`, `docs/decisions/0006-service-deployment-architecture.md`, `docs/production-readiness.md` | Milestone 4 backup bucket hardening: a writer that cannot delete or overwrite, a retention policy with a recorded lock decision, explicit soft delete, and noncurrent-version expiry. A decision 0006 amendment records why Gitea stays over Forgejo and confirms that Gitea chart 12.7.0 still declares the Bitnami subcharts. Documentation only; no Terraform change. |
 
 Local checks: `terraform fmt -check -recursive` and `terraform validate` pass for the bootstrap, shared, and primary roots. `python3 -m unittest discover -s tests`, yamllint, ansible-lint, and syntax checks for all six playbooks pass. These checks are not gate evidence.
 
@@ -48,9 +50,15 @@ Local checks: `terraform fmt -check -recursive` and `terraform validate` pass fo
 | 2026-09-25 | `scripts/prepare_ansible_inventory.py --terraform-dir infra/primary`, then `validate_cluster.yml` through `scripts/run_with_iap.py` | Inventory generation from the renamed outputs exited `0`. Validation recap: control plane `ok=6 changed=0 unreachable=0 failed=0`; `elapsed 18s, exit 0`. |
 | 2026-09-25 | Deleted `infra/shared/migrations.tf` and `infra/primary/migrations.tf`, then `terraform plan -detailed-exitcode` in both roots | Both exited `0`. |
 | 2026-09-25 | GitHub Actions on PRs #7, #8, and #9 | `docs` and `validate` passed on all three. The `pins` job passed on #8 and #9. |
+| 2026-09-26 | `scripts/run_with_iap.py ... bootstrap.yml` with `helm_version: "4.3.0"` | Passed. Recap: control plane `ok=57 changed=13 unreachable=0 failed=0 skipped=8`; worker `ok=52 changed=0 unreachable=0 failed=0 skipped=9`. With `failed=0`, the Helm version task matched `v4.3.0`, `helm upgrade --install` upgraded the Traefik release that Helm 3.22.0 installed, and the Traefik rollout and `Accepted` GatewayClass waits passed. The `run_with_iap` timing line was not captured. |
+| 2026-09-26 | `scripts/run_with_iap.py ... validate_cluster.yml -v` after the Helm 4 bootstrap | Passed. Recap: control plane `ok=6 changed=0 unreachable=0 failed=0`. The playbook fails unless both nodes are `Ready`, the rollouts complete, and the `traefik` GatewayClass is `Accepted`. The timing line was not captured. |
 
 The preparation gate passed on 2026-09-25: both roots plan with no changes, IAP access works, cluster-only validation passes, the pin check passes in CI, and decision 0006 is accepted.
 
 ![Shared root apply: 6 imported, 0 added, 1 changed, 0 destroyed](../images/prep-shared-root-import-apply.png)
 
 ![Primary root apply: 0 added, 0 changed, 0 destroyed](../images/prep-primary-root-migration-apply.png)
+
+![Helm 4 bootstrap recap: failed=0 on both hosts](../images/helm4-bootstrap-recap.png)
+
+![Cluster validation recap after Helm 4: failed=0](../images/helm4-validate-cluster-recap.png)

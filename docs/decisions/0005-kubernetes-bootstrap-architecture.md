@@ -1,6 +1,6 @@
 # 0005: Kubernetes bootstrap architecture
 
-Status: Accepted. Amended on 2026-09-23 for the ingress reachability check. Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
+Status: Accepted. Amended on 2026-09-23 for the ingress reachability check and on 2026-09-26 for Helm 4; see the [Helm 4 amendment](#amendment-helm-4). Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
 
 Date: 2026-09-23
 
@@ -71,6 +71,30 @@ Use the following initial compatibility baseline:
 The implementation records the exact Ansible, Python package, containerd, Kubernetes Debian package, Helm, and chart versions in tracked dependency or variable files. It must not resolve an unbounded `latest` release during bootstrap. Updating a pin is an explicit change followed by the same validation gate.
 
 Use the Kubernetes community repository at `pkgs.k8s.io`, which publishes a separate package repository for each Kubernetes minor version. Configure both containerd and kubelet to use the systemd cgroup driver because Ubuntu uses systemd and Kubernetes requires the runtime and kubelet cgroup drivers to agree.
+
+### Amendment: Helm 4
+
+Date: 2026-09-26.
+
+**Problem:** the Helm CLI pin was 3.22.0, the last Helm 3 minor release. Helm 3 receives security fixes only until 2027-02-10 ([Helm 3 end of life](https://helm.sh/blog/helm-v3-end-of-life/)). Helm 4 has been generally available since November 2025, and Flux 2.8 and later use the Helm 4 SDK. After milestone 3, the Traefik install would be the only component still on Helm 3.
+
+**Decision:** pin the Helm CLI to 4.3.0, the latest stable release on 2026-09-26. Traefik stays with Ansible, as [decision 0006](0006-service-deployment-architecture.md#split-ownership-between-ansible-and-flux) requires. The install tasks and flags do not change.
+
+| What the bootstrap uses | Helm 4.3.0 behavior |
+| --- | --- |
+| `helm upgrade --install` with `--repo`, `--version`, `--values`, `--namespace`, `--create-namespace`, `--kubeconfig` | All flags still exist. Helm 4 renames only `--atomic` and `--force`, which the bootstrap does not use. |
+| `helm version --short` | Prints `v4.3.0+g<commit>`. The substring check on `v4.3.0` still matches. |
+| Archive `helm-v4.3.0-linux-amd64.tar.gz` and its `.sha256sum` | Both exist. The archive still contains `linux-amd64/helm`, and the checksum verifies. |
+| Upgrading a release that Helm 3 installed | Supported. The Helm 4 overview says `apiVersion: v2` charts work unchanged and describes how upgrades treat releases created by Helm 3. No migration tool is needed. |
+
+**Apply method:** Helm 4 adds `--server-side` with a default of `auto`. An upgrade follows the apply method of the previous release revision, so the existing primary Traefik release, installed by Helm 3, keeps client-side apply. A new install defaults to server-side apply. A recovery cluster therefore installs Traefik with server-side apply while the primary keeps client-side apply. On an empty cluster both methods create the same objects, so the recovery result does not change. Setting `--server-side=true` on the primary would align the two, but it would convert a validated release's field ownership for no recovery benefit, so it is not done now.
+
+**Trade-offs:**
+
+- The upgrade changes a validated milestone 2 component. The bootstrap and `validate_cluster.yml` must pass again on the running cluster before milestone 3 relies on it.
+- Primary and recovery use different apply methods for Traefik until the primary is rebuilt or explicitly switched.
+
+References: [Helm 4 overview](https://helm.sh/docs/overview/), [Helm 4.3.0 release](https://github.com/helm/helm/releases/tag/v4.3.0).
 
 ### Use Calico VXLAN on non-overlapping configurable networks
 

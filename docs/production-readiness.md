@@ -9,7 +9,7 @@ The target setting is an organization that must run Kubernetes on VMs it control
 | Availability within a region | One control plane, one worker, one zonal data disk | Three control-plane nodes behind a stable endpoint, several workers across zones, and replicated storage. Zonal failures are more common than regional ones. |
 | Control-plane endpoint | The control-plane node address | A DNS name or virtual address, so control-plane nodes can be replaced or added without re-initializing |
 | Node lifecycle | Pinned packages, manual upgrades | A documented upgrade cadence for the OS, containerd, and Kubernetes; certificate expiry monitoring; hardened images such as CIS benchmarks |
-| Backup isolation | Same project, one Belgium bucket, operator-held credentials | A separate backup project or account, retention locks, a second copy in another location, and a writer that cannot delete |
+| Backup isolation | Same project, one Belgium bucket, operator-held credentials. Milestone 4 plans a writer that cannot delete or overwrite, an unlocked retention policy, explicit soft delete, and noncurrent-version expiry. | A separate backup project or account, a locked retention policy, and a second copy in another location |
 | Terraform execution | Operator machine with personal credentials | A pipeline with reviewed plans, a service account through workload identity federation, and audited break-glass access |
 | Secrets | SOPS with an offline age key (planned) | A secrets manager with rotation and audit, plus an offline recovery copy of its unseal or root material |
 | Cost control | Manual review in Cloud Billing | Budget alerts and ownership labels. See [decision 0004](decisions/0004-remove-budget-alert.md). |
