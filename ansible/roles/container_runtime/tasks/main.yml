@@ -1,7 +1,42 @@
 ---
+# Ubuntu's archive keeps only the newest containerd build, so an exact pin stops
+# installing when Ubuntu publishes the next one. Docker's repository keeps
+# earlier containerd.io versions, and the package bundles runc.
+- name: Create the APT keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the Docker repository signing key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure the Docker package repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types:
+      - deb
+    uris:
+      - https://download.docker.com/linux/ubuntu
+    suites:
+      - "{{ ansible_distribution_release }}"
+    components:
+      - stable
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
+
+# containerd.io conflicts with and replaces Ubuntu's containerd and runc, so apt
+# removes them in the same transaction on nodes built before this change.
 - name: Install the pinned containerd package
   ansible.builtin.apt:
-    name: "containerd={{ containerd_deb_version }}"
+    name: "containerd.io={{ containerd_deb_version }}"
     state: present
     allow_downgrade: true
     update_cache: true

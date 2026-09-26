@@ -9,7 +9,6 @@ fail during a drill. Run this in CI on a schedule to find out first.
 
 import argparse
 from dataclasses import dataclass
-import gzip
 from pathlib import Path
 import sys
 import urllib.error
@@ -18,7 +17,7 @@ import urllib.request
 import yaml
 
 DEFAULT_VARIABLES = Path("ansible/playbooks/group_vars/all.yml")
-UBUNTU_POCKETS = ("noble-updates", "noble-security", "noble")
+DOCKER_PACKAGES_URL = "https://download.docker.com/linux/ubuntu/dists/noble/stable/binary-amd64/Packages"
 KUBERNETES_PACKAGES = ("kubelet", "kubeadm", "kubectl")
 TIMEOUT_SECONDS = 60
 
@@ -105,19 +104,15 @@ def check_kubernetes_packages(pins: dict, fetch=_fetch) -> Result:
 
 def check_containerd(pins: dict, fetch=_fetch) -> Result:
     wanted = pins["containerd_deb_version"]
-    seen = set()
-    for pocket in UBUNTU_POCKETS:
-        url = f"http://archive.ubuntu.com/ubuntu/dists/{pocket}/main/binary-amd64/Packages.gz"
-        try:
-            index = gzip.decompress(fetch(url)).decode()
-        except (urllib.error.URLError, TimeoutError) as error:
-            return Result("containerd", False, f"{url}: {error}")
-        versions = debian_package_versions(index, "containerd")
-        if wanted in versions:
-            return Result("containerd", True, f"{wanted} in {pocket}")
-        seen |= versions
-    available = ", ".join(sorted(seen)) or "none"
-    return Result("containerd", False, f"{wanted} is no longer published; available: {available}")
+    try:
+        index = fetch(DOCKER_PACKAGES_URL).decode()
+    except (urllib.error.URLError, TimeoutError) as error:
+        return Result("containerd", False, f"{DOCKER_PACKAGES_URL}: {error}")
+    versions = debian_package_versions(index, "containerd.io")
+    if wanted not in versions:
+        available = ", ".join(sorted(versions)) or "none"
+        return Result("containerd", False, f"containerd.io {wanted} is not published; available: {available}")
+    return Result("containerd", True, f"containerd.io {wanted} in {DOCKER_PACKAGES_URL}")
 
 
 def check_traefik_chart(pins: dict, fetch=_fetch) -> Result:
