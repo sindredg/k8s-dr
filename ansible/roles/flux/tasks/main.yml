@@ -31,7 +31,8 @@
   changed_when: false
 
 # The key is read on the operator machine and sent on stdin, so it is never
-# written to disk on the node or shown in logs.
+# written to disk on the node or shown in logs. Do not append '\n' here: in a
+# folded scalar Jinja receives a literal backslash and n, which corrupts the key.
 - name: Reconcile the SOPS age key Secret
   ansible.builtin.command:
     cmd: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -
@@ -42,7 +43,7 @@
         'metadata': {'name': 'sops-age', 'namespace': 'flux-system'},
         'type': 'Opaque',
         'stringData': {
-          'age.agekey': lookup('ansible.builtin.file', sops_age_key_file) ~ '\n'
+          'age.agekey': lookup('ansible.builtin.file', sops_age_key_file)
         }
       } | to_json }}
   register: flux_sops_secret

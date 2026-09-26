@@ -70,6 +70,7 @@ class RunWithIapTests(unittest.TestCase):
         environment = run.call_args_list[2].kwargs["env"]
         self.assertIn("StrictHostKeyChecking=yes", environment["ANSIBLE_SSH_COMMON_ARGS"])
         self.assertIn("UserKnownHostsFile=", environment["ANSIBLE_SSH_COMMON_ARGS"])
+        self.assertIn("ServerAliveInterval=30", environment["ANSIBLE_SSH_COMMON_ARGS"])
         for process in processes:
             process.terminate.assert_called_once()
 

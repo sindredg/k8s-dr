@@ -1,4 +1,9 @@
+import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 import yaml
@@ -46,6 +51,36 @@ class FluxBootstrapTests(unittest.TestCase):
         for task in tasks.values():
             for module in ("ansible.builtin.copy", "ansible.builtin.template"):
                 self.assertNotIn("sops_age_key_file", str(task.get(module, "")))
+
+    def test_age_key_reaches_kubectl_unchanged(self):
+        # Regression: a '\\n' suffix in the task rendered as a literal backslash
+        # and n, and Flux rejected the key as "malformed secret key: mixed case".
+        binary = shutil.which("ansible-playbook") or ".venv/bin/ansible-playbook"
+        if not Path(binary).is_file() and shutil.which(binary) is None:
+            self.skipTest("ansible-playbook is not installed")
+        task = _tasks_by_name()["Reconcile the SOPS age key Secret"]
+        key = "# created: test\n# public key: age1test\nAGE-SECRET-KEY-1TESTONLY"
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            key_file = directory / "test.agekey"
+            key_file.write_text(key + "\n")
+            rendered = directory / "rendered.json"
+            task = {**task, "ansible.builtin.command": {
+                **task["ansible.builtin.command"], "cmd": f"tee {rendered}",
+            }}
+            playbook = directory / "render.yml"
+            playbook.write_text(yaml.safe_dump(
+                [{"hosts": "localhost", "gather_facts": False, "tasks": [task]}]
+            ))
+            subprocess.run(
+                [binary, "-i", "localhost,", "-c", "local", str(playbook),
+                 "-e", f"sops_age_key_file={key_file}"],
+                check=True, capture_output=True, text=True,
+                env={**os.environ, "ANSIBLE_CONFIG": "ansible.cfg"},
+            )
+            secret = json.loads(rendered.read_text())
+        self.assertEqual(secret["stringData"]["age.agekey"], key)
+        self.assertEqual(secret["metadata"], {"name": "sops-age", "namespace": "flux-system"})
 
     def test_sync_reads_the_cluster_directory_and_decrypts_with_sops(self):
         documents = _sync_documents()
