@@ -63,6 +63,7 @@ These changes are easier before the worker disk holds service data. See the [pre
 - [ ] Capture PostgreSQL and Gitea repository and configuration data at a consistent point.
 - [ ] Store backups outside the primary region with timestamps and integrity checks.
 - [ ] Make failed or incomplete backup sets ineligible for restore.
+- [ ] Harden the backup bucket: a writer that cannot delete or overwrite objects, a retention policy longer than the backup interval plus the drill window with a recorded decision on locking it, an explicit soft-delete policy, and a lifecycle rule that expires noncurrent versions. See [decision 0006](docs/decisions/0006-service-deployment-architecture.md#deferred-to-milestone-4).
 - [ ] Restore a backup into a separate test environment.
 
 **Gate:** The restored service contains the expected commit and issue and accepts a new push. Record the backup age and restore duration.

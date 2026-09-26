@@ -1,6 +1,6 @@
 # 0006: Service deployment architecture
 
-Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Not yet implemented.
+Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Not yet implemented.
 
 Date: 2026-09-25
 
@@ -136,4 +136,14 @@ Recorded here so they are not lost:
 
 - How to pause writes for a consistent backup: scale Gitea to zero, or dump and reconcile with `gitea doctor`.
 - A separate backup prefix per cluster, and a rule that stops a returning primary from uploading backups after failover.
-- Whether the job that writes backups gets create-only access.
+- Backup writer access. `backup_operator` holds `roles/storage.objectAdmin` on the backup bucket in `infra/shared/main.tf`, so a leaked writer credential can delete every recovery point, including noncurrent versions. The writer must be able to create objects but not delete or overwrite them. Overwriting an object needs `storage.objects.delete`, so a create-only role blocks both.
+- A bucket retention policy longer than the backup interval plus the drill window, so every recovery point a drill could need stays undeletable. Decide whether to lock it. A locked policy cannot be removed or shortened, even by a project owner, which protects against a compromised administrator. It is also irreversible: the bucket cannot be deleted until every object meets the period, and a period that is too long costs storage until it expires. The lab leans toward an unlocked policy; production locks it, as [production readiness](../production-readiness.md) lists.
+- An explicit `soft_delete_policy` instead of the implicit Cloud Storage default of seven days, and a lifecycle rule that expires noncurrent versions. With versioning on, every overwrite and delete keeps a billed noncurrent version, and deleting that version moves it to soft delete. Without expiry, storage cost grows without limit. Lifecycle deletion still respects the retention policy.
+
+## Amendment: Forgejo considered
+
+Date: 2026-09-26.
+
+[Forgejo](https://forgejo.org/) was considered as an alternative to Gitea. It has been a hard fork since 2024 and has diverged in features and database migrations, so it is no longer a drop-in replacement. Gitea stays: it is actively maintained, this decision uses its official chart, and the recovery method (a PostgreSQL dump plus the repository volume, restored in another region) does not depend on which forge runs.
+
+The PostgreSQL decision is unchanged. Gitea chart 12.7.0, the latest release on 2026-09-26, still declares the Bitnami `postgresql`, `postgresql-ha`, `valkey`, and `valkey-cluster` dependencies from `oci://registry-1.docker.io/bitnamicharts`, so disabling all four remains necessary.
