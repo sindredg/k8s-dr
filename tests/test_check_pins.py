@@ -8,7 +8,7 @@ PINS = {
     "kubernetes_minor": "v1.36",
     "kubernetes_deb_version": "1.36.2-2.1",
     "containerd_deb_version": "2.2.1-0ubuntu1~24.04.3",
-    "helm_version": "3.22.0",
+    "helm_version": "4.3.0",
     "calico_version": "3.32.2",
     "gateway_api_version": "1.6.1",
     "traefik_chart_version": "41.6.0",
@@ -104,7 +104,7 @@ class CheckTests(unittest.TestCase):
             self.assertTrue(module.check_url(name, url, upstream).ok)
         self.assertTrue(all(method == "HEAD" for method, _ in upstream.requests))
         urls = [url for _, url in upstream.requests]
-        self.assertIn("https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz", urls)
+        self.assertIn("https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz", urls)
         self.assertTrue(all("latest" not in url and "master" not in url for url in urls))
 
     def test_every_pinned_version_variable_is_checked(self):

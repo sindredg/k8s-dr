@@ -10,7 +10,7 @@ class AnsibleContractTests(unittest.TestCase):
         self.assertEqual(values["kubernetes_version"], "1.36.2")
         self.assertEqual(values["kubernetes_deb_version"], "1.36.2-2.1")
         self.assertEqual(values["containerd_deb_version"], "2.2.1-0ubuntu1~24.04.3")
-        self.assertEqual(values["helm_version"], "3.22.0")
+        self.assertEqual(values["helm_version"], "4.3.0")
 
     def test_network_and_storage_values_are_exact(self):
         values = yaml.safe_load(Path("ansible/playbooks/group_vars/all.yml").read_text())
