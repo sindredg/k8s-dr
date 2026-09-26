@@ -113,6 +113,7 @@ class ClusterManifestTests(unittest.TestCase):
 
     VALIDATION_PLAYBOOKS = (
         "ansible/playbooks/validate_cluster.yml",
+        "ansible/playbooks/validate_services.yml",
         "ansible/playbooks/validate_test_app.yml",
     )
 

@@ -146,4 +146,47 @@ The age private key is a recovery credential. Without it, a recovered cluster ca
 
 To encrypt a new secret, write it as `<name>.sops.yaml` under `deploy/` and run `sops --encrypt --in-place <file>` before `git add`. SOPS reads the recipient from `.sops.yaml`. To rotate the key, add the new public key to `.sops.yaml`, run `sops updatekeys` on every encrypted file, rerun `make bootstrap` with the new key file, and then remove the old public key.
 
+## cert-manager and certificates
+
+Flux installs cert-manager from its Helm chart through the `infrastructure` Kustomization. The `certificates` Kustomization runs after it and applies the SOPS-encrypted Cloudflare token, the `letsencrypt-staging` and `letsencrypt-production` ClusterIssuers, and the `git-tls` Certificate for `git.sindrg.com` in the `gitea` namespace. Both issuers solve DNS-01 through Cloudflare, so the cluster needs no inbound port for issuance.
+
+`git-tls` uses the staging issuer until issuance is proven. Staging certificates are not trusted by browsers. Let's Encrypt allows five production certificates for the same names each week, so use staging for rebuild tests.
+
+The `certificates` Kustomization does not wait for its objects to become ready. A slow Let's Encrypt order therefore cannot fail `make bootstrap`; `make validate-services` checks the Certificate instead.
+
+1. Encrypt the Cloudflare token into the repository. The token is read without echo and piped to SOPS, so the plaintext is never written to a file.
+
+   ```bash
+   read -rsp 'Cloudflare API token: ' CF_API_TOKEN; echo
+   printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: cloudflare-api-token\n  namespace: cert-manager\ntype: Opaque\nstringData:\n  api-token: %s\n' "$CF_API_TOKEN" \
+     | sops --encrypt --filename-override deploy/issuers/cloudflare-api-token.sops.yaml \
+         --input-type yaml --output-type yaml /dev/stdin \
+     > deploy/issuers/cloudflare-api-token.sops.yaml
+   unset CF_API_TOKEN
+   ```
+
+2. Check the file without printing the token.
+
+   ```bash
+   grep -c 'api-token: ENC\[' deploy/issuers/cloudflare-api-token.sops.yaml
+   SOPS_AGE_KEY_FILE=~/.config/k8s-dr/age.agekey sops --decrypt deploy/issuers/cloudflare-api-token.sops.yaml >/dev/null && echo decrypts
+   make check
+   ```
+
+   Expected: `1`, then `decrypts`, then passing checks. The test suite fails if any Secret under `deploy/` is not SOPS-encrypted.
+
+3. Commit and push the branch, then point Flux at it and validate. Flux reads the branch from GitHub.
+
+   ```bash
+   make bootstrap FLUX_GIT_BRANCH=<branch>
+   make validate-cluster
+   make validate-services
+   ```
+
+   Expected: all three recaps end with `failed=0`. `validate-services` waits for the `infrastructure` and `certificates` Kustomizations, the `cert-manager` HelmRelease, both ClusterIssuers, and `certificate/git-tls`. The last task prints the issuer `letsencrypt-staging`, the name `git.sindrg.com`, and an expiry about 90 days ahead.
+
+4. After the merge, run `make bootstrap` so Flux tracks `main` again, then repeat both validations.
+
+To rotate the Cloudflare token, repeat steps 1 to 3 with the new token, then revoke the old one in Cloudflare.
+
 If a check fails, send the failing command, its exit code, and the relevant error text. Do not send state, plan files, or credentials.

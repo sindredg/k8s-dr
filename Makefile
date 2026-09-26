@@ -16,10 +16,10 @@ VENV := .venv
 BIN ?= $(VENV)/bin/
 IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
 PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
-PLAYBOOKS := bootstrap deploy_test_app cleanup_test_app validate validate_cluster validate_test_app
+PLAYBOOKS := bootstrap deploy_test_app cleanup_test_app validate validate_cluster validate_services validate_test_app
 
 .DEFAULT_GOAL := help
-.PHONY: help venv inventory bootstrap validate-cluster validate deploy-test-app cleanup-test-app check pins
+.PHONY: help venv inventory bootstrap validate-cluster validate-services validate deploy-test-app cleanup-test-app check pins
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -40,6 +40,9 @@ bootstrap: ## Run bootstrap.yml through IAP
 
 validate-cluster: ## Run validate_cluster.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/validate_cluster.yml -v
+
+validate-services: ## Run validate_services.yml (Flux-owned services) through IAP
+	$(IAP) $(PLAYBOOK) ansible/playbooks/validate_services.yml -v
 
 validate: ## Run validate.yml (cluster and test app) through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/validate.yml -v
