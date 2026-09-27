@@ -89,6 +89,8 @@ Local checks for cert-manager: `make check` passes: 95 tests, yamllint (SOPS-enc
 
 Local checks for PostgreSQL and Gitea: `make check` passes: 120 tests, yamllint, ansible-lint, and syntax checks. `kubectl kustomize` builds every directory under `deploy/`. `helm template` of chart 12.7.0 with the release values renders one Deployment with the `Recreate` strategy, the volume-owner init container as root and the chart containers as non-root, and the expected `app.ini` sections. `make pins` resolves the Gitea 12.7.0 chart and the `postgres:18.6-trixie` digest, and a zero digest fails with `404`. These checks are not gate evidence.
 
+Local checks for the Flux reconcile-order fix: `make check` passes: 121 tests, yamllint, ansible-lint, and syntax checks. These checks are not gate evidence.
+
 ### Validation record
 
 | Date | Check and command | Result and sanitized evidence |

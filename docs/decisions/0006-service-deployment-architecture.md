@@ -32,7 +32,7 @@ The repository is public, so it must never contain a plaintext secret. See [secr
 | Ansible | Host configuration, kubeadm, Calico, Gateway API CRDs, Traefik, Local Path Provisioner, Flux controllers, the SOPS decryption key Secret |
 | Flux | cert-manager, PostgreSQL, Gitea, the Gitea Gateway listener and HTTPRoute, network policies |
 
-Traefik stays with Ansible. Moving an existing Helm release to Flux means adopting it in place or reinstalling it, and both change a validated milestone 2 component for no recovery benefit. The README tool table will change to say that Flux deploys the application layer.
+Traefik stays with Ansible. Moving an existing Helm release to Flux means adopting it in place or reinstalling it, and both change a validated milestone 2 component for no recovery benefit. The README tool table says that Flux deploys the application layer.
 
 ### Encrypt secrets with SOPS and age
 
@@ -113,7 +113,7 @@ flowchart TD
     GT --> D
 ```
 
-The repository gains a `deploy/` tree: shared manifests in `deploy/base/` and one directory per cluster under `deploy/clusters/`. The primary and recovery clusters differ only in hostname and certificate issuer.
+The `deploy/` tree holds shared manifests in `deploy/base/`, `deploy/infrastructure/`, `deploy/certificates/`, and `deploy/apps/`, and one directory per cluster under `deploy/clusters/`. The primary and recovery clusters differ only in hostname and certificate issuer, which each cluster sets in its `cluster-settings.yaml`.
 
 ## Consequences
 
