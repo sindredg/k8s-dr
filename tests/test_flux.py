@@ -91,6 +91,29 @@ class FluxBootstrapTests(unittest.TestCase):
         command = _tasks_by_name()["Request an immediate Flux reconcile"]["ansible.builtin.command"]
         self.assertIn("reconcile.fluxcd.io/requestedAt=", command)
 
+    def test_kustomization_reconciles_only_after_the_branch_is_fetched(self):
+        # Regression: a Ready GitRepository still held the previous branch's
+        # artifact, flux-system reconciled it, and its health check waited on a
+        # child Kustomization that had already read the new artifact.
+        tasks = _tasks_by_name()
+        names = list(tasks)
+        fetch = names.index("Request an immediate fetch of the Git source")
+        fetched = names.index("Wait for Flux to fetch the requested branch")
+        request = names.index("Request an immediate Flux reconcile")
+        self.assertLess(fetch, fetched)
+        self.assertLess(fetched, request)
+        self.assertNotIn("kustomization/", tasks["Request an immediate fetch of the Git source"]["ansible.builtin.command"])
+        self.assertNotIn("gitrepository/", tasks["Request an immediate Flux reconcile"]["ansible.builtin.command"])
+        self.assertEqual(
+            tasks["Wait for Flux to fetch the requested branch"]["until"],
+            "flux_source_revision.stdout.startswith(flux_git_branch ~ '@')",
+        )
+        # A stale Ready condition must not end the wait.
+        self.assertEqual(
+            tasks["Wait for Flux to apply the cluster configuration"]["until"],
+            "flux_applied.stdout == flux_source_revision.stdout ~ ' True'",
+        )
+
     def test_sync_reads_the_cluster_directory_and_decrypts_with_sops(self):
         documents = _sync_documents()
         self.assertEqual(documents["GitRepository"]["spec"]["ref"], {"branch": "main"})
@@ -150,7 +173,7 @@ class DeployTreeTests(unittest.TestCase):
         self.assertFalse(certificates["wait"])
 
     def test_issuers_use_the_cloudflare_token_and_no_email(self):
-        issuers = list(yaml.safe_load_all(Path("deploy/issuers/cluster-issuers.yaml").read_text()))
+        issuers = list(yaml.safe_load_all(Path("deploy/certificates/cluster-issuers.yaml").read_text()))
         self.assertEqual(
             {issuer["metadata"]["name"] for issuer in issuers},
             {"letsencrypt-staging", "letsencrypt-production"},

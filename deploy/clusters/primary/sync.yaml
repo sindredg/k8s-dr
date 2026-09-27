@@ -30,7 +30,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./deploy/clusters/primary/certificates
+  path: ./deploy/certificates
   prune: true
   wait: false
   timeout: 5m
@@ -38,3 +38,54 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgresql
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/apps/postgresql
+  prune: true
+  wait: true
+  timeout: 5m
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+---
+# Gitea runs its database migrations in an init container, so a first
+# install can take several minutes.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gitea
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: postgresql
+    - name: certificates
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/apps/gitea
+  prune: true
+  wait: true
+  timeout: 10m
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings

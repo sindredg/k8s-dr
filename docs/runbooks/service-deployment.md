@@ -150,7 +150,7 @@ To encrypt a new secret, write it as `<name>.sops.yaml` under `deploy/` and run 
 
 Flux installs cert-manager from its Helm chart through the `infrastructure` Kustomization. The `certificates` Kustomization runs after it and applies the SOPS-encrypted Cloudflare token, the `letsencrypt-staging` and `letsencrypt-production` ClusterIssuers, and the `git-tls` Certificate for `git.sindrg.com` in the `gitea` namespace. Both issuers solve DNS-01 through Cloudflare, so the cluster needs no inbound port for issuance.
 
-`git-tls` uses the staging issuer until issuance is proven. Staging certificates are not trusted by browsers. Let's Encrypt allows five production certificates for the same names each week, so use staging for rebuild tests.
+Each cluster names its hostname and issuer in `deploy/clusters/<cluster>/cluster-settings.yaml`, and Flux substitutes them into `deploy/certificates/git-certificate.yaml`. The primary first used `letsencrypt-staging` to prove issuance, then switched to `letsencrypt-production` in the [PostgreSQL and Gitea](#postgresql-and-gitea) section. Staging certificates are not trusted by browsers. Let's Encrypt allows five production certificates for the same names each week, so set `git_issuer: letsencrypt-staging` on a test branch before a rebuild test.
 
 The `certificates` Kustomization does not wait for its objects to become ready. A slow Let's Encrypt order therefore cannot fail `make bootstrap`; `make validate-services` checks the Certificate instead.
 
@@ -159,17 +159,17 @@ The `certificates` Kustomization does not wait for its objects to become ready. 
    ```bash
    read -rsp 'Cloudflare API token: ' CF_API_TOKEN; echo
    printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: cloudflare-api-token\n  namespace: cert-manager\ntype: Opaque\nstringData:\n  api-token: %s\n' "$CF_API_TOKEN" \
-     | sops --encrypt --filename-override deploy/issuers/cloudflare-api-token.sops.yaml \
+     | sops --encrypt --filename-override deploy/certificates/cloudflare-api-token.sops.yaml \
          --input-type yaml --output-type yaml /dev/stdin \
-     > deploy/issuers/cloudflare-api-token.sops.yaml
+     > deploy/certificates/cloudflare-api-token.sops.yaml
    unset CF_API_TOKEN
    ```
 
 2. Check the file without printing the token.
 
    ```bash
-   grep -c 'api-token: ENC\[' deploy/issuers/cloudflare-api-token.sops.yaml
-   SOPS_AGE_KEY_FILE=~/.config/k8s-dr/age.agekey sops --decrypt deploy/issuers/cloudflare-api-token.sops.yaml >/dev/null && echo decrypts
+   grep -c 'api-token: ENC\[' deploy/certificates/cloudflare-api-token.sops.yaml
+   SOPS_AGE_KEY_FILE=~/.config/k8s-dr/age.agekey sops --decrypt deploy/certificates/cloudflare-api-token.sops.yaml >/dev/null && echo decrypts
    make check
    ```
 
@@ -183,10 +183,88 @@ The `certificates` Kustomization does not wait for its objects to become ready. 
    make validate-services
    ```
 
-   Expected: all three recaps end with `failed=0`. `validate-services` waits for the `infrastructure` and `certificates` Kustomizations, the `cert-manager` HelmRelease, both ClusterIssuers, and `certificate/git-tls`. The last task prints the issuer `letsencrypt-staging`, the name `git.sindrg.com`, and an expiry about 90 days ahead.
+   Expected: all three recaps end with `failed=0`. `validate-services` waits for the `infrastructure` and `certificates` Kustomizations, the `cert-manager` HelmRelease, both ClusterIssuers, and `certificate/git-tls`, then prints its issuer, the name `git.sindrg.com`, and an expiry about 90 days ahead. From the next section on, `validate-services` also checks PostgreSQL and Gitea.
 
 4. After the merge, run `make bootstrap` so Flux tracks `main` again, then repeat both validations.
 
 To rotate the Cloudflare token, repeat steps 1 to 3 with the new token, then revoke the old one in Cloudflare.
+
+## PostgreSQL and Gitea
+
+Flux applies two more Kustomizations. `postgresql` runs PostgreSQL 18 as a one-replica StatefulSet with a `local-path` volume on the worker disk. `gitea` depends on `postgresql` and `certificates`. It installs Gitea chart 12.7.0 with its Bitnami subcharts disabled, a `gitea` Gateway with an HTTP listener that redirects to HTTPS and an HTTPS listener that uses `git-tls`, and the network policies from [decision 0006](../decisions/0006-service-deployment-architecture.md#restrict-traffic-with-network-policies). The same change switches `git-tls` to `letsencrypt-production`, which issues one production certificate.
+
+The database and administrator passwords are generated random values, committed encrypted in `deploy/apps/postgresql/credentials.sops.yaml`, `deploy/apps/gitea/database.sops.yaml`, and `deploy/apps/gitea/admin.sops.yaml`. The age key decrypts them, so they need no separate entry in the credential store.
+
+The first Gitea install runs database migrations and can take several minutes. `make bootstrap` waits up to 15 minutes for the `flux-system` Kustomization, which waits for the others.
+
+1. Confirm the encrypted files decrypt with the operator key, without printing them.
+
+   ```bash
+   for file in deploy/apps/postgresql/credentials.sops.yaml deploy/apps/gitea/database.sops.yaml deploy/apps/gitea/admin.sops.yaml; do
+     SOPS_AGE_KEY_FILE=~/.config/k8s-dr/age.agekey sops --decrypt "$file" >/dev/null && echo "decrypts: $file"
+   done
+   ```
+
+   Expected: three `decrypts:` lines.
+
+2. Point Flux at the pushed branch and validate.
+
+   ```bash
+   make bootstrap FLUX_GIT_BRANCH=<branch>
+   make validate-cluster
+   make validate-services
+   ```
+
+   Expected: all three recaps end with `failed=0`. `validate-services` also waits for the `postgresql` and `gitea` Kustomizations and the `gitea` HelmRelease, the StatefulSet and Deployment rollouts, both volume claims `Bound`, the Gateway `Programmed`, both HTTPRoutes `Accepted`, and a `default-deny` policy in each namespace. It then requests Traefik's private NodePort with the Gitea host and requires a `301` to `https://git.sindrg.com/`. The certificate task prints the issuer `letsencrypt-production` and a new expiry.
+
+3. From the operator machine, check the public endpoint. No `-k`: the production certificate must be trusted.
+
+   ```bash
+   curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://git.sindrg.com/
+   curl -fsS https://git.sindrg.com/api/healthz
+   echo | openssl s_client -connect git.sindrg.com:443 -servername git.sindrg.com 2>/dev/null \
+     | openssl x509 -noout -issuer -enddate
+   ```
+
+   Expected: `301 https://git.sindrg.com/`; a JSON body with `"status": "pass"`, including the database check; an issuer with `O = Let's Encrypt` and the same expiry as step 2.
+
+4. Sign in through the API as the administrator. The password is read into a variable and not printed.
+
+   ```bash
+   GITEA_ADMIN_PASSWORD="$(SOPS_AGE_KEY_FILE=~/.config/k8s-dr/age.agekey sops --decrypt \
+     --extract '["stringData"]["password"]' deploy/apps/gitea/admin.sops.yaml)"
+   curl -fsS -u "gitea-admin:$GITEA_ADMIN_PASSWORD" https://git.sindrg.com/api/v1/user \
+     | python3 -c 'import json, sys; user = json.load(sys.stdin); print(user["login"], user["is_admin"])'
+   unset GITEA_ADMIN_PASSWORD
+   ```
+
+   Expected: `gitea-admin True`.
+
+5. Check the network policies from the control plane. Each command should fail.
+
+   ```bash
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap \
+     --command='sudo kubectl --kubeconfig /etc/kubernetes/admin.conf run np-probe --namespace default --rm -i --restart=Never --image=busybox:1.37.0 -- nc -z -w 3 postgresql.postgresql.svc.cluster.local 5432; echo "exit=$?"'
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap \
+     --command='sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec --namespace gitea deploy/gitea -c gitea -- wget -q -T 5 -O /dev/null https://dl.gitea.com/; echo "exit=$?"'
+   ```
+
+   Expected: a non-zero `exit=` for both. The first shows that a pod outside `gitea` cannot reach PostgreSQL. The second shows that Gitea has no internet egress. Step 3 already showed that Traefik reaches Gitea and Gitea reaches PostgreSQL.
+
+6. Restart both pods and check that the service returns.
+
+   ```bash
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap \
+     --command='K="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"; $K delete pod --namespace postgresql postgresql-0 && $K delete pod --namespace gitea -l app.kubernetes.io/name=gitea && $K rollout status statefulset/postgresql --namespace postgresql --timeout=300s && $K rollout status deployment/gitea --namespace gitea --timeout=600s'
+   curl -fsS https://git.sindrg.com/api/healthz
+   ```
+
+   Then repeat step 4.
+
+   Expected: both rollouts complete, `healthz` passes, and the administrator signs in. The volume claims keep their data. The milestone gate repeats this check after the fixtures exist.
+
+7. After the merge, run `make bootstrap` so Flux tracks `main` again, then repeat `make validate-cluster` and `make validate-services`.
+
+To rotate the administrator password, replace `password` in `admin.sops.yaml` with `sops edit` and let Flux apply it; Gitea resets the password when its pod starts. To rotate the database password, run `ALTER ROLE gitea PASSWORD '<new>'` in PostgreSQL first, then update both `credentials.sops.yaml` and `database.sops.yaml`, and restart Gitea. The image reads `POSTGRES_PASSWORD` only when it creates an empty data directory.
 
 If a check fails, send the failing command, its exit code, and the relevant error text. Do not send state, plan files, or credentials.

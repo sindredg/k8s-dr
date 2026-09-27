@@ -1,0 +1,11 @@
+---
+# Values that differ between the primary and recovery clusters. Flux
+# substitutes them into the certificates and gitea Kustomizations.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-settings
+  namespace: flux-system
+data:
+  git_host: git.sindrg.com
+  git_issuer: letsencrypt-production

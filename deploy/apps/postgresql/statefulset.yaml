@@ -1,0 +1,102 @@
+---
+# One PostgreSQL 18 instance from the official image, pinned by tag and
+# digest. See decision 0006. The volume claim is not owned by Flux, so
+# pruning the StatefulSet keeps the data.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: postgresql
+spec:
+  serviceName: postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgresql
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        # Local Path Provisioner creates volume directories as root with mode
+        # 0770, and the kubelet does not apply fsGroup to them. Hand the
+        # volume root to the postgres user (999) before the server starts.
+        - name: volume-owner
+          # yamllint disable-line rule:line-length
+          image: postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+          command:
+            - sh
+            - -c
+            - chown 999:999 /var/lib/postgresql && chmod 0700 /var/lib/postgresql
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["CHOWN", "FOWNER"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+      containers:
+        - name: postgresql
+          # yamllint disable-line rule:line-length
+          image: postgres:18.6-trixie@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+          env:
+            # The image reads these only when it initializes an empty data
+            # directory. Changing the password later needs ALTER ROLE.
+            - name: POSTGRES_USER
+              value: gitea
+            - name: POSTGRES_DB
+              value: gitea
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-credentials
+                  key: password
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "--host=127.0.0.1", "--username=gitea", "--dbname=gitea"]
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "--host=127.0.0.1", "--username=gitea", "--dbname=gitea"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi

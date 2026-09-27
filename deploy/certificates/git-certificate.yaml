@@ -1,0 +1,15 @@
+---
+# The Gitea Gateway listener in deploy/apps/gitea references this Secret.
+# Each cluster sets git_host and git_issuer in its cluster-settings ConfigMap.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: git-tls
+  namespace: gitea
+spec:
+  secretName: git-tls
+  dnsNames:
+    - ${git_host}
+  issuerRef:
+    kind: ClusterIssuer
+    name: ${git_issuer}

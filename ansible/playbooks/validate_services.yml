@@ -10,17 +10,22 @@
       ansible.builtin.command: >-
         kubectl --kubeconfig /etc/kubernetes/admin.conf
         wait --for=condition=Ready kustomization/{{ item }}
-        --namespace flux-system --timeout=300s
+        --namespace flux-system --timeout=600s
       loop:
         - infrastructure
         - certificates
+        - postgresql
+        - gitea
       changed_when: false
 
-    - name: Wait for the cert-manager release
+    - name: Wait for the Helm releases
       ansible.builtin.command: >-
         kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready helmrelease/cert-manager
-        --namespace cert-manager --timeout=300s
+        wait --for=condition=Ready helmrelease/{{ item }}
+        --namespace {{ item }} --timeout=300s
+      loop:
+        - cert-manager
+        - gitea
       changed_when: false
 
     - name: Wait for the ACME accounts of both issuers
@@ -46,3 +51,88 @@
         get certificate/git-tls --namespace gitea
         --output=custom-columns=ISSUER:.spec.issuerRef.name,NAMES:.spec.dnsNames,EXPIRES:.status.notAfter
       changed_when: false
+
+    - name: Wait for PostgreSQL
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        rollout status statefulset/postgresql --namespace postgresql --timeout=300s
+      changed_when: false
+
+    - name: Wait for Gitea
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        rollout status deployment/gitea --namespace gitea --timeout=300s
+      changed_when: false
+
+    - name: Require the data volumes to be bound
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get persistentvolumeclaim/{{ item.name }} --namespace {{ item.namespace }}
+        --output=jsonpath={.status.phase}
+      loop:
+        - {namespace: postgresql, name: data-postgresql-0}
+        - {namespace: gitea, name: gitea-shared-storage}
+      register: validate_data_pvc
+      changed_when: false
+      failed_when: validate_data_pvc.stdout != "Bound"
+
+    - name: Wait for the Gitea Gateway to be programmed
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        wait --for=condition=Programmed gateway/gitea
+        --namespace gitea --timeout=180s
+      changed_when: false
+
+    - name: Require both Gitea routes to be accepted
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get httproute {{ item }} --namespace gitea
+        --output=jsonpath='{.status.parents[*].conditions[?(@.type=="Accepted")].status}'
+      loop:
+        - gitea
+        - gitea-https-redirect
+      register: validate_gitea_route
+      changed_when: false
+      until: validate_gitea_route.stdout == "True"
+      retries: 30
+      delay: 5
+
+    - name: List the network policies
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get networkpolicies --namespace {{ item }} --output=name
+      loop:
+        - postgresql
+        - gitea
+      register: validate_network_policies
+      changed_when: false
+      failed_when: >-
+        'networkpolicy.networking.k8s.io/default-deny'
+        not in validate_network_policies.stdout_lines
+
+    - name: Read the Gitea hostname from the cluster settings
+      ansible.builtin.command: >-
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        get configmap/cluster-settings --namespace flux-system
+        --output=jsonpath={.data.git_host}
+      register: validate_git_host
+      changed_when: false
+      failed_when: validate_git_host.stdout == ""
+
+    # The request travels from the control plane to Traefik's private
+    # NodePort, so it exercises the HTTP listener and the redirect route.
+    - name: Require the HTTP listener to redirect to HTTPS
+      ansible.builtin.uri:
+        url: >-
+          http://{{ hostvars[groups['kube_workers'] | first].node_internal_ip
+          }}:{{ traefik_http_node_port }}/
+        method: GET
+        headers:
+          Host: "{{ validate_git_host.stdout }}"
+        follow_redirects: none
+        status_code: 301
+      register: validate_redirect
+      changed_when: false
+      failed_when: >-
+        validate_redirect.status != 301 or
+        not validate_redirect.location.startswith('https://' ~ validate_git_host.stdout ~ '/')
