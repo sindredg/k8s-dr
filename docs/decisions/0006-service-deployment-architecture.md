@@ -1,6 +1,6 @@
 # 0006: Service deployment architecture
 
-Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation). Implementation in progress: Flux, SOPS, and cert-manager are implemented and validated; PostgreSQL, Gitea, the HTTPS listener, and network policies are written but not yet validated on the cluster; fixtures are not started.
+Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation). Implementation in progress: Flux, SOPS, cert-manager, PostgreSQL, Gitea, the HTTPS listener, and network policies are implemented and validated on the primary cluster; fixtures are not started.
 
 Date: 2026-09-25
 

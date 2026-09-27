@@ -39,4 +39,6 @@ A unit test checks the task order and both wait conditions.
 
 ## Verify
 
-Not yet verified on the cluster. The same race needs a branch switch that moves a child path, which this change does not repeat. Check the next `make bootstrap`: the task `Wait for Flux to fetch the requested branch` must pass, and `Wait for Flux to apply the cluster configuration` must end with the fetched revision.
+`make bootstrap FLUX_GIT_BRANCH=feat/gitea` at `796f863` passed with `failed=0` on both hosts, including `Wait for Flux to fetch the requested branch` and the revision-and-Ready wait. Flux reported every Kustomization at `feat/gitea@sha1:796f863`. See the [milestone 3 worklog](../worklogs/03-service-deployment.md#validation-record-1).
+
+That run did not move a child path, so it shows that the new tasks work, not that they prevent the race. The race needs a branch switch that changes a child Kustomization's path.
