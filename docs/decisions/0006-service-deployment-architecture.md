@@ -1,6 +1,6 @@
 # 0006: Service deployment architecture
 
-Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation). Implementation in progress: Flux, SOPS, and cert-manager are implemented and validated; PostgreSQL, Gitea, the HTTPS listener, and network policies are written but not yet validated on the cluster; fixtures are not started.
+Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation) and the [recovery fixtures](#amendment-recovery-fixtures). Implementation in progress: Flux, SOPS, cert-manager, PostgreSQL, Gitea, the HTTPS listener, and network policies are implemented and validated on the primary cluster; the fixture automation is implemented and not yet run on the cluster.
 
 Date: 2026-09-25
 
@@ -32,7 +32,7 @@ The repository is public, so it must never contain a plaintext secret. See [secr
 | Ansible | Host configuration, kubeadm, Calico, Gateway API CRDs, Traefik, Local Path Provisioner, Flux controllers, the SOPS decryption key Secret |
 | Flux | cert-manager, PostgreSQL, Gitea, the Gitea Gateway listener and HTTPRoute, network policies |
 
-Traefik stays with Ansible. Moving an existing Helm release to Flux means adopting it in place or reinstalling it, and both change a validated milestone 2 component for no recovery benefit. The README tool table will change to say that Flux deploys the application layer.
+Traefik stays with Ansible. Moving an existing Helm release to Flux means adopting it in place or reinstalling it, and both change a validated milestone 2 component for no recovery benefit. The README tool table says that Flux deploys the application layer.
 
 ### Encrypt secrets with SOPS and age
 
@@ -92,7 +92,7 @@ Deny all ingress and egress in the Gitea and PostgreSQL namespaces by default. A
 
 ### Create fixtures through the Gitea API
 
-Create the recovery fixtures from the operator machine through the public endpoint: one user, one repository with a known commit, and one issue. Record their identifiers and the creation time in the milestone 3 worklog. The identifiers are not secret. The recovery checks in decision 0002 compare against them.
+Create the recovery fixtures from the operator machine through the public endpoint: one user, one repository with a known commit, and one issue. Record their identifiers and the creation time in the milestone 3 worklog. The identifiers are not secret. The recovery checks in decision 0002 compare against them. The [amendment](#amendment-recovery-fixtures) moves the identifiers into a tracked file.
 
 ## Layout
 
@@ -113,7 +113,7 @@ flowchart TD
     GT --> D
 ```
 
-The repository gains a `deploy/` tree: shared manifests in `deploy/base/` and one directory per cluster under `deploy/clusters/`. The primary and recovery clusters differ only in hostname and certificate issuer.
+The `deploy/` tree holds shared manifests in `deploy/base/`, `deploy/infrastructure/`, `deploy/certificates/`, and `deploy/apps/`, and one directory per cluster under `deploy/clusters/`. The primary and recovery clusters differ only in hostname and certificate issuer, which each cluster sets in its `cluster-settings.yaml`.
 
 ## Consequences
 
@@ -164,3 +164,18 @@ Implementing PostgreSQL and Gitea settled these details. None changes a decision
 | Credentials | The database password is in two SOPS Secrets with the same value, one per namespace, because Secrets cannot cross namespaces. The Gitea administrator uses `passwordMode: keepUpdated`, so the Secret in Git stays authoritative after a database restore. | Rotating the database password needs both files and an `ALTER ROLE`. The image reads `POSTGRES_PASSWORD` only when it creates an empty data directory. |
 | Bootstrap wait | The `flux-system` Kustomization waits for the Kustomizations it applies, including the first Gitea install. Its timeout rose from 5 to 15 minutes and the Ansible wait from 300 to 900 seconds. | A failed Gitea install now holds `make bootstrap` for up to 15 minutes before it fails. Ansible fetches the branch before it requests this reconcile; see [troubleshooting 04](../troubleshooting/04-flux-reconciled-stale-revision.md). |
 | Gitea egress | Mirroring, repository migrations, and the update checker are off, because the network policies block internet egress. | Features that fetch from the internet are unavailable. |
+
+## Amendment: Recovery fixtures
+
+Date: 2026-09-27.
+
+The fixtures and their checks are automated so that the milestone 5 restore and the milestone 6 drill reuse them unchanged against the recovery endpoint.
+
+| Topic | Implementation | Trade-off |
+| --- | --- | --- |
+| Identifiers | `recovery/fixtures.yaml` records the user, repository, branch, commit SHA, and issue number and title. It is tracked and not secret, so it survives the loss of the primary region with the repository. Creation times go in the milestone worklog. | Changing a fixture needs a commit. |
+| Fixed commit SHA | The fixture commit is a root commit with fixed content, identity, and dates, so its SHA is known before the push. The create playbook fails if the pushed SHA differs, and a unit test recomputes it. The repository starts empty, so the issue is `#1`. | The commit date is not the creation time. The worklog records the push time instead. |
+| Fixture password | `recovery/fixtures.sops.yaml`, encrypted for the same age key as `deploy/` under a second `.sops.yaml` rule that encrypts every value. It is an operator credential, not a cluster Secret, so it stays out of `deploy/` and Flux never reads it. A unit test fails if any `*.sops.yaml` file matches no rule or holds an unencrypted value. | The age key now also protects an operator credential. It was already a recovery credential, so the credential store gains no entry. |
+| Where checks run | On the operator machine against the public HTTPS endpoint, through `make create-fixtures`, `make check-fixtures`, and `make write-check`. `GIT_HOST` selects the endpoint. | The checks do not run over IAP, so they need the public DNS record and certificate to work. That is what users need too. |
+| Git authentication | `git push` and `git clone` run over HTTPS; SSH is disabled in Gitea. `scripts/git_with_password.sh` reads the password from stdin and serves it to Git as `GIT_ASKPASS`, and ignores the operator's Git configuration so no credential helper stores it. The password tasks use `no_log`. | Failures from those tasks show only the Git exit code and error text, which do not include the password. |
+| Write check | Separate from the read-only check. Each run pushes one commit under `write-checks/` and prints the UTC time the push was accepted. The read-only check prints the newest commit on the branch, which the drill compares with the last acknowledged write. | Write-check commits accumulate on the fixture branch. They are small. |

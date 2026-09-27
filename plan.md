@@ -53,7 +53,7 @@ These changes are easier before the worker disk holds service data. See the [pre
 ## 3. Service deployment
 
 - [ ] Bootstrap Flux from the external GitHub repository.
-- [ ] Deploy Gitea and PostgreSQL with Helm and persistent volumes.
+- [ ] Deploy Gitea from its Helm chart and PostgreSQL as a StatefulSet, both with persistent volumes. See the [decision 0006 amendment](docs/decisions/0006-service-deployment-architecture.md#amendment-postgresql-and-gitea-implementation).
 - [ ] Create a user, repository, commit, and issue as recovery fixtures.
 
 **Gate:** Git changes reconcile; Gitea works after its pods restart; all fixture data remains.

@@ -267,4 +267,101 @@ The first Gitea install runs database migrations and can take several minutes. `
 
 To rotate the administrator password, replace `password` in `admin.sops.yaml` with `sops edit` and let Flux apply it; Gitea resets the password when its pod starts. To rotate the database password, run `ALTER ROLE gitea PASSWORD '<new>'` in PostgreSQL first, then update both `credentials.sops.yaml` and `database.sops.yaml`, and restart Gitea. The image reads `POSTGRES_PASSWORD` only when it creates an empty data directory.
 
+## Recovery fixtures
+
+The recovery checks in [decision 0002](../decisions/0002-recovery-contract.md) need known data: one user, one repository with a known commit on its default branch, and one issue. `recovery/fixtures.yaml` records their identifiers. It is tracked and not secret, so it stays available on GitHub and in every clone when the primary region is lost. The fixture user's password is in `recovery/fixtures.sops.yaml`, encrypted for the same age key as `deploy/`. See the [decision 0006 amendment](../decisions/0006-service-deployment-architecture.md#amendment-recovery-fixtures).
+
+Three make targets run on the operator machine against the public HTTPS endpoint, not through IAP, so they check what users see. Each decrypts passwords locally with `FLUX_AGE_KEY_FILE` and hides them with `no_log`. Git runs over HTTPS and reads the password from stdin through `scripts/git_with_password.sh`, so the password never appears in command arguments or on disk.
+
+| Target | Changes data | What it does |
+| --- | --- | --- |
+| `make create-fixtures` | Yes | Creates each missing fixture through the Gitea API and a real `git push`, then runs the read-only check. Skips fixtures that already exist, so it is safe to rerun. |
+| `make check-fixtures` | No | Fails unless the fixture user signs in, the repository exists, the recorded commit is on the default branch, and the recorded issue has the expected title. Prints the newest commit on the default branch. |
+| `make write-check` | Yes | Pushes one new commit as the fixture user and prints the UTC time the push was accepted. That time is the last acknowledged write for the RPO measurement. |
+
+The targets use `git_host` from `deploy/clusters/primary/cluster-settings.yaml`. To check another endpoint, such as the recovery host, set `GIT_HOST`:
+
+```bash
+make check-fixtures GIT_HOST=git-dr.sindrg.com
+```
+
+The fixture commit has fixed content, identity, and dates, so its SHA is recorded before the push. `scripts/fixture_commit.py` builds it, the create playbook fails if the SHA differs from the record, and a unit test fails if someone edits the commit fields without updating the SHA. The issue is `#1` because the repository starts empty.
+
+1. Create the fixtures. Requires `git`, `sops`, and the controller toolchain from `make venv`.
+
+   ```bash
+   make create-fixtures
+   ```
+
+   Expected: `Report what this run created` prints a creation time for the user, repository, and issue, and a push time for commit `3775f53a1042434d76ec940d3d49360e1b3a0847`. The check play then reports all four fixtures, and the recap ends with `failed=0`. A rerun reports each fixture as `already present`.
+
+2. Record the four lines from `Report what this run created` in the milestone worklog. Gitea reports creation times in its server time zone; the push time is UTC.
+
+3. Run the read-only check.
+
+   ```bash
+   make check-fixtures
+   ```
+
+   Expected: `failed=0` and `changed=0`. `Report the fixture state` lists the user, repository, commit, issue, and the newest commit on `main`.
+
+4. Run the write check.
+
+   ```bash
+   make write-check
+   ```
+
+   Expected: `failed=0` and a line `Push accepted at <UTC time> by https://git.sindrg.com/`, followed by the new commit SHA. A later `make check-fixtures` shows that SHA as the newest commit.
+
+## Milestone gate
+
+The [milestone 3 gate](../../plan.md#3-service-deployment) requires that Git changes reconcile, Gitea works after its pods restart, and all fixture data remains. Run the steps in order and record each result.
+
+1. Bootstrap from `main` and validate.
+
+   ```bash
+   make bootstrap
+   make validate-cluster
+   make validate-services
+   ```
+
+   Expected: all three recaps end with `failed=0`. `validate-cluster` prints `main@sha1:<commit>` equal to `git rev-parse origin/main`.
+
+2. Create the fixtures as described in [Recovery fixtures](#recovery-fixtures), steps 1 and 2.
+
+3. Restart both pods with the command from [PostgreSQL and Gitea](#postgresql-and-gitea), step 6.
+
+   Expected: both rollouts complete.
+
+4. Run the fixture checks.
+
+   ```bash
+   make check-fixtures
+   make write-check
+   ```
+
+   Expected: both end with `failed=0`. The write check prints the time the push was accepted.
+
+5. Restart the worker VM. This is stronger than the plan requires: it checks that the Local Path volumes on the dedicated disk come back with the node.
+
+   ```bash
+   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='sudo systemctl reboot'
+   gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='findmnt /var/lib/k8s-dr'
+   make validate-cluster
+   make validate-services
+   make check-fixtures
+   ```
+
+   Expected: the reboot command may exit nonzero when the connection drops. Retry `findmnt` until it shows the `ext4` data disk. Both validations and the fixture check end with `failed=0`, and the newest commit is the one from step 4.
+
+6. Show that a Git change reconciles without a bootstrap. Merge a harmless change to `main`, such as a label on the service namespaces in `deploy/base/namespaces.yaml`. The `GitRepository` polls every minute. Then read what Flux applied:
+
+   ```bash
+   gcloud compute ssh "$CONTROL_PLANE_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap \
+     --command='K="sudo kubectl --kubeconfig /etc/kubernetes/admin.conf"; $K get kustomization/flux-system --namespace flux-system -o jsonpath="{.status.lastAppliedRevision}{\"\n\"}"; $K get namespaces gitea postgresql -L app.kubernetes.io/part-of'
+   git rev-parse origin/main
+   ```
+
+   Expected: the applied revision is `main@sha1:` followed by the merge commit, and both namespaces show the new label.
+
 If a check fails, send the failing command, its exit code, and the relevant error text. Do not send state, plan files, or credentials.

@@ -1,0 +1,15 @@
+---
+# Shared by the fixture playbooks, which run on the operator machine against
+# the public HTTPS endpoint. Pass -e git_host=<host> to check another endpoint,
+# such as the recovery host.
+fixture_repo_root: "{{ playbook_dir | dirname | dirname }}"
+git_host: >-
+  {{ (lookup('ansible.builtin.file',
+  fixture_repo_root ~ '/deploy/clusters/primary/cluster-settings.yaml')
+  | from_yaml).data.git_host }}
+fixture_api: "https://{{ git_host }}/api/v1"
+fixture_clone_url: >-
+  https://{{ fixture_user }}@{{ git_host }}/{{ fixture_user }}/{{ fixture_repository }}.git
+# Reads the password from stdin; see the script.
+fixture_git: "{{ fixture_repo_root }}/scripts/git_with_password.sh"
+ansible_python_interpreter: "{{ ansible_playbook_python }}"

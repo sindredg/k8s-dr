@@ -1,0 +1,155 @@
+---
+# Read-only checks of the recovery fixtures in recovery/fixtures.yaml, run
+# from the operator machine through the public HTTPS endpoint. The recovery
+# drill runs the same checks against the recovery host.
+- name: Check the recovery fixtures
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../recovery/fixtures.yaml
+    - vars/fixtures.yml
+  tasks:
+    - name: Show the endpoint under test
+      ansible.builtin.debug:
+        msg: "{{ fixture_user }}/{{ fixture_repository }} on https://{{ git_host }}/"
+
+    - name: Read the fixture password
+      ansible.builtin.import_tasks: tasks/fixture_password.yml
+
+    - name: Sign in as the fixture user
+      ansible.builtin.uri:
+        url: "{{ fixture_api }}/user"
+        url_username: "{{ fixture_user }}"
+        url_password: "{{ fixture_password.stdout }}"
+        force_basic_auth: true
+        status_code: [200, 401, 403]
+      register: check_fixture_login
+      no_log: true
+
+    - name: Require the fixture user to sign in
+      ansible.builtin.assert:
+        that:
+          - check_fixture_login.status == 200
+          - check_fixture_login.json.login == fixture_user
+        fail_msg: "Sign-in as {{ fixture_user }} returned HTTP {{ check_fixture_login.status }}"
+        quiet: true
+
+    - name: Read the fixture repository
+      ansible.builtin.uri:
+        url: "{{ fixture_api }}/repos/{{ fixture_user }}/{{ fixture_repository }}"
+        url_username: "{{ fixture_user }}"
+        url_password: "{{ fixture_password.stdout }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: check_fixture_repository
+      no_log: true
+
+    - name: Require the fixture repository
+      ansible.builtin.assert:
+        that:
+          - check_fixture_repository.status == 200
+          - check_fixture_repository.json.default_branch == fixture_branch
+        fail_msg: >-
+          {{ fixture_user }}/{{ fixture_repository }} returned HTTP
+          {{ check_fixture_repository.status }}
+        quiet: true
+
+    - name: Read the fixture issue
+      ansible.builtin.uri:
+        url: >-
+          {{ fixture_api }}/repos/{{ fixture_user }}/{{ fixture_repository
+          }}/issues/{{ fixture_issue.number }}
+        url_username: "{{ fixture_user }}"
+        url_password: "{{ fixture_password.stdout }}"
+        force_basic_auth: true
+        status_code: [200, 404]
+      register: check_fixture_issue
+      no_log: true
+
+    - name: Require the fixture issue with its title
+      ansible.builtin.assert:
+        that:
+          - check_fixture_issue.status == 200
+          - check_fixture_issue.json.title == fixture_issue.title
+          - check_fixture_issue.json.pull_request is none
+        fail_msg: "Issue #{{ fixture_issue.number }} is missing or has another title"
+        quiet: true
+
+    - name: Check the fixture commit through a clone
+      block:
+        - name: Create a temporary clone directory
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: .fixture
+          register: check_fixture_workdir
+          # Local scratch space; the check changes nothing on the server.
+          changed_when: false
+
+        - name: Clone the fixture repository over HTTPS
+          ansible.builtin.command:
+            argv:
+              - "{{ fixture_git }}"
+              - clone
+              - --quiet
+              - --no-checkout
+              - --single-branch
+              - --branch
+              - "{{ fixture_branch }}"
+              - "{{ fixture_clone_url }}"
+              - "{{ check_fixture_workdir.path }}/repo"
+            stdin: "{{ fixture_password.stdout }}"
+          register: check_fixture_clone
+          changed_when: false
+          failed_when: false
+          no_log: true
+
+        - name: Require the clone to succeed
+          ansible.builtin.assert:
+            that: check_fixture_clone.rc == 0
+            fail_msg: >-
+              git clone exited {{ check_fixture_clone.rc }}:
+              {{ check_fixture_clone.stderr }}
+            quiet: true
+
+        - name: Require the fixture commit on the default branch
+          ansible.builtin.command:
+            argv:
+              - git
+              - -C
+              - "{{ check_fixture_workdir.path }}/repo"
+              - merge-base
+              - --is-ancestor
+              - "{{ fixture_commit.sha }}"
+              - HEAD
+          changed_when: false
+
+        # The drill compares this with the last acknowledged write to
+        # measure data loss.
+        - name: Show the newest commit on the default branch
+          ansible.builtin.command:
+            argv:
+              - git
+              - -C
+              - "{{ check_fixture_workdir.path }}/repo"
+              - log
+              - -1
+              - --format=%H %s
+          register: check_fixture_head
+          changed_when: false
+
+        - name: Report the fixture state
+          ansible.builtin.debug:
+            msg:
+              - "User {{ fixture_user }} signed in."
+              - "Repository {{ fixture_user }}/{{ fixture_repository }} exists."
+              - "Commit {{ fixture_commit.sha }} is on {{ fixture_branch }}."
+              - "Issue #{{ fixture_issue.number }}: {{ fixture_issue.title }}"
+              - "Newest commit on {{ fixture_branch }}: {{ check_fixture_head.stdout }}"
+      always:
+        - name: Remove the temporary clone
+          ansible.builtin.file:
+            path: "{{ check_fixture_workdir.path }}"
+            state: absent
+          changed_when: false
+          when: check_fixture_workdir.path is defined
