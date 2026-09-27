@@ -1,7 +1,12 @@
 ---
-# SOPS encrypts secrets under deploy/ for the operator's age public key.
-# Flux decrypts them with the matching private key in flux-system/sops-age.
+# SOPS encrypts secrets for the operator's age public key.
 creation_rules:
+  # Kubernetes Secrets under deploy/. Flux decrypts them with the matching
+  # private key in flux-system/sops-age.
   - path_regex: ^deploy/.*\.sops\.yaml$
     encrypted_regex: ^(data|stringData)$
+    age: age1cxdnhpr5c2nt2j7jncce24vaa3r55kjzej4x9x74h2f08janvaps2xfgr4
+  # Operator credentials under recovery/, such as the fixture password. Only
+  # the operator machine decrypts them; every value is encrypted.
+  - path_regex: ^recovery/.*\.sops\.yaml$
     age: age1cxdnhpr5c2nt2j7jncce24vaa3r55kjzej4x9x74h2f08janvaps2xfgr4

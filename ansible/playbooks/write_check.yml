@@ -1,0 +1,136 @@
+---
+# Pushes one new commit as the fixture user and prints the UTC time the push
+# was accepted. That time is the last acknowledged write for the RPO
+# measurement in decision 0002. Run on request only; the read-only checks are
+# in check_fixtures.yml.
+- name: Push a write-check commit
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../recovery/fixtures.yaml
+    - vars/fixtures.yml
+  tasks:
+    - name: Read the fixture password
+      ansible.builtin.import_tasks: tasks/fixture_password.yml
+
+    - name: Commit and push through a clone
+      block:
+        - name: Create a temporary clone directory
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: .fixture
+          register: write_check_workdir
+
+        - name: Clone the default branch over HTTPS
+          ansible.builtin.command:
+            argv:
+              - "{{ fixture_git }}"
+              - clone
+              - --quiet
+              - --depth
+              - "1"
+              - --single-branch
+              - --branch
+              - "{{ fixture_branch }}"
+              - "{{ fixture_clone_url }}"
+              - "{{ write_check_workdir.path }}/repo"
+            stdin: "{{ fixture_password.stdout }}"
+          register: write_check_clone
+          changed_when: false
+          failed_when: false
+          no_log: true
+
+        - name: Require the clone to succeed
+          ansible.builtin.assert:
+            that: write_check_clone.rc == 0
+            fail_msg: "git clone exited {{ write_check_clone.rc }}: {{ write_check_clone.stderr }}"
+            quiet: true
+
+        - name: Name the write check
+          ansible.builtin.set_fact:
+            write_check_started: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
+
+        - name: Create the write-check directory
+          ansible.builtin.file:
+            path: "{{ write_check_workdir.path }}/repo/write-checks"
+            state: directory
+            mode: "0755"
+
+        - name: Write a file named after the start time
+          ansible.builtin.copy:
+            dest: >-
+              {{ write_check_workdir.path }}/repo/write-checks/{{
+              write_check_started | replace(':', '') }}.txt
+            content: "Write check started {{ write_check_started }} against {{ git_host }}\n"
+            mode: "0644"
+
+        - name: Stage the write check
+          ansible.builtin.command:
+            argv: [git, -C, "{{ write_check_workdir.path }}/repo", add, write-checks]
+          changed_when: true
+
+        - name: Commit the write check
+          ansible.builtin.command:
+            argv:
+              - git
+              - -C
+              - "{{ write_check_workdir.path }}/repo"
+              - -c
+              - "user.name={{ fixture_user }}"
+              - -c
+              - "user.email={{ fixture_email }}"
+              - commit
+              - --quiet
+              - --message
+              - "Write check {{ write_check_started }}"
+          environment:
+            GIT_CONFIG_GLOBAL: /dev/null
+            GIT_CONFIG_NOSYSTEM: "1"
+          changed_when: true
+
+        - name: Read the write-check commit SHA
+          ansible.builtin.command:
+            argv: [git, -C, "{{ write_check_workdir.path }}/repo", log, -1, --format=%H]
+          register: write_check_sha
+          changed_when: false
+
+        - name: Push the write check
+          ansible.builtin.command:
+            argv:
+              - "{{ fixture_git }}"
+              - -C
+              - "{{ write_check_workdir.path }}/repo"
+              - push
+              - --quiet
+              - origin
+              - "HEAD:{{ fixture_branch }}"
+            stdin: "{{ fixture_password.stdout }}"
+          register: write_check_push
+          changed_when: write_check_push.rc == 0
+          failed_when: false
+          no_log: true
+
+        - name: Record when the push was accepted
+          ansible.builtin.set_fact:
+            write_check_acknowledged: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
+
+        - name: Require the push to succeed
+          ansible.builtin.assert:
+            that: write_check_push.rc == 0
+            fail_msg: "git push exited {{ write_check_push.rc }}: {{ write_check_push.stderr }}"
+            quiet: true
+
+        - name: Report the acknowledged write
+          ansible.builtin.debug:
+            msg:
+              - "Push accepted at {{ write_check_acknowledged }} by https://{{ git_host }}/"
+              - >-
+                Commit {{ write_check_sha.stdout }} on {{ fixture_branch }}:
+                Write check {{ write_check_started }}
+      always:
+        - name: Remove the temporary clone
+          ansible.builtin.file:
+            path: "{{ write_check_workdir.path }}"
+            state: absent
+          when: write_check_workdir.path is defined

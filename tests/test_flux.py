@@ -203,11 +203,16 @@ class DeployTreeTests(unittest.TestCase):
                         self.assertIn("sops", document)
 
     def test_sops_encrypts_deploy_secrets_for_one_age_recipient(self):
+        # One age key decrypts both the cluster Secrets and the operator
+        # credentials under recovery/.
         rules = yaml.safe_load(Path(".sops.yaml").read_text())["creation_rules"]
-        self.assertEqual(len(rules), 1)
-        self.assertEqual(rules[0]["path_regex"], r"^deploy/.*\.sops\.yaml$")
+        self.assertEqual(
+            [rule["path_regex"] for rule in rules],
+            [r"^deploy/.*\.sops\.yaml$", r"^recovery/.*\.sops\.yaml$"],
+        )
         self.assertEqual(rules[0]["encrypted_regex"], "^(data|stringData)$")
         self.assertRegex(rules[0]["age"], r"^age1[0-9a-z]{58}$")
+        self.assertEqual({rule["age"] for rule in rules}, {rules[0]["age"]})
 
 
 if __name__ == "__main__":

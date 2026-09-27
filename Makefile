@@ -5,21 +5,29 @@
 
 TF_DIR ?= infra/primary
 SSH_KEY ?= $$HOME/.ssh/google_compute_engine
-# Age private key that Flux uses to decrypt SOPS secrets. Keep it outside the
-# repository and in the recovery credential store.
+# Age private key that decrypts the SOPS files. Flux receives it at bootstrap;
+# the fixture targets use it locally. Keep it outside the repository and in the
+# recovery credential store.
 FLUX_AGE_KEY_FILE ?= $(HOME)/.config/k8s-dr/age.agekey
 # Branch Flux reconciles. Override it to test a pushed branch before merging.
 FLUX_GIT_BRANCH ?= main
+# Endpoint for the fixture targets. Empty means git_host from the primary
+# cluster settings; a drill sets the recovery host.
+GIT_HOST ?=
 INVENTORY := ansible/inventory/generated/hosts.json
 VENV := .venv
 # CI installs tools into the system Python and runs `make check BIN=`.
 BIN ?= $(VENV)/bin/
 IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
 PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
-PLAYBOOKS := bootstrap deploy_test_app cleanup_test_app validate validate_cluster validate_services validate_test_app
+# The fixture playbooks run on the operator machine against the public endpoint.
+FIXTURE_PLAYBOOK := SOPS_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)ansible-playbook -i localhost, \
+	$(if $(GIT_HOST),-e git_host=$(GIT_HOST))
+PLAYBOOKS := bootstrap deploy_test_app cleanup_test_app validate validate_cluster validate_services validate_test_app create_fixtures check_fixtures write_check
 
 .DEFAULT_GOAL := help
-.PHONY: help venv inventory bootstrap validate-cluster validate-services validate deploy-test-app cleanup-test-app check pins
+.PHONY: help venv inventory age-key bootstrap validate-cluster validate-services validate deploy-test-app \
+	cleanup-test-app create-fixtures check-fixtures write-check check pins
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -33,8 +41,10 @@ inventory: ## Generate the ignored inventory from TF_DIR outputs
 		--ssh-user "$$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')" \
 		--ssh-key "$(SSH_KEY)" --output $(INVENTORY)
 
-bootstrap: ## Run bootstrap.yml through IAP
+age-key:
 	@test -r "$(FLUX_AGE_KEY_FILE)" || { echo "FLUX_AGE_KEY_FILE not readable: $(FLUX_AGE_KEY_FILE)" >&2; exit 1; }
+
+bootstrap: age-key ## Run bootstrap.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/bootstrap.yml \
 		-e sops_age_key_file="$(FLUX_AGE_KEY_FILE)" -e flux_git_branch="$(FLUX_GIT_BRANCH)"
 
@@ -53,9 +63,18 @@ deploy-test-app: ## Deploy the disposable application through IAP
 cleanup-test-app: ## Remove the disposable application through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/cleanup_test_app.yml
 
+create-fixtures: age-key ## Create the recovery fixtures, then check them
+	$(FIXTURE_PLAYBOOK) ansible/playbooks/create_fixtures.yml
+
+check-fixtures: age-key ## Check the recovery fixtures (read-only)
+	$(FIXTURE_PLAYBOOK) ansible/playbooks/check_fixtures.yml
+
+write-check: age-key ## Push a commit as the fixture user; print its UTC time
+	$(FIXTURE_PLAYBOOK) ansible/playbooks/write_check.yml
+
 check: ## Run the local unit tests, linters, and syntax checks
 	$(BIN)python -m unittest discover -s tests
-	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy .sops.yaml .github/workflows
+	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy recovery .sops.yaml .github/workflows
 	$(BIN)ansible-lint ansible
 	for playbook in $(PLAYBOOKS); do \
 		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \

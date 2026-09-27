@@ -1,0 +1,25 @@
+---
+# Recovery fixtures from decision 0002. The create, check, and write-check
+# playbooks read this file; see docs/runbooks/service-deployment.md.
+# The values are not secret. The password is in fixtures.sops.yaml.
+fixture_user: recovery-fixture
+fixture_email: recovery-fixture@example.com
+fixture_repository: recovery-fixture
+fixture_branch: main
+
+# A root commit with fixed content, identity, and dates always has the same
+# SHA, so it is recorded before the push. tests/test_fixtures.py recomputes it.
+fixture_commit:
+  path: README.md
+  content: |
+    # Recovery fixture
+
+    The recovery checks require this commit on the default branch.
+  message: Add the recovery fixture
+  author: Recovery Fixture <recovery-fixture@example.com>
+  date: "2026-09-27T00:00:00+00:00"
+  sha: 3775f53a1042434d76ec940d3d49360e1b3a0847
+
+fixture_issue:
+  number: 1
+  title: Recovery fixture issue
