@@ -87,12 +87,12 @@ class ServiceKustomizationTests(unittest.TestCase):
         template = Path("ansible/roles/flux/templates/flux-sync.yml.j2").read_text()
         root = _duration_seconds(re.search(r"timeout: (\d+[smh])", template).group(1))
         self.assertGreaterEqual(root, chain)
-        tasks = Path("ansible/roles/flux/tasks/main.yml").read_text()
-        self.assertIn(
-            f"wait --for=condition=Ready kustomization/flux-system\n"
-            f"    --namespace flux-system --timeout={root}s",
-            tasks,
-        )
+        tasks = {
+            task["name"]: task
+            for task in yaml.safe_load(Path("ansible/roles/flux/tasks/main.yml").read_text())
+        }
+        wait = tasks["Wait for Flux to apply the cluster configuration"]
+        self.assertEqual(wait["retries"] * wait["delay"], root)
 
 
 class PostgresqlTests(unittest.TestCase):

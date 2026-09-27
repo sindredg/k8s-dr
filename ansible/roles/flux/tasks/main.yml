@@ -65,27 +65,49 @@
   changed_when: true
 
 # Flux does not watch the key Secret, and reapplying an unchanged spec does not
-# trigger a reconcile. Without this request, a failure recorded before the
+# trigger a reconcile. Without these requests, a failure recorded before the
 # Secret was replaced stays until the next interval.
-- name: Request an immediate Flux reconcile
+#
+# Fetch the source first. A Ready GitRepository can still hold the previous
+# branch's artifact, and a Kustomization reconciled from it can wait on child
+# Kustomizations that already read the new artifact. See
+# docs/troubleshooting/04-flux-reconciled-stale-revision.md.
+- name: Request an immediate fetch of the Git source
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf
-    annotate --overwrite --namespace flux-system
-    gitrepository/flux-system kustomization/flux-system
+    annotate --overwrite --namespace flux-system gitrepository/flux-system
     reconcile.fluxcd.io/requestedAt={{ now(utc=true).isoformat() }}
   changed_when: true
 
-- name: Wait for Flux to fetch the repository
+- name: Wait for Flux to fetch the requested branch
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf
-    wait --for=condition=Ready gitrepository/flux-system
-    --namespace flux-system --timeout=180s
+    get gitrepository/flux-system --namespace flux-system
+    --output=jsonpath={.status.artifact.revision}
+  register: flux_source_revision
   changed_when: false
+  until: flux_source_revision.stdout.startswith(flux_git_branch ~ '@')
+  retries: 36
+  delay: 5
 
-# Matches the flux-system Kustomization timeout in flux-sync.yml.j2.
+- name: Request an immediate Flux reconcile
+  ansible.builtin.command: >-
+    kubectl --kubeconfig /etc/kubernetes/admin.conf
+    annotate --overwrite --namespace flux-system kustomization/flux-system
+    reconcile.fluxcd.io/requestedAt={{ now(utc=true).isoformat() }}
+  changed_when: true
+
+# A Ready condition from the previous revision would satisfy kubectl wait, so
+# require the fetched revision and Ready together. 180 retries of 5 seconds
+# match the flux-system Kustomization timeout in flux-sync.yml.j2.
 - name: Wait for Flux to apply the cluster configuration
   ansible.builtin.command: >-
     kubectl --kubeconfig /etc/kubernetes/admin.conf
-    wait --for=condition=Ready kustomization/flux-system
-    --namespace flux-system --timeout=900s
+    get kustomization/flux-system --namespace flux-system
+    --output=jsonpath='{.status.lastAppliedRevision}
+    {.status.conditions[?(@.type=="Ready")].status}'
+  register: flux_applied
   changed_when: false
+  until: flux_applied.stdout == flux_source_revision.stdout ~ ' True'
+  retries: 180
+  delay: 5

@@ -22,6 +22,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Worker join failure](troubleshooting/01-worker-join-failure.md) | Diagnose a worker that cannot join or become Ready. This is a guide, not an incident report. |
 | [Billing budget apply errors](troubleshooting/02-billing-budget-apply-errors.md) | Record the historical budget errors and the decision to remove the alert. |
 | [Flux rejected the age key](troubleshooting/03-flux-age-key-rejected.md) | A corrupted SOPS key, a stale Flux failure, and a dropped IAP session during the first Flux bootstrap. |
+| [Flux reconciled the previous branch](troubleshooting/04-flux-reconciled-stale-revision.md) | A branch switch where Flux applied the old artifact and waited on a child that had read the new one. |
 | [Regional recovery](runbooks/regional-recovery.md) | Execute and measure a cold recovery drill after prerequisites are implemented. |
 
 Record completed work and the commands and results that validate it in the corresponding worklog. Keep credentials, kubeconfigs, Terraform state, database dumps, and unsanitized command output out of this repository.
