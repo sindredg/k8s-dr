@@ -1,6 +1,6 @@
 # 0006: Service deployment architecture
 
-Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation) and the [recovery fixtures](#amendment-recovery-fixtures). Implementation in progress: Flux, SOPS, cert-manager, PostgreSQL, Gitea, the HTTPS listener, and network policies are implemented and validated on the primary cluster; the fixture automation is implemented and not yet run on the cluster.
+Status: Accepted on 2026-09-25 with public exposure option A and PostgreSQL 18. Amended on 2026-09-26 to record the Forgejo alternative; see the [amendment](#amendment-forgejo-considered). Amended on 2026-09-27 with [implementation details](#amendment-postgresql-and-gitea-implementation) and the [recovery fixtures](#amendment-recovery-fixtures). Implemented: the milestone 3 gate passed on the primary cluster on 2026-09-27; see the [worklog](../worklogs/03-service-deployment.md#milestone-gate).
 
 Date: 2026-09-25
 
