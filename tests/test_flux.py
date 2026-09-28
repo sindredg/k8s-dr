@@ -43,7 +43,7 @@ class FluxBootstrapTests(unittest.TestCase):
         self.assertTrue(secret["no_log"])
         self.assertEqual(
             secret["ansible.builtin.command"]["cmd"],
-            "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -",
+            "kubectl apply -f -",
         )
         self.assertIn("sops_age_key_file", secret["ansible.builtin.command"]["stdin"])
         self.assertTrue(tasks["Require an age private key in the key file"]["no_log"])

@@ -37,7 +37,7 @@ venv: ## Install the pinned controller toolchain
 	$(VENV)/bin/pip install -r ansible/requirements.txt
 
 inventory: ## Generate the ignored inventory from TF_DIR outputs
-	python3 scripts/prepare_ansible_inventory.py --terraform-dir $(TF_DIR) \
+	$(BIN)python scripts/prepare_ansible_inventory.py --terraform-dir $(TF_DIR) \
 		--ssh-user "$$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')" \
 		--ssh-key "$(SSH_KEY)" --output $(INVENTORY)
 

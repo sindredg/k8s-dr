@@ -39,7 +39,7 @@
 
 - name: Wait for the Kubernetes API readiness endpoint
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf get --raw=/readyz
+    kubectl get --raw=/readyz
   register: control_plane_readyz
   changed_when: false
   failed_when: false
@@ -49,7 +49,7 @@
 
 - name: Collect verbose API readiness diagnostics
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf get --raw=/readyz?verbose
+    kubectl get --raw=/readyz?verbose
   register: control_plane_readyz_diagnostics
   changed_when: false
   failed_when: false

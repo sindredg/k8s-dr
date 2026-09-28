@@ -11,20 +11,19 @@
 
 - name: Label the worker node for workload placement
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    label node {{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}
+    kubectl label node {{ hostvars[groups['kube_workers'] | first].gcp_instance_name }}
     node-role.kubernetes.io/worker= --overwrite
   changed_when: true
 
 - name: Apply pinned Calico operator CRDs
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    kubectl apply --server-side
     -f {{ cluster_addons_calico_url }}/manifests/operator-crds.yaml
   changed_when: true
 
 - name: Apply the pinned Calico operator
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    kubectl apply --server-side
     -f {{ cluster_addons_calico_url }}/manifests/tigera-operator.yaml
   changed_when: true
 
@@ -38,14 +37,12 @@
 
 - name: Apply Calico custom resources
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    apply -f /etc/kubernetes/calico-custom-resources.yml
+    kubectl apply -f /etc/kubernetes/calico-custom-resources.yml
   changed_when: true
 
 - name: Wait for the Tigera operator
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    rollout status deployment/tigera-operator
+    kubectl rollout status deployment/tigera-operator
     --namespace tigera-operator --timeout=300s
   changed_when: false
 
@@ -53,8 +50,7 @@
 # reconciles the Installation, so rollout status alone can race it.
 - name: Wait for the operator to create the Calico node DaemonSet
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    get daemonset/calico-node --namespace calico-system --output=name
+    kubectl get daemonset/calico-node --namespace calico-system --output=name
   register: cluster_addons_calico_node
   changed_when: false
   until: cluster_addons_calico_node.rc == 0
@@ -63,21 +59,19 @@
 
 - name: Wait for Calico on every node
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    rollout status daemonset/calico-node
+    kubectl rollout status daemonset/calico-node
     --namespace calico-system --timeout=300s
   changed_when: false
 
 - name: Wait for CoreDNS
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    rollout status deployment/coredns
+    kubectl rollout status deployment/coredns
     --namespace kube-system --timeout=300s
   changed_when: false
 
 - name: Apply pinned Gateway API Standard CRDs
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    kubectl apply --server-side
     -f {{ cluster_addons_gateway_api_url }}/standard-install.yaml
   changed_when: true
 
@@ -143,24 +137,21 @@
     --version {{ traefik_chart_version }}
     --values /etc/kubernetes/traefik-values.yml
     --namespace traefik --create-namespace
-    --kubeconfig /etc/kubernetes/admin.conf
   changed_when: true
 
 - name: Wait for Traefik
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    rollout status deployment/traefik --namespace traefik --timeout=300s
+    kubectl rollout status deployment/traefik --namespace traefik --timeout=300s
   changed_when: false
 
 - name: Wait for the Traefik GatewayClass
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    wait --for=condition=Accepted gatewayclass/traefik --timeout=180s
+    kubectl wait --for=condition=Accepted gatewayclass/traefik --timeout=180s
   changed_when: false
 
 - name: Apply the pinned Local Path Provisioner
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf apply
+    kubectl apply
     -f {{ cluster_addons_local_path_url }}/deploy/local-path-storage.yaml
   changed_when: true
 
@@ -174,20 +165,17 @@
 
 - name: Apply the restricted Local Path Provisioner configuration
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    apply -f /etc/kubernetes/local-path-config.yml
+    kubectl apply -f /etc/kubernetes/local-path-config.yml
   changed_when: true
 
 - name: Mark local-path as the default StorageClass
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    annotate storageclass local-path
+    kubectl annotate storageclass local-path
     storageclass.kubernetes.io/is-default-class=true --overwrite
   changed_when: true
 
 - name: Wait for the Local Path Provisioner
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    rollout status deployment/local-path-provisioner
+    kubectl rollout status deployment/local-path-provisioner
     --namespace local-path-storage --timeout=180s
   changed_when: false
