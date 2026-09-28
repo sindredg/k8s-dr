@@ -1,6 +1,6 @@
 # Simplification after milestone 3
 
-Status: Implemented and validated on 2026-09-28.
+Status: Validated on 2026-09-28. The fact-variable change is implemented; its bootstrap run is pending.
 
 ## Scope
 
@@ -23,6 +23,11 @@ Remove code that milestone 3 made redundant before milestone 4 adds backups. No 
 - `scripts/run_with_iap.py` writes `known_hosts` without a redundant descriptor cleanup path.
 - `infra/primary` grants the administrator `roles/iam.serviceAccountUser` on both node service accounts with one `for_each` resource. `moved` blocks keep the existing grants.
 
+### Read facts from `ansible_facts`
+
+- `node_prepare` and `container_runtime` read facts as `ansible_facts['...']` instead of the injected `ansible_*` variables, which ansible-core 2.24 removes. The bootstrap on 2026-09-28 printed an `INJECT_FACTS_AS_VARS` deprecation warning for each use.
+- `ansible.cfg` sets `inject_facts_as_vars = False`, so any new use of an injected fact fails immediately instead of at the upgrade.
+
 ## Validation record
 
 | Date | Command | Result |
@@ -37,3 +42,5 @@ Remove code that milestone 3 made redundant before milestone 4 adds backups. No 
 | 2026-09-28 | `make validate-cluster` | `ok=10 changed=0 unreachable=0 failed=0`. Commands ran as plain `kubectl` with `KUBECONFIG` from the play. Both nodes `Ready`; Flux last applied `main@sha1:d9e4772`. `run_with_iap: started 2026-09-28T22:00:10Z, finished 2026-09-28T22:00:55Z, elapsed 44s, exit 0`. |
 | 2026-09-28 | `make bootstrap` | control-plane `ok=71 changed=14 unreachable=0 failed=0 skipped=8`; worker `ok=55 changed=0 unreachable=0 failed=0 skipped=9`. The `changed` tasks are the `kubectl apply`, `helm upgrade --install`, and annotate steps that always report a change. kubeadm did not initialize or join again, and the worker disk was not formatted. `run_with_iap: started 2026-09-28T22:03:04Z, finished 2026-09-28T22:05:33Z, elapsed 146s, exit 0`. |
 | 2026-09-28 | `make validate-services` after the bootstrap | `ok=13 changed=0 unreachable=0 failed=0`. `run_with_iap: started 2026-09-28T22:27:27Z, finished 2026-09-28T22:28:15Z, elapsed 48s, exit 0`. |
+| 2026-09-29 | `make check` after the fact change | `Ran 119 tests`, `OK`. |
+| 2026-09-29 | Local play with `gather_facts: true` under the project `ansible.cfg` | `ansible_facts` returned `distribution`, `distribution_version`, `distribution_release`, `architecture`, and `swaptotal_mb`; `ansible_distribution is defined` was `false`. |
