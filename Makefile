@@ -23,11 +23,11 @@ PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
 # The fixture playbooks run on the operator machine against the public endpoint.
 FIXTURE_PLAYBOOK := SOPS_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)ansible-playbook -i localhost, \
 	$(if $(GIT_HOST),-e git_host=$(GIT_HOST))
-PLAYBOOKS := bootstrap deploy_test_app cleanup_test_app validate validate_cluster validate_services validate_test_app create_fixtures check_fixtures write_check
+PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_fixtures write_check
 
 .DEFAULT_GOAL := help
-.PHONY: help venv inventory age-key bootstrap validate-cluster validate-services validate deploy-test-app \
-	cleanup-test-app create-fixtures check-fixtures write-check check pins
+.PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
+	create-fixtures check-fixtures write-check check pins
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -53,15 +53,6 @@ validate-cluster: ## Run validate_cluster.yml through IAP
 
 validate-services: ## Run validate_services.yml (Flux-owned services) through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/validate_services.yml -v
-
-validate: ## Run validate.yml (cluster and test app) through IAP
-	$(IAP) $(PLAYBOOK) ansible/playbooks/validate.yml -v
-
-deploy-test-app: ## Deploy the disposable application through IAP
-	$(IAP) $(PLAYBOOK) ansible/playbooks/deploy_test_app.yml
-
-cleanup-test-app: ## Remove the disposable application through IAP
-	$(IAP) $(PLAYBOOK) ansible/playbooks/cleanup_test_app.yml
 
 create-fixtures: age-key ## Create the recovery fixtures, then check them
 	$(FIXTURE_PLAYBOOK) ansible/playbooks/create_fixtures.yml

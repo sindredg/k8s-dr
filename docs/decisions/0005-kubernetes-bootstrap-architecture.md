@@ -1,6 +1,6 @@
 # 0005: Kubernetes bootstrap architecture
 
-Status: Accepted. Amended on 2026-09-23 for the ingress reachability check and on 2026-09-26 for Helm 4 and the containerd source; see the [Helm 4](#amendment-helm-4) and [containerd](#amendment-containerd-from-dockers-repository) amendments. Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
+Status: Accepted. Amended on 2026-09-23 for the ingress reachability check on 2026-09-26 for Helm 4 and the containerd source, and on 2026-09-28 to retire the disposable application; see the [Helm 4](#amendment-helm-4), [containerd](#amendment-containerd-from-dockers-repository), and [disposable application](#amendment-retire-the-disposable-application) amendments. Implemented and validated in the [milestone 2 worklog](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
 
 Date: 2026-09-23
 
@@ -181,6 +181,24 @@ Date: 2026-09-23.
 | Tests cross-node networking | No, the request enters on the worker | Yes, the request leaves the control plane |
 
 The check no longer proves that the operator can open HTTP to the cluster from outside the VPC. Milestone 2 does not require that path, and Milestone 3 designs public exposure separately. If operator access is needed later, `gcloud compute start-iap-tunnel` to port 30080 is the fallback. It needs a firewall rule that allows the IAP range on that port.
+
+### Amendment: retire the disposable application
+
+Date: 2026-09-28.
+
+**Problem:** since milestone 3, Flux deploys PostgreSQL and Gitea on every bootstrap. The disposable application duplicated what those services already prove, and its playbooks, manifest, and tests had to be maintained alongside them.
+
+**Decision:** remove the disposable application, its playbooks, and its `make` targets. The [bootstrap runbook](../runbooks/kubernetes-bootstrap.md) validates with `make validate-services` and `make check-fixtures` instead.
+
+| Check | Disposable application | Gitea and fixtures |
+| --- | --- | --- |
+| Scheduling on the worker and a bound PVC | Yes | Yes, two PVCs |
+| Cross-node request through the Traefik NodePort | Yes, `200` and `404` | Yes, the HTTP-to-HTTPS redirect |
+| Data survives a pod or worker restart | Marker file | Fixture user, repository, commit, and issue |
+| Public DNS and TLS | No | Yes |
+| Independent of Flux and cert-manager | Yes | No |
+
+The trade-off is the last row. If Flux, cert-manager, or Let's Encrypt fails, the service checks fail too, and `make validate-cluster` is the only check that does not depend on them. The milestone 2 evidence in the worklog was recorded with the disposable application and stays valid for that milestone.
 
 ## Data and credential flow
 
