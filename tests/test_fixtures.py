@@ -81,12 +81,16 @@ class FixtureSecretTests(unittest.TestCase):
             documents = yaml.safe_load(path.read_text())
             plays = documents if "hosts" in documents[0] else [{"tasks": documents}]
             for play in plays:
+                # module_defaults passes the password to every task that
+                # uses the module, without the task naming it.
+                defaults = play.get("module_defaults", {})
                 for task in _tasks(play.get("tasks", [])):
                     # Blocks are checked through their tasks; asserts and
                     # imports only name the password variable.
                     if {"block", "ansible.builtin.assert", "ansible.builtin.import_tasks"} & set(task):
                         continue
                     arguments = {key: value for key, value in task.items() if key != "name"}
+                    arguments.update({module: defaults[module] for module in task if module in defaults})
                     if re.search(r"password", str(arguments)):
                         with self.subTest(path=str(path), task=task["name"]):
                             self.assertIs(task.get("no_log"), True)

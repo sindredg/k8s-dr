@@ -50,8 +50,7 @@
 
 - name: Wait until the API lists the worker node
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    get node {{ gcp_instance_name }} --output=name
+    kubectl get node {{ gcp_instance_name }} --output=name
   delegate_to: "{{ groups['kube_control_plane'] | first }}"
   become: true
   register: worker_join_api_result

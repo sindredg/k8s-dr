@@ -5,11 +5,12 @@
   hosts: kube_control_plane
   gather_facts: false
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tasks:
     - name: Wait for the Flux service Kustomizations
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready kustomization/{{ item }}
+        kubectl wait --for=condition=Ready kustomization/{{ item }}
         --namespace flux-system --timeout=600s
       loop:
         - infrastructure
@@ -20,8 +21,7 @@
 
     - name: Wait for the Helm releases
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready helmrelease/{{ item }}
+        kubectl wait --for=condition=Ready helmrelease/{{ item }}
         --namespace {{ item }} --timeout=300s
       loop:
         - cert-manager
@@ -30,8 +30,7 @@
 
     - name: Wait for the ACME accounts of both issuers
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready clusterissuer/{{ item }} --timeout=180s
+        kubectl wait --for=condition=Ready clusterissuer/{{ item }} --timeout=180s
       loop:
         - letsencrypt-staging
         - letsencrypt-production
@@ -40,34 +39,29 @@
     # A first DNS-01 order waits for Cloudflare propagation.
     - name: Wait for the Gitea certificate
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready certificate/git-tls
+        kubectl wait --for=condition=Ready certificate/git-tls
         --namespace gitea --timeout=600s
       changed_when: false
 
     - name: Show the Gitea certificate issuer, names, and expiry
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get certificate/git-tls --namespace gitea
+        kubectl get certificate/git-tls --namespace gitea
         --output=custom-columns=ISSUER:.spec.issuerRef.name,NAMES:.spec.dnsNames,EXPIRES:.status.notAfter
       changed_when: false
 
     - name: Wait for PostgreSQL
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        rollout status statefulset/postgresql --namespace postgresql --timeout=300s
+        kubectl rollout status statefulset/postgresql --namespace postgresql --timeout=300s
       changed_when: false
 
     - name: Wait for Gitea
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        rollout status deployment/gitea --namespace gitea --timeout=300s
+        kubectl rollout status deployment/gitea --namespace gitea --timeout=300s
       changed_when: false
 
     - name: Require the data volumes to be bound
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get persistentvolumeclaim/{{ item.name }} --namespace {{ item.namespace }}
+        kubectl get persistentvolumeclaim/{{ item.name }} --namespace {{ item.namespace }}
         --output=jsonpath={.status.phase}
       loop:
         - {namespace: postgresql, name: data-postgresql-0}
@@ -78,15 +72,13 @@
 
     - name: Wait for the Gitea Gateway to be programmed
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Programmed gateway/gitea
+        kubectl wait --for=condition=Programmed gateway/gitea
         --namespace gitea --timeout=180s
       changed_when: false
 
     - name: Require both Gitea routes to be accepted
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get httproute {{ item }} --namespace gitea
+        kubectl get httproute {{ item }} --namespace gitea
         --output=jsonpath='{.status.parents[*].conditions[?(@.type=="Accepted")].status}'
       loop:
         - gitea
@@ -99,8 +91,7 @@
 
     - name: List the network policies
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get networkpolicies --namespace {{ item }} --output=name
+        kubectl get networkpolicies --namespace {{ item }} --output=name
       loop:
         - postgresql
         - gitea
@@ -112,8 +103,7 @@
 
     - name: Read the Gitea hostname from the cluster settings
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get configmap/cluster-settings --namespace flux-system
+        kubectl get configmap/cluster-settings --namespace flux-system
         --output=jsonpath={.data.git_host}
       register: validate_git_host
       changed_when: false

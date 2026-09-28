@@ -9,9 +9,13 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+import yaml
 
-POD_CIDR = ipaddress.ip_network("192.168.0.0/16")
-SERVICE_CIDR = ipaddress.ip_network("10.96.0.0/12")
+# The cluster networks are set once, in the Ansible variables kubeadm reads.
+GROUP_VARS = Path(__file__).resolve().parents[1] / "ansible/playbooks/group_vars/all.yml"
+_CLUSTER_VARS = yaml.safe_load(GROUP_VARS.read_text())
+POD_CIDR = ipaddress.ip_network(_CLUSTER_VARS["pod_cidr"])
+SERVICE_CIDR = ipaddress.ip_network(_CLUSTER_VARS["service_cidr"])
 LOCAL_PORTS = {"control-plane": 2201, "worker": 2202}
 REQUIRED_OUTPUTS = (
     "project_id",

@@ -5,17 +5,17 @@
   hosts: kube_control_plane
   gather_facts: false
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   tasks:
     - name: Wait for both Kubernetes nodes to be Ready
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready nodes --all --timeout=300s
+        kubectl wait --for=condition=Ready nodes --all --timeout=300s
       changed_when: false
 
     - name: Wait for cluster add-ons after restart
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        rollout status {{ item.resource }}
+        kubectl rollout status {{ item.resource }}
         --namespace {{ item.namespace }} --timeout=300s
       loop:
         - namespace: calico-system
@@ -30,15 +30,13 @@
 
     - name: Wait for the Flux controllers
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        rollout status deployment/{{ item }} --namespace flux-system --timeout=300s
+        kubectl rollout status deployment/{{ item }} --namespace flux-system --timeout=300s
       loop: "{{ flux_controllers }}"
       changed_when: false
 
     - name: Wait for the Flux Git source and cluster Kustomization
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Ready {{ item }} --namespace flux-system --timeout=300s
+        kubectl wait --for=condition=Ready {{ item }} --namespace flux-system --timeout=300s
       loop:
         - gitrepository/flux-system
         - kustomization/flux-system
@@ -46,36 +44,31 @@
 
     - name: Show the Git revision Flux last applied
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get kustomization/flux-system --namespace flux-system
+        kubectl get kustomization/flux-system --namespace flux-system
         --output=jsonpath={.status.lastAppliedRevision}
       changed_when: false
 
     - name: Require the SOPS age key Secret without reading it
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get secret/sops-age --namespace flux-system --output=name
+        kubectl get secret/sops-age --namespace flux-system --output=name
       changed_when: false
 
     - name: Wait for the Traefik GatewayClass
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        wait --for=condition=Accepted gatewayclass/traefik --timeout=180s
+        kubectl wait --for=condition=Accepted gatewayclass/traefik --timeout=180s
       changed_when: false
 
     - name: List cluster nodes
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes --output=wide
+        kubectl get nodes --output=wide
       changed_when: false
 
     - name: List system pods
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get pods --all-namespaces --output=wide
+        kubectl get pods --all-namespaces --output=wide
       changed_when: false
 
     - name: List cluster deployments
       ansible.builtin.command: >-
-        kubectl --kubeconfig /etc/kubernetes/admin.conf
-        get deployments --all-namespaces
+        kubectl get deployments --all-namespaces
       changed_when: false

@@ -19,14 +19,13 @@
 
 - name: Apply the pinned Flux release manifest
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf apply --server-side
+    kubectl apply --server-side
     -f https://github.com/fluxcd/flux2/releases/download/v{{ flux_version }}/install.yaml
   changed_when: true
 
 - name: Wait for the Flux controllers
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    rollout status deployment/{{ item }} --namespace flux-system --timeout=300s
+    kubectl rollout status deployment/{{ item }} --namespace flux-system --timeout=300s
   loop: "{{ flux_controllers }}"
   changed_when: false
 
@@ -35,7 +34,7 @@
 # folded scalar Jinja receives a literal backslash and n, which corrupts the key.
 - name: Reconcile the SOPS age key Secret
   ansible.builtin.command:
-    cmd: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -
+    cmd: kubectl apply -f -
     stdin: >-
       {{ {
         'apiVersion': 'v1',
@@ -60,8 +59,7 @@
 
 - name: Apply the Flux Git source and cluster Kustomization
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    apply -f /etc/kubernetes/flux-sync.yml
+    kubectl apply -f /etc/kubernetes/flux-sync.yml
   changed_when: true
 
 # Flux does not watch the key Secret, and reapplying an unchanged spec does not
@@ -74,15 +72,13 @@
 # docs/troubleshooting/04-flux-reconciled-stale-revision.md.
 - name: Request an immediate fetch of the Git source
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    annotate --overwrite --namespace flux-system gitrepository/flux-system
+    kubectl annotate --overwrite --namespace flux-system gitrepository/flux-system
     reconcile.fluxcd.io/requestedAt={{ now(utc=true).isoformat() }}
   changed_when: true
 
 - name: Wait for Flux to fetch the requested branch
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    get gitrepository/flux-system --namespace flux-system
+    kubectl get gitrepository/flux-system --namespace flux-system
     --output=jsonpath={.status.artifact.revision}
   register: flux_source_revision
   changed_when: false
@@ -92,8 +88,7 @@
 
 - name: Request an immediate Flux reconcile
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    annotate --overwrite --namespace flux-system kustomization/flux-system
+    kubectl annotate --overwrite --namespace flux-system kustomization/flux-system
     reconcile.fluxcd.io/requestedAt={{ now(utc=true).isoformat() }}
   changed_when: true
 
@@ -102,8 +97,7 @@
 # match the flux-system Kustomization timeout in flux-sync.yml.j2.
 - name: Wait for Flux to apply the cluster configuration
   ansible.builtin.command: >-
-    kubectl --kubeconfig /etc/kubernetes/admin.conf
-    get kustomization/flux-system --namespace flux-system
+    kubectl get kustomization/flux-system --namespace flux-system
     --output=jsonpath='{.status.lastAppliedRevision}
     {.status.conditions[?(@.type=="Ready")].status}'
   register: flux_applied

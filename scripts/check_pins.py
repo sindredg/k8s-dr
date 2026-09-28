@@ -22,6 +22,7 @@ DEFAULT_VARIABLES = Path("ansible/playbooks/group_vars/all.yml")
 DEFAULT_DEPLOY = Path("deploy")
 DOCKER_PACKAGES_URL = "https://download.docker.com/linux/ubuntu/dists/noble/stable/binary-amd64/Packages"
 KUBERNETES_PACKAGES = ("kubelet", "kubeadm", "kubectl")
+TRAEFIK_CHARTS_URL = "https://traefik.github.io/charts"
 TIMEOUT_SECONDS = 60
 IMAGE_DIGEST = re.compile(r"image:\s*[\"']?([^\s\"']+@sha256:[0-9a-f]{64})")
 MANIFEST_TYPES = ", ".join((
@@ -131,18 +132,6 @@ def check_containerd(pins: dict, fetch=_fetch) -> Result:
     return Result("containerd", True, f"containerd.io {wanted} in {DOCKER_PACKAGES_URL}")
 
 
-def check_traefik_chart(pins: dict, fetch=_fetch) -> Result:
-    url = "https://traefik.github.io/charts/index.yaml"
-    wanted = pins["traefik_chart_version"]
-    try:
-        versions = chart_versions(fetch(url).decode(), "traefik")
-    except (urllib.error.URLError, TimeoutError) as error:
-        return Result("Traefik chart", False, f"{url}: {error}")
-    if wanted not in versions:
-        return Result("Traefik chart", False, f"{wanted} not in {url}")
-    return Result("Traefik chart", True, f"{wanted} in {url}")
-
-
 def flux_chart_pins(deploy_dir: Path) -> list[tuple[str, str, str, str]]:
     """Return (release, repository URL, chart, version) for each Flux HelmRelease."""
     documents = [
@@ -218,7 +207,9 @@ def run_checks(pins: dict, fetch=_fetch, deploy_dir: Path | None = None) -> list
     results = [
         check_kubernetes_packages(pins, fetch),
         check_containerd(pins, fetch),
-        check_traefik_chart(pins, fetch),
+        check_chart(
+            "Traefik", TRAEFIK_CHARTS_URL, "traefik", pins["traefik_chart_version"], fetch
+        ),
     ]
     results += [check_url(name, url, fetch) for name, url in artifact_urls(pins).items()]
     if deploy_dir is not None:
