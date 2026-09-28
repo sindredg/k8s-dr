@@ -1,4 +1,6 @@
 ---
+# Plays that run kubectl or helm read the administrative kubeconfig from
+# KUBECONFIG, so tasks do not repeat --kubeconfig.
 - name: Bootstrap Kubernetes nodes
   hosts: kube_cluster
   gather_facts: true
@@ -19,6 +21,8 @@
   hosts: kube_control_plane
   gather_facts: false
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   roles:
     - control_plane
 
@@ -26,6 +30,8 @@
   hosts: kube_workers
   gather_facts: false
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   roles:
     - worker_join
 
@@ -33,6 +39,8 @@
   hosts: kube_control_plane
   gather_facts: false
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   roles:
     - cluster_addons
 
@@ -40,5 +48,7 @@
   hosts: kube_control_plane
   gather_facts: false
   become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
   roles:
     - flux

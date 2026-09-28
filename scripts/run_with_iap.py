@@ -141,15 +141,9 @@ def write_known_hosts(targets: list[Target], path: Path) -> None:
     path = Path(path)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as known_hosts:
-            known_hosts.write("\n".join(keys) + "\n")
-    except BaseException:
-        try:
-            os.close(descriptor)
-        except OSError:
-            pass
-        raise
+    with os.fdopen(descriptor, "w", encoding="utf-8") as known_hosts:
+        known_hosts.write("\n".join(keys) + "\n")
+    # O_CREAT applies the mode only to a new file.
     path.chmod(0o600)
 
 

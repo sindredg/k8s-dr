@@ -9,6 +9,12 @@
   vars_files:
     - ../../recovery/fixtures.yaml
     - vars/fixtures.yml
+  # API calls sign in as the fixture user unless a task overrides it.
+  module_defaults:
+    ansible.builtin.uri:
+      url_username: "{{ fixture_user }}"
+      url_password: "{{ fixture_password.stdout }}"
+      force_basic_auth: true
   tasks:
     - name: Show the endpoint under test
       ansible.builtin.debug:
@@ -20,9 +26,6 @@
     - name: Sign in as the fixture user
       ansible.builtin.uri:
         url: "{{ fixture_api }}/user"
-        url_username: "{{ fixture_user }}"
-        url_password: "{{ fixture_password.stdout }}"
-        force_basic_auth: true
         status_code: [200, 401, 403]
       register: check_fixture_login
       no_log: true
@@ -38,9 +41,6 @@
     - name: Read the fixture repository
       ansible.builtin.uri:
         url: "{{ fixture_api }}/repos/{{ fixture_user }}/{{ fixture_repository }}"
-        url_username: "{{ fixture_user }}"
-        url_password: "{{ fixture_password.stdout }}"
-        force_basic_auth: true
         status_code: [200, 404]
       register: check_fixture_repository
       no_log: true
@@ -60,9 +60,6 @@
         url: >-
           {{ fixture_api }}/repos/{{ fixture_user }}/{{ fixture_repository
           }}/issues/{{ fixture_issue.number }}
-        url_username: "{{ fixture_user }}"
-        url_password: "{{ fixture_password.stdout }}"
-        force_basic_auth: true
         status_code: [200, 404]
       register: check_fixture_issue
       no_log: true

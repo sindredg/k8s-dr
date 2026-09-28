@@ -35,14 +35,19 @@ resource "google_compute_disk" "worker_data" {
   }
 }
 
-resource "google_service_account_iam_member" "admin_can_use_control_plane" {
-  service_account_id = module.primary_cluster.service_account_ids["control-plane"]
+resource "google_service_account_iam_member" "admin_can_use_node" {
+  for_each           = module.primary_cluster.service_account_ids
+  service_account_id = each.value
   role               = "roles/iam.serviceAccountUser"
   member             = var.admin_member
 }
 
-resource "google_service_account_iam_member" "admin_can_use_worker" {
-  service_account_id = module.primary_cluster.service_account_ids["worker"]
-  role               = "roles/iam.serviceAccountUser"
-  member             = var.admin_member
+moved {
+  from = google_service_account_iam_member.admin_can_use_control_plane
+  to   = google_service_account_iam_member.admin_can_use_node["control-plane"]
+}
+
+moved {
+  from = google_service_account_iam_member.admin_can_use_worker
+  to   = google_service_account_iam_member.admin_can_use_node["worker"]
 }
