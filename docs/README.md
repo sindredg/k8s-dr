@@ -7,6 +7,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Primary infrastructure worklog](worklogs/01-primary-infrastructure.md) | Record milestone 1 changes and validation. |
 | [Kubernetes bootstrap worklog](worklogs/02-kubernetes-bootstrap.md) | Record milestone 2 changes and validation. |
 | [Service deployment worklog](worklogs/03-service-deployment.md) | Record milestone 3 preparation, changes, and validation. |
+| [Simplification worklog](worklogs/03b-simplification.md) | Record the cleanup between milestones 3 and 4. |
 | [Use kubeadm](decisions/0001-use-kubeadm.md) | Explain the cluster bootstrap choice and its trade-offs. |
 | [Recovery contract](decisions/0002-recovery-contract.md) | Define recovery targets, checks, architecture, and alternatives. |
 | [Regional infrastructure and state](decisions/0003-regional-infrastructure-and-state.md) | Explain the reusable module and offsite state decisions. |

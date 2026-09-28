@@ -1,7 +1,0 @@
----
-# Full milestone 2 validation: the cluster, then the disposable application.
-- name: Validate the cluster
-  ansible.builtin.import_playbook: validate_cluster.yml
-
-- name: Validate the test application
-  ansible.builtin.import_playbook: validate_test_app.yml

@@ -62,17 +62,7 @@ The load balancer bills a forwarding rule and a static address every hour while 
 
    Expected: `404` for both. The HTTPS request uses Traefik's default self-signed certificate, so `-k` is required until cert-manager issues one.
 
-6. Optional: prove a Gateway route works end to end through the public path with the disposable application, then remove it.
-
-   ```bash
-   make deploy-test-app
-   curl -sS -H 'Host: milestone2.local' "http://$PUBLIC_WEB/"
-   make cleanup-test-app
-   ```
-
-   Expected: the response contains the application's persistent marker.
-
-7. Create the DNS record in the Cloudflare dashboard for `sindrg.com`:
+6. Create the DNS record in the Cloudflare dashboard for `sindrg.com`:
 
    | Field | Value |
    | --- | --- |
@@ -84,7 +74,7 @@ The load balancer bills a forwarding rule and a static address every hour while 
 
    DNS only keeps TLS termination in the cluster. The 60-second TTL bounds the cutover delay that [decision 0002](../decisions/0002-recovery-contract.md) measures.
 
-8. Confirm the record resolves and reaches Traefik.
+7. Confirm the record resolves and reaches Traefik.
 
    ```bash
    dig +short git.sindrg.com @1.1.1.1

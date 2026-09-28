@@ -2,6 +2,8 @@
 
 Status: Validated. The Milestone 2 gate passed on 2026-09-25 after a VM rebuild, repeated bootstrap runs, and application validation. See the [worklog](../worklogs/02-kubernetes-bootstrap.md) for recorded evidence. Design: [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md).
 
+The milestone 2 gate used a disposable test application. Gitea and the recovery fixtures now cover the same checks, so the test application was removed; this procedure validates with the service and fixture checks instead. See the [ADR 0005 amendment](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-retire-the-disposable-application).
+
 Run every command from the repository root on the external operator machine unless a step says otherwise. Both VMs stay private. Ansible reaches them only through IAP and OS Login.
 
 The `make` targets wrap the commands in the repository `Makefile`. Run `make` to list them, and `make -n <target>` to print a command without running it. `make inventory` reads the OS Login user from `gcloud` and the node values from `TF_DIR`, which defaults to `infra/primary`. The Makefile stores no real identifiers.
@@ -12,8 +14,8 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
 
 | Gate condition | Evidence step |
 | --- | --- |
-| Both nodes report `Ready` | [Validate the disposable application](#validate-the-disposable-application), `validate.yml` node output |
-| A disposable app schedules and is reachable | [Validate the disposable application](#validate-the-disposable-application) |
+| Both nodes report `Ready` | [Bootstrap the cluster](#bootstrap-the-cluster), step 3 |
+| An application schedules and is reachable | [Validate the services](#validate-the-services) |
 | The worker rejoins after a restart | [Restart the worker](#restart-the-worker) |
 | A fresh rebuild follows the same steps | [Rebuild from fresh VMs](#rebuild-from-fresh-vms) |
 
@@ -105,34 +107,29 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
    make validate-cluster
    ```
 
-   Expected: `failed=0`. Both nodes are `Ready`; the Calico, CoreDNS, Local Path Provisioner, Traefik, and Flux rollouts complete; the `traefik` GatewayClass is `Accepted`; and the Flux Git source and cluster Kustomization are `Ready`. `validate.yml` runs this playbook and then `validate_test_app.yml`, which needs the disposable application.
+   Expected: `failed=0`. Both nodes are `Ready`; the Calico, CoreDNS, Local Path Provisioner, Traefik, and Flux rollouts complete; the `traefik` GatewayClass is `Accepted`; and the Flux Git source and cluster Kustomization are `Ready`.
 
    The IAP runner prints a final line such as `run_with_iap: started 2026-09-25T08:00:00Z, finished 2026-09-25T08:07:30Z, elapsed 450s, exit 0` for every command. Include it in evidence for bootstrap runs; it is the baseline for recovery timing.
 
-## Validate the disposable application
+## Validate the services
 
-1. Deploy the application and rerun validation.
+Flux deploys PostgreSQL and Gitea during bootstrap. Their checks prove scheduling, cross-node networking, persistent volumes, Gateway API routing, and public HTTPS.
 
-   ```bash
-   make deploy-test-app
-   make validate
-   ```
-
-   Expected: deployment ends with `failed=0`, and validation ends with `failed=0`. Inspect its output: both nodes must be `Ready` on Kubernetes `v1.36.2`; the Tigera operator, `calico-node`, CoreDNS, Traefik, and `local-path-provisioner` pods must be `Running`; the PVC must be `Bound` with StorageClass `local-path`, with a matching PV; and the application pod must be `Running` on the worker. The playbook fails unless the Gateway is `Programmed`, the HTTPRoute is `Accepted`, and the PVC is `Bound`. It then requests the application from the control plane through the worker's private address and Traefik NodePort 30080:
-
-   - `Request the application through the Gateway route` returns `200` with body `milestone2 persistent marker`.
-   - `Confirm the route rejects requests without the application host` returns `404`, which confirms that the route matches the hostname.
-
-   These requests prove reachability inside the VPC. They do not test access from the operator machine. See [ADR 0005](../decisions/0005-kubernetes-bootstrap-architecture.md#amendment-in-cluster-reachability-check).
-
-2. Delete the application pod, wait for its replacement, and rerun validation.
+1. Check the Flux-owned services.
 
    ```bash
-   python3 scripts/run_with_iap.py --inventory ansible/inventory/generated/hosts.json -- .venv/bin/ansible control-plane -i ansible/inventory/generated/hosts.json --become -m ansible.builtin.shell -a 'kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test delete pod -l app=milestone2-app --wait=true && kubectl --kubeconfig /etc/kubernetes/admin.conf -n milestone2-test rollout status deployment/milestone2-app --timeout=180s'
-   make validate
+   make validate-services
    ```
 
-   Expected: the rollout completes, the application pod has a new name in the second validation output, and validation ends with `failed=0` with the same marker. Compare pod names and the PVC-to-PV binding in the validation output before and after deletion. The replacement pod read the file that the first pod wrote to the persistent volume.
+   Expected: `failed=0`. The service Kustomizations and Helm releases are `Ready`, the certificate is `Ready`, both data PVCs are `Bound`, the Gateway is `Programmed`, both HTTPRoutes are `Accepted`, and a request from the control plane to the worker's Traefik NodePort is redirected to HTTPS. See [service deployment](service-deployment.md) for details.
+
+2. Check the recovery fixtures from the operator machine.
+
+   ```bash
+   make check-fixtures
+   ```
+
+   Expected: `failed=0`. The fixture user signs in, and the repository, issue, and commit exist. The fixtures live on the worker data disk, so this also proves the data survived. If the fixtures do not exist yet, create them first as described in [Recovery fixtures](service-deployment.md#recovery-fixtures).
 
 ## Restart the worker
 
@@ -148,29 +145,23 @@ The tested Ubuntu image is pinned as the `boot_image` default in `infra/modules/
 2. Rerun validation.
 
    ```bash
-   make validate
+   make validate-cluster
+   make validate-services
+   make check-fixtures
    ```
 
-   Expected: validation waits up to five minutes for both nodes and the Calico, CoreDNS, Local Path Provisioner, Traefik, and test-app rollouts. The IAP runner also retries a temporary SSH host-key scan failure for up to 30 seconds. Validation then ends with `failed=0`. Inspect the node and pod output to confirm the worker is `Ready` again without a new join. Compare the PVC-to-PV binding with the output before the restart, and confirm the application request returns the same marker. If a wait times out, inspect the named workload and its events before retrying.
-
-3. Remove the disposable application.
-
-   ```bash
-   make cleanup-test-app
-   ```
-
-   Expected: `failed=0`. The namespace `milestone2-test` no longer exists, and the provisioner deletes the PV directory because the `local-path` reclaim policy is `Delete`.
+   Expected: validation waits up to five minutes for both nodes and the Calico, CoreDNS, Local Path Provisioner, Traefik, and Flux rollouts. The IAP runner also retries a temporary SSH host-key scan failure for up to 30 seconds. All three commands end with `failed=0`. Inspect the node output to confirm the worker is `Ready` again without a new join. The fixture check confirms the Gitea data survived the restart. If a wait times out, inspect the named workload and its events before retrying.
 
 ## Rebuild from fresh VMs
 
 This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, buckets, and state. The data disk has `prevent_destroy`, and the storage role reuses its existing `k8sdr-data` filesystem instead of formatting it.
 
-1. Confirm the image from [Confirm the boot image](#confirm-the-boot-image) matches the tracked pin and that cleanup ran. Then save a replacement plan for exactly the two VMs.
+1. Confirm the image from [Confirm the boot image](#confirm-the-boot-image) matches the tracked pin. Then save a replacement plan for exactly the two VMs.
 
    ```bash
    cd infra/primary
-   terraform plan -out=milestone2-rebuild.tfplan -replace='module.primary_cluster.google_compute_instance.node["control-plane"]' -replace='module.primary_cluster.google_compute_instance.node["worker"]'
-   terraform show milestone2-rebuild.tfplan
+   terraform plan -out=vm-rebuild.tfplan -replace='module.primary_cluster.google_compute_instance.node["control-plane"]' -replace='module.primary_cluster.google_compute_instance.node["worker"]'
+   terraform show vm-rebuild.tfplan
    ```
 
    Expected: the plan replaces the two `google_compute_instance.node` resources and the `google_compute_attached_disk.worker_data` attachment, which depends on the worker instance. It must not destroy `google_compute_disk.worker_data`, the network, subnet, firewall rules, router, NAT, service accounts, or buckets. If it does, do not apply. Report the plan summary line.
@@ -178,8 +169,8 @@ This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, 
 2. Apply only the reviewed plan, then delete it.
 
    ```bash
-   terraform apply milestone2-rebuild.tfplan
-   rm milestone2-rebuild.tfplan
+   terraform apply vm-rebuild.tfplan
+   rm vm-rebuild.tfplan
    cd ../..
    ```
 
@@ -188,10 +179,9 @@ This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, 
 3. Repeat these sections in order with no manual changes on the nodes:
    1. [Prepare the toolchain and inventory](#prepare-the-toolchain-and-inventory), steps 2 to 4. The IAP runner scans new host keys on every run, so the replaced VMs need no `known_hosts` cleanup.
    2. [Bootstrap the cluster](#bootstrap-the-cluster), all steps, including the second run.
-   3. [Validate the disposable application](#validate-the-disposable-application), step 1.
-   4. Cleanup from [Restart the worker](#restart-the-worker), step 3.
+   3. [Validate the services](#validate-the-services), all steps.
 
-   Expected: every step gives the same result as the first build. Record any step that needed a manual action as a failure in the worklog.
+   Expected: every step gives the same result as the first build. The fixture check passes without recreating the fixtures, because the worker data disk is kept. Record any step that needed a manual action as a failure in the worklog.
 
 ## Troubleshooting
 
