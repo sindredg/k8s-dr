@@ -1,6 +1,6 @@
 # Simplification after milestone 3
 
-Status: Validated on 2026-09-28. The fact-variable change is implemented; its bootstrap run is pending.
+Status: Implemented and validated on 2026-09-29.
 
 ## Scope
 
@@ -44,3 +44,4 @@ Remove code that milestone 3 made redundant before milestone 4 adds backups. No 
 | 2026-09-28 | `make validate-services` after the bootstrap | `ok=13 changed=0 unreachable=0 failed=0`. `run_with_iap: started 2026-09-28T22:27:27Z, finished 2026-09-28T22:28:15Z, elapsed 48s, exit 0`. |
 | 2026-09-29 | `make check` after the fact change | `Ran 119 tests`, `OK`. |
 | 2026-09-29 | Local play with `gather_facts: true` under the project `ansible.cfg` | `ansible_facts` returned `distribution`, `distribution_version`, `distribution_release`, `architecture`, and `swaptotal_mb`; `ansible_distribution is defined` was `false`. |
+| 2026-09-29 | `make bootstrap` with `inject_facts_as_vars = False` | control-plane `ok=71 changed=14 unreachable=0 failed=0 skipped=8`; worker `ok=55 changed=0 unreachable=0 failed=0 skipped=9`. The platform assertion passed on both nodes, the swap task was skipped, and the output had no `INJECT_FACTS_AS_VARS` warnings. `run_with_iap: started 2026-09-28T23:00:59Z, finished 2026-09-28T23:03:44Z, elapsed 165s, exit 0`. |
