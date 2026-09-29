@@ -56,13 +56,25 @@ The backup pod authenticates as the worker VM's service account through the meta
 - `roles/storage.objectCreator`, conditioned to its own `<cluster>/` prefix. Overwriting an object needs `storage.objects.delete`, so the writer can neither delete nor replace a set.
 - `roles/storage.objectViewer` on the whole bucket, so a recovery cluster can restore the primary's sets. The objects are encrypted and the cluster has no decryption key.
 
-A network policy allows only the backup pod to reach the metadata server. The previous `roles/storage.objectAdmin` grant to a user account is removed; that account is a project owner and keeps administrative access.
+Other pods on the worker can also reach the metadata server and obtain the same token. The `gitea` and `postgresql` namespaces deny egress by default, so only the backup pod there has a rule that allows it. Traefik, cert-manager, Flux, CoreDNS, and Local Path Provisioner have no egress policy. The cluster has neither the Calico API server nor policy tiers, so one cluster-wide rule cannot block the metadata server without also bypassing each namespace's default deny. Per-namespace policies would change components that Ansible installs and validates. The exposure is accepted: those components can already read cluster Secrets, so compromising one of them compromises the cluster, and the token can only add objects under `primary/` and read ciphertext. Because the age public keys are public, such a compromise could add a well-formed set. Restore therefore records which set it used, and the restored service must pass the fixture checks before it is accepted.
+
+The previous `roles/storage.objectAdmin` grant to a user account is removed; that account is a project owner and keeps administrative access.
 
 | Option | Trade-off |
 | --- | --- |
-| Node service account (selected) | No key file to store or rotate. Any pod on the worker that bypasses the network policy could obtain the token, but the token cannot delete or overwrite backups. |
+| Node service account (selected) | No key file to store or rotate. Any pod on the worker without an egress policy can obtain the token, but the token cannot delete or overwrite backups. |
 | Service account key in a SOPS Secret | Portable across clusters. It is a long-lived key to rotate, and each recovery cluster needs its own. |
 | Workload identity federation | Per-pod identity without keys. Needs a public OIDC issuer for the kubeadm API server, which is more setup than this lab needs. |
+
+### Build one tool image in CI
+
+The backup and restore Jobs need `pg_dump` and `pg_restore` from the server's PostgreSQL release, `age`, `curl`, `jq`, and `kubectl` in one container. One container is required because the step that scales Gitea back up must run on every exit path, including a failed dump. No upstream image ships all of these tools. `images/backup/Dockerfile` adds them to the pinned PostgreSQL image, with `kubectl` verified against a pinned SHA-256. GitHub Actions builds the image on pull requests and publishes it to `ghcr.io` from `main`. Manifests pin the published digest, and `scripts/check_pins.py` checks that the digest still resolves. The shell scripts ship in a ConfigMap, so they change without a rebuild.
+
+| Option | Trade-off |
+| --- | --- |
+| Project image on GHCR (selected) | One reviewed Dockerfile, a digest pin, and no downloads at run time. Adds a build workflow and a dependency on `ghcr.io`, which is GitHub, where Flux already reads the repository. |
+| Install `age` and `kubectl` when each Job starts | No image to build. Every hourly run and every restore then depends on package mirrors or GitHub releases, and the installed versions can drift. |
+| Separate containers from upstream images | No custom image. An init container that fails stops the Pod, so no later step can scale Gitea back up. |
 
 ### Fence a returning primary by removing its writer grant
 

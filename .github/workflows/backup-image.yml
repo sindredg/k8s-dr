@@ -1,0 +1,45 @@
+---
+name: Backup image
+
+# Builds the backup and restore tool image on every pull request that changes
+# it, and publishes it from main. Manifests pin the published digest.
+"on":
+  pull_request:
+    paths: ["images/backup/**", ".github/workflows/backup-image.yml"]
+  push:
+    branches: [main]
+    paths: ["images/backup/**", ".github/workflows/backup-image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: images/backup
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          provenance: false
+          tags: ghcr.io/${{ github.repository_owner }}/k8s-dr-backup:${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+      - if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/k8s-dr-backup
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "Published ${IMAGE}@${DIGEST}" | tee -a "$GITHUB_STEP_SUMMARY"
