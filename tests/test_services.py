@@ -32,7 +32,11 @@ class ClusterSettingsTests(unittest.TestCase):
         self.assertEqual(settings["metadata"]["namespace"], "flux-system")
         self.assertEqual(
             settings["data"],
-            {"git_host": "git.sindrg.com", "git_issuer": "letsencrypt-production"},
+            {
+                "git_host": "git.sindrg.com",
+                "git_issuer": "letsencrypt-production",
+                "backup_cluster": "primary",
+            },
         )
 
     def test_every_substituted_variable_is_defined(self):
@@ -178,6 +182,65 @@ class GiteaReleaseTests(unittest.TestCase):
         self.assertTrue({"admin.sops.yaml", "database.sops.yaml"} <= set(resources))
 
 
+class BackupTests(unittest.TestCase):
+    def setUp(self):
+        self.documents = {
+            (document["kind"], document["metadata"]["name"]): document
+            for document in _documents(APPS / "gitea/backup.yaml")
+        }
+        self.cronjob = self.documents["CronJob", "gitea-backup"]["spec"]
+        self.pod = self.cronjob["jobTemplate"]["spec"]["template"]["spec"]
+        self.kustomization = yaml.safe_load((APPS / "gitea/kustomization.yaml").read_text())
+        self.script = (APPS / "gitea/backup/backup.sh").read_text()
+
+    def test_runs_hourly_one_at_a_time_without_retries(self):
+        self.assertEqual(self.cronjob["schedule"], "7 * * * *")
+        self.assertEqual(self.cronjob["concurrencyPolicy"], "Forbid")
+        self.assertEqual(self.cronjob["jobTemplate"]["spec"]["backoffLimit"], 0)
+
+    def test_uses_the_digest_pinned_tool_image(self):
+        image = self.pod["containers"][0]["image"]
+        self.assertRegex(image, r"^ghcr\.io/sindredg/k8s-dr-backup@sha256:[0-9a-f]{64}$")
+
+    def test_mounts_the_gitea_volume_read_only(self):
+        data = next(volume for volume in self.pod["volumes"] if volume["name"] == "data")
+        self.assertEqual(data["persistentVolumeClaim"], {"claimName": "gitea-shared-storage", "readOnly": True})
+
+    def test_flux_does_not_substitute_the_script(self):
+        # Flux would replace the script's ${VAR} references with empty strings.
+        self.assertEqual(
+            self.kustomization["generatorOptions"]["annotations"],
+            {"kustomize.toolkit.fluxcd.io/substitute": "disabled"},
+        )
+        self.assertIn("${backup_cluster}", str(self.pod["containers"][0]["env"]))
+
+    def test_role_can_scale_only_gitea(self):
+        rules = self.documents["Role", "gitea-backup"]["rules"]
+        writes = [rule for rule in rules if set(rule["verbs"]) - {"get", "list", "watch"}]
+        self.assertEqual(writes, [{
+            "apiGroups": ["apps"],
+            "resources": ["deployments/scale"],
+            "resourceNames": ["gitea"],
+            "verbs": ["get", "patch", "update"],
+        }])
+
+    def test_uploads_cannot_replace_objects_and_the_manifest_is_last(self):
+        self.assertIn("x-goog-if-generation-match: 0", self.script)
+        self.assertIn("Content-MD5", self.script)
+        uploads = re.findall(r"^\s*upload \S+ (\S+)", self.script, re.MULTILINE)
+        self.assertEqual(uploads[-1], "manifest.json")
+
+    def test_encrypts_only_to_public_keys(self):
+        recipients = [
+            line for line in (APPS / "gitea/backup/recipients.txt").read_text().splitlines()
+            if line and not line.startswith("#")
+        ]
+        self.assertEqual(len(recipients), 2)
+        self.assertTrue(all(re.fullmatch(r"age1[0-9a-z]{58}", line) for line in recipients))
+        sops_recipient = re.search(r"age1[0-9a-z]{58}", Path(".sops.yaml").read_text()).group(0)
+        self.assertNotIn(sops_recipient, recipients)
+
+
 class GatewayTests(unittest.TestCase):
     def setUp(self):
         self.documents = {
@@ -220,26 +283,43 @@ class NetworkPolicyTests(unittest.TestCase):
                 self.assertEqual(deny["metadata"]["namespace"], namespace)
                 self.assertEqual(deny["spec"], {"podSelector": {}, "policyTypes": ["Ingress", "Egress"]})
 
+    @staticmethod
+    def _peer(peer):
+        if "ipBlock" in peer:
+            return peer["ipBlock"]["cidr"]
+        namespace = peer["namespaceSelector"]["matchLabels"]["kubernetes.io/metadata.name"]
+        labels = peer["podSelector"].get("matchLabels", {})
+        return f"{namespace}/{labels.get('app.kubernetes.io/name', labels.get('k8s-app', '*'))}"
+
     def test_only_listed_flows_are_allowed(self):
         flows = set()
         for namespace in ("postgresql", "gitea"):
             for name, policy in self.policies(namespace).items():
+                pods = policy["spec"]["podSelector"].get("matchLabels", {}).get("app.kubernetes.io/name", "*")
                 for direction, peers_key in (("ingress", "from"), ("egress", "to")):
                     for rule in policy["spec"].get(direction, []):
-                        for peer in rule[peers_key]:
-                            source = peer["namespaceSelector"]["matchLabels"]["kubernetes.io/metadata.name"]
+                        # A rule without peers allows any address.
+                        for peer in rule.get(peers_key, [None]):
+                            other = "any" if peer is None else self._peer(peer)
                             for port in rule["ports"]:
-                                flows.add((namespace, direction, source, port["protocol"], port["port"]))
+                                flows.add((f"{namespace}/{pods}", direction, other, port["protocol"], port["port"]))
         self.assertEqual(
             flows,
             {
-                ("postgresql", "ingress", "gitea", "TCP", 5432),
-                ("postgresql", "egress", "kube-system", "UDP", 53),
-                ("postgresql", "egress", "kube-system", "TCP", 53),
-                ("gitea", "ingress", "traefik", "TCP", 3000),
-                ("gitea", "egress", "postgresql", "TCP", 5432),
-                ("gitea", "egress", "kube-system", "UDP", 53),
-                ("gitea", "egress", "kube-system", "TCP", 53),
+                ("postgresql/postgresql", "ingress", "gitea/gitea", "TCP", 5432),
+                ("postgresql/postgresql", "ingress", "gitea/gitea-backup", "TCP", 5432),
+                ("postgresql/*", "egress", "kube-system/kube-dns", "UDP", 53),
+                ("postgresql/*", "egress", "kube-system/kube-dns", "TCP", 53),
+                ("gitea/gitea", "ingress", "traefik/traefik", "TCP", 3000),
+                ("gitea/gitea", "egress", "postgresql/postgresql", "TCP", 5432),
+                ("gitea/*", "egress", "kube-system/kube-dns", "UDP", 53),
+                ("gitea/*", "egress", "kube-system/kube-dns", "TCP", 53),
+                # The backup Job: database, metadata server token, Cloud
+                # Storage, Healthchecks.io, and the Kubernetes API.
+                ("gitea/gitea-backup", "egress", "postgresql/postgresql", "TCP", 5432),
+                ("gitea/gitea-backup", "egress", "169.254.169.254/32", "TCP", 80),
+                ("gitea/gitea-backup", "egress", "any", "TCP", 443),
+                ("gitea/gitea-backup", "egress", "any", "TCP", 6443),
             },
         )
 
@@ -249,9 +329,21 @@ class NetworkPolicyTests(unittest.TestCase):
             for name, policy in self.policies(namespace).items():
                 for rule in policy["spec"].get("ingress", []) + policy["spec"].get("egress", []):
                     for peer in rule.get("from", []) + rule.get("to", []):
+                        if "ipBlock" in peer:
+                            continue
                         with self.subTest(namespace=namespace, policy=name):
                             self.assertIn("podSelector", peer)
                             self.assertIn("namespaceSelector", peer)
+
+    def test_address_peers_are_single_hosts(self):
+        for namespace in ("postgresql", "gitea"):
+            for name, policy in self.policies(namespace).items():
+                for rule in policy["spec"].get("egress", []):
+                    for peer in rule.get("to", []):
+                        if "ipBlock" in peer:
+                            with self.subTest(namespace=namespace, policy=name):
+                                self.assertTrue(peer["ipBlock"]["cidr"].endswith("/32"))
+                                self.assertNotIn("except", peer["ipBlock"])
 
 
 if __name__ == "__main__":

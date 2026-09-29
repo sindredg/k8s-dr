@@ -9,3 +9,5 @@ metadata:
 data:
   git_host: git.sindrg.com
   git_issuer: letsencrypt-production
+  # Prefix for this cluster's backup sets. See decision 0007.
+  backup_cluster: primary

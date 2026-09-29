@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: gitea-backup
+    namespace: gitea
+type: Opaque
+stringData:
+    bucket: ENC[AES256_GCM,data:nBD5Cfae4gRMnz/qhh+lN/xVX04mlW+4Io1xL6TicNLFWQ==,iv:+9bpcrWxrP1os00KiKfyrVGfcddCMdTN6XgfObYsa7s=,tag:EiWSXWuq72cpb49lCxhT1Q==,type:str]
+    ping_url: ENC[AES256_GCM,data:LxG8rLiq0HdXUnAwNyvftd8WL90CiUv2AyLDjEOka1xqLGDG+cuPveofAFOXQ3HC4KQkLvOeBT4=,iv:KWjNTnXtFOrlzw6aPrLjUG5t7QWfvJXRjts2wXHJ6xo=,tag:v8rqJ0GEgshE9ZhXHYb+4w==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvS1l0RlB3NlNjVzZDajRr
+            MjY5U1VJakx0YktSY1Mxb3dLZlNxbW94NXp3CkpDTzI3RTgyeExKbDVKZ0xoLzg2
+            NTRIc09qTWdSU3ZYRGpIVEZob2FTZjAKLS0tIFZnYmlQUEFUMkpyc0kwQ2ZiUUN2
+            VU4wS3JHU0FNR2lEbi9nRTZ3U2w1WEUKZ90MVGinOm987jYm6nSZyG9jhyXsN5wo
+            hRerbe91RS6elwd0QszYLL+QFYmv9p4Wy7hN8TNq/jjOJP1vkUl6ug==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1cxdnhpr5c2nt2j7jncce24vaa3r55kjzej4x9x74h2f08janvaps2xfgr4
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-09-29T10:35:00Z"
+    mac: ENC[AES256_GCM,data:5HOyvQWuqhv2X2LsSjP9xueTaOOrF4X/d3aSR7EpUFkArdKSrKm20jF/SlrclzW+jshi7yOaDx6hBxFxpt565Kq3Ffsz0sBxsU9pcwOuus1091C3aqIwSynZonqQQaa5OxDC03r2dxHNeIaTS5lcVKcgWLc5KI8IGsrsb/DmQeQ=,iv:uEvrHbfQ6omVLHhkQoddGIWnFcO5cMeXqVGm4TELKRg=,tag:Eh7Utrl1IYHqEV2sXMgYUg==,type:str]
+    version: 3.13.3

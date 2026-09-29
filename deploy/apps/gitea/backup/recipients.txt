@@ -1,0 +1,6 @@
+# age public keys for backup encryption. The cluster holds no private key.
+# See decision 0007.
+# Backup key, kept with the recovery credentials.
+age1ydvaxgakydyu95p4tnr4thkjz8hkfe42j5zmuv77yf9tdyfy5ylq3fkj0a
+# Offline key.
+age1updzj6ytjvmgzc73zharf68ld5pn8shj3dy035k5ser4vg9j8f8qw5ch7j

@@ -76,3 +76,40 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+---
+# The backup Job reads PostgreSQL, calls the Kubernetes API to scale Gitea,
+# gets a token from the metadata server, and uploads to Cloud Storage and
+# Healthchecks.io over HTTPS. The API server is reached on its node address
+# after the Service translates it, so the rule allows port 6443 by port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backup-egress
+  namespace: gitea
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-backup
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: postgresql
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 80
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443

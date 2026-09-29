@@ -12,7 +12,7 @@ Capture PostgreSQL and the Gitea volume hourly at one consistent point, store ea
 
 ### Pause Gitea by scaling it to zero
 
-An hourly CronJob in the `gitea` namespace scales the Gitea Deployment to zero, runs `pg_dump`, archives the Gitea volume, and scales Gitea back to one. Encryption and upload run after Gitea is back, as [decision 0002](0002-recovery-contract.md#dependencies-and-boundaries) requires.
+An hourly CronJob in the `gitea` namespace scales the Gitea Deployment to zero, runs `pg_dump`, archives the Gitea volume, and scales Gitea back to one. The dump and archive stream through `age` into local staging, so no plaintext copy reaches disk. The upload runs after Gitea is back, as [decision 0002](0002-recovery-contract.md#dependencies-and-boundaries) requires.
 
 | Option | Trade-off |
 | --- | --- |
