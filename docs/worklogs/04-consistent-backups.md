@@ -69,4 +69,10 @@ Apply complete! Resources: 2 added, 1 changed, 1 destroyed.
 
 A following `terraform plan` reported `No changes. Your infrastructure matches the configuration.`
 
+### First reconciliation of the CronJob failed
+
+- **Symptom:** after the CronJob change merged, the `gitea` Kustomization reported `ConfigMap/gitea-backup-9gf79t552m namespace not specified` and applied nothing. The running service was unaffected.
+- **Cause:** the `gitea` Kustomization sets no default namespace, and a `configMapGenerator` entry does not inherit one from the other resources. `kubectl kustomize` renders the object without complaint; only the API server rejects it.
+- **Fix:** set `namespace: gitea` on the generator. A test now requires it.
+
 The milestone gate is pending.
