@@ -246,6 +246,46 @@ class BackupTests(unittest.TestCase):
         self.assertNotIn(sops_recipient, recipients)
 
 
+class RestoreTests(unittest.TestCase):
+    def setUp(self):
+        self.script = (APPS / "gitea/backup/restore.sh").read_text()
+        self.playbook = yaml.safe_load(Path("ansible/playbooks/restore.yml").read_text())[0]
+        self.job = Path("ansible/playbooks/templates/restore-job.yml.j2").read_text()
+
+    def test_script_ships_in_the_configmap_under_a_fixed_name(self):
+        # The playbook mounts the ConfigMap by name, outside Kustomize.
+        generator = yaml.safe_load((APPS / "gitea/kustomization.yaml").read_text())["configMapGenerator"][0]
+        self.assertIn("backup/restore.sh", generator["files"])
+        self.assertTrue(generator["options"]["disableNameSuffixHash"])
+        self.assertIn("name: gitea-backup\n", self.job)
+
+    def test_verifies_before_the_first_destructive_step(self):
+        destructive = self.script.index("DROP DATABASE")
+        for check in ("sha256sum", "pg_restore --list", "tar -tzf", "--replicas=0"):
+            with self.subTest(check=check):
+                self.assertLess(self.script.index(check), destructive)
+
+    def test_selects_only_sets_with_a_manifest(self):
+        self.assertIn('matchGlob=${RESTORE_SOURCE}/*/manifest.json', self.script)
+
+    def test_requires_an_explicit_target_namespace(self):
+        self.assertNotIn("restore_namespace", self.playbook["vars"])
+        makefile = Path("Makefile").read_text()
+        self.assertRegex(makefile, r"(?m)^RESTORE_NAMESPACE \?=$")
+
+    def test_job_uses_the_backup_identity_and_image(self):
+        self.assertIn("serviceAccountName: gitea-backup", self.job)
+        self.assertIn("app.kubernetes.io/name: gitea-backup", self.job)
+        self.assertIn("backup.yaml", self.playbook["vars"]["restore_image"])
+
+    def test_key_secret_is_deleted_on_every_exit(self):
+        block = next(task for task in self.playbook["tasks"] if "block" in task)
+        self.assertTrue(any(
+            "delete secret/{{ restore_key_secret }}" in str(task.get("ansible.builtin.command"))
+            for task in block["always"]
+        ))
+
+
 class GatewayTests(unittest.TestCase):
     def setUp(self):
         self.documents = {
