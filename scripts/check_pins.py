@@ -177,8 +177,22 @@ def image_pins(deploy_dir: Path) -> list[str]:
     })
 
 
+# Registries that serve anonymous pull tokens, by host. Docker Hub is the
+# default for references without a registry host.
+REGISTRIES = {
+    "docker.io": (
+        "https://auth.docker.io/token?service=registry.docker.io&scope=repository:{}:pull",
+        "https://registry-1.docker.io/v2/{}/manifests/{}",
+    ),
+    "ghcr.io": (
+        "https://ghcr.io/token?scope=repository:{}:pull",
+        "https://ghcr.io/v2/{}/manifests/{}",
+    ),
+}
+
+
 def check_image(reference: str, fetch=_fetch) -> Result:
-    """Check that a Docker Hub image digest still resolves.
+    """Check that an image digest on Docker Hub or GHCR still resolves.
 
     Kubernetes pulls a reference with a digest by the digest alone, so the
     digest must stay available even if the tag moves.
@@ -187,17 +201,21 @@ def check_image(reference: str, fetch=_fetch) -> Result:
     repository = name.rsplit(":", 1)[0] if ":" in name.rsplit("/", 1)[-1] else name
     first = repository.split("/", 1)[0]
     if "/" in repository and ("." in first or ":" in first):
-        return Result(f"{name} image", False, f"{reference}: only Docker Hub images are checked")
-    if "/" not in repository:
-        repository = f"library/{repository}"
-    token_url = (
-        "https://auth.docker.io/token?service=registry.docker.io"
-        f"&scope=repository:{repository}:pull"
-    )
-    manifest_url = f"https://registry-1.docker.io/v2/{repository}/manifests/{digest}"
+        host, repository = repository.split("/", 1)
+    else:
+        host = "docker.io"
+        if "/" not in repository:
+            repository = f"library/{repository}"
+    if host not in REGISTRIES:
+        return Result(f"{name} image", False, f"{reference}: registry {host} is not checked")
+    token_url, manifest_url = REGISTRIES[host]
     try:
-        token = json.loads(fetch(token_url))["token"]
-        fetch(manifest_url, "HEAD", {"Authorization": f"Bearer {token}", "Accept": MANIFEST_TYPES})
+        token = json.loads(fetch(token_url.format(repository)))["token"]
+        fetch(
+            manifest_url.format(repository, digest),
+            "HEAD",
+            {"Authorization": f"Bearer {token}", "Accept": MANIFEST_TYPES},
+        )
     except (urllib.error.URLError, TimeoutError, KeyError, ValueError) as error:
         return Result(f"{name} image", False, f"{reference}: {error}")
     return Result(f"{name} image", True, reference)

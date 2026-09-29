@@ -33,6 +33,31 @@ Plan: 2 to add, 1 to change, 1 to destroy.
 
 The soft delete policy shows no change because the explicit value matches the existing default.
 
+### Backup-age heartbeat
+
+Created the Healthchecks.io check `k8s-dr-backup` with a 1-hour period and a 1-hour grace time, so it alerts when no verified set completes within the 2-hour RPO. The ping URL is held with the recovery credentials and is not in the repository.
+
+![Healthchecks.io check with a 1-hour period and grace time](../images/healthchecks-backup-check.png)
+
+### Backup tool image
+
+- Added `images/backup/Dockerfile`: the pinned PostgreSQL 18.6 image plus `age`, `curl`, `jq`, and `kubectl` 1.36.2 verified by SHA-256.
+- Added the `Backup image` workflow. It builds on pull requests and publishes `ghcr.io/sindredg/k8s-dr-backup` from `main`.
+- `scripts/check_pins.py` now checks GHCR digests as well as Docker Hub digests.
+- Corrected decision 0007: other pods on the worker can reach the metadata server, and the decision records why that exposure is accepted.
+
 ## Validation
 
-Pending.
+### Bucket hardening applied
+
+`terraform apply` in `infra/shared` on 2026-09-29 applied the plan above:
+
+```text
+Apply complete! Resources: 2 added, 1 changed, 1 destroyed.
+```
+
+![Apply of the backup bucket hardening](../images/backup-bucket-apply.png)
+
+A following `terraform plan` reported `No changes. Your infrastructure matches the configuration.`
+
+The milestone gate is pending.

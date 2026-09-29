@@ -197,6 +197,14 @@ class ImageTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertIn("404", result.detail)
 
+    def test_ghcr_image_digest_is_checked_with_an_anonymous_token(self):
+        token_url = "https://ghcr.io/token?scope=repository:owner/tool:pull"
+        manifest_url = f"https://ghcr.io/v2/owner/tool/manifests/{self.DIGEST}"
+        upstream = FakeUpstream({token_url: b'{"token": "t"}'})
+        result = module.check_image(f"ghcr.io/owner/tool@{self.DIGEST}", upstream)
+        self.assertTrue(result.ok)
+        self.assertEqual(upstream.requests, [("GET", token_url), ("HEAD", manifest_url)])
+
     def test_other_registries_fail_instead_of_passing_silently(self):
         result = module.check_image(f"docker.gitea.com/gitea:1.27.0@{self.DIGEST}", FakeUpstream())
         self.assertFalse(result.ok)
