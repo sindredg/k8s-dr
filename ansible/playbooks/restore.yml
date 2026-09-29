@@ -111,10 +111,12 @@
               | from_yaml | to_json }}
           changed_when: true
 
+        # The single quotes keep the double quotes around True: the command
+        # module splits arguments like a shell and would remove them.
         - name: Wait for the restore Job to finish
           ansible.builtin.command: >-
             kubectl get job/{{ restore_job }} --namespace {{ restore_namespace }}
-            --output=jsonpath={.status.conditions[?(@.status=="True")].type}
+            --output=jsonpath='{.status.conditions[?(@.status=="True")].type}'
           register: restore_result
           changed_when: false
           until: restore_result.stdout is search('Complete|Failed')

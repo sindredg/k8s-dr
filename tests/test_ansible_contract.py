@@ -1,10 +1,22 @@
 from pathlib import Path
+import re
 import unittest
 
 import yaml
 
 
 class AnsibleContractTests(unittest.TestCase):
+    def test_jsonpath_string_literals_survive_argument_splitting(self):
+        # The command module splits arguments like a shell. Without single
+        # quotes around the expression, "True" reaches kubectl as True and the
+        # filter matches nothing.
+        pattern = re.compile(r"jsonpath=([^\s]*)")
+        for path in Path("ansible").rglob("*.yml"):
+            for expression in pattern.findall(path.read_text()):
+                if '"' in expression:
+                    with self.subTest(path=str(path), expression=expression):
+                        self.assertTrue(expression.startswith("'"))
+
     def test_component_versions_are_exact(self):
         values = yaml.safe_load(Path("ansible/playbooks/group_vars/all.yml").read_text())
         self.assertEqual(values["kubernetes_version"], "1.36.2")
