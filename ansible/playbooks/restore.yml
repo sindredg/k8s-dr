@@ -1,0 +1,153 @@
+---
+# Restores one backup set into a Gitea and PostgreSQL namespace pair with the
+# restore script from the gitea-backup ConfigMap. The backup age key reaches
+# the cluster only in a Secret that exists while the Job runs. See decision
+# 0007 and docs/runbooks/backup-restore.md.
+#
+# restore_namespace is required, so that a run cannot replace the live
+# service by default: gitea on a recovery cluster, gitea-restore for a test.
+- name: Restore a backup set
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  vars:
+    restore_postgresql_namespace: "{{ restore_namespace | replace('gitea', 'postgresql', 1) }}"
+    # The cluster prefix to restore from, and an optional set name such as
+    # 20260929T140701Z. Empty selects the newest complete set.
+    restore_source: primary
+    restore_set: ""
+    restore_job: gitea-restore
+    restore_key_secret: gitea-restore-key
+    # The Job runs the same digest-pinned image as the backup CronJob.
+    restore_image: >-
+      {{ (lookup('ansible.builtin.file', playbook_dir ~ '/../../deploy/apps/gitea/backup.yaml')
+      | from_yaml_all | selectattr('kind', 'equalto', 'CronJob') | first)
+      .spec.jobTemplate.spec.template.spec.containers[0].image }}
+  tasks:
+    - name: Require a restore target and the backup age key
+      ansible.builtin.assert:
+        that:
+          - restore_namespace is defined
+          - restore_namespace in ['gitea', 'gitea-restore']
+          - backup_age_key_file is defined
+          - backup_age_key_file is file
+          - restore_set == '' or restore_set is match('^[0-9]{8}T[0-9]{6}Z$')
+        fail_msg: >-
+          Set restore_namespace to gitea or gitea-restore, backup_age_key_file
+          to the backup age private key, and restore_set to empty or a set
+          name. See docs/runbooks/backup-restore.md.
+        quiet: true
+
+    - name: Require an age private key in the key file
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.file', backup_age_key_file) is search('AGE-SECRET-KEY-')
+        quiet: true
+      no_log: true
+
+    - name: Show the restore target
+      ansible.builtin.debug:
+        msg: >-
+          Restoring {{ restore_source }}/{{ restore_set or '<newest complete set>' }}
+          into {{ restore_namespace }} and {{ restore_postgresql_namespace }}
+
+    - name: Look for the backup CronJob in the target namespace
+      ansible.builtin.command: >-
+        kubectl get cronjob/gitea-backup --namespace {{ restore_namespace }}
+        --ignore-not-found --output=name
+      register: restore_cronjob
+      changed_when: false
+
+    - name: Restore with backups paused
+      block:
+        # A backup run would start Gitea in the middle of the restore.
+        - name: Suspend the backup CronJob
+          ansible.builtin.command: >-
+            kubectl patch cronjob/gitea-backup --namespace {{ restore_namespace }}
+            --type=merge --patch '{"spec":{"suspend":true}}'
+          when: restore_cronjob.stdout != ""
+          changed_when: true
+
+        - name: Wait for a running backup to finish
+          ansible.builtin.command: >-
+            kubectl get cronjob/gitea-backup --namespace {{ restore_namespace }}
+            --output=jsonpath={.status.active}
+          register: restore_active_backups
+          when: restore_cronjob.stdout != ""
+          changed_when: false
+          until: restore_active_backups.stdout == ""
+          retries: 60
+          delay: 10
+
+        - name: Remove a previous restore Job
+          ansible.builtin.command: >-
+            kubectl delete job/{{ restore_job }} --namespace {{ restore_namespace }}
+            --ignore-not-found --wait=true
+          changed_when: true
+
+        # The key is read on the operator machine and sent on stdin, as the
+        # flux role does with the SOPS key.
+        - name: Create the backup age key Secret
+          ansible.builtin.command:
+            cmd: kubectl apply -f -
+            stdin: >-
+              {{ {
+                'apiVersion': 'v1',
+                'kind': 'Secret',
+                'metadata': {'name': restore_key_secret, 'namespace': restore_namespace},
+                'type': 'Opaque',
+                'stringData': {'key': lookup('ansible.builtin.file', backup_age_key_file)}
+              } | to_json }}
+          changed_when: true
+          no_log: true
+
+        - name: Start the restore Job
+          ansible.builtin.command:
+            cmd: kubectl apply -f -
+            stdin: >-
+              {{ lookup('ansible.builtin.template', 'templates/restore-job.yml.j2')
+              | from_yaml | to_json }}
+          changed_when: true
+
+        - name: Wait for the restore Job to finish
+          ansible.builtin.command: >-
+            kubectl get job/{{ restore_job }} --namespace {{ restore_namespace }}
+            --output=jsonpath={.status.conditions[?(@.status=="True")].type}
+          register: restore_result
+          changed_when: false
+          until: restore_result.stdout is search('Complete|Failed')
+          retries: 190
+          delay: 10
+
+      always:
+        - name: Read the restore log
+          ansible.builtin.command: >-
+            kubectl logs job/{{ restore_job }} --namespace {{ restore_namespace }}
+          register: restore_log
+          changed_when: false
+          failed_when: false
+
+        - name: Show the restore log
+          ansible.builtin.debug:
+            var: restore_log.stdout_lines
+
+        - name: Delete the backup age key Secret
+          ansible.builtin.command: >-
+            kubectl delete secret/{{ restore_key_secret }} --namespace {{ restore_namespace }}
+            --ignore-not-found
+          changed_when: true
+
+        - name: Resume the backup CronJob
+          ansible.builtin.command: >-
+            kubectl patch cronjob/gitea-backup --namespace {{ restore_namespace }}
+            --type=merge --patch '{"spec":{"suspend":false}}'
+          when: restore_cronjob.stdout != ""
+          changed_when: true
+
+    - name: Require the restore Job to complete
+      ansible.builtin.assert:
+        that: restore_result.stdout is search('Complete')
+        fail_msg: "The restore Job failed; see the log above."
+        quiet: true

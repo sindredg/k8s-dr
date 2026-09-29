@@ -16,7 +16,12 @@ configMapGenerator:
     namespace: gitea
     files:
       - backup/backup.sh
+      - backup/restore.sh
       - backup/recipients.txt
+    options:
+      # ansible/playbooks/restore.yml mounts it by name. Jobs read the
+      # current content when they start, so no hash suffix is needed.
+      disableNameSuffixHash: true
 generatorOptions:
   # Keep Flux from substituting the shell variables in the script.
   annotations:
