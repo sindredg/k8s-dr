@@ -192,6 +192,44 @@ The push reached only the test copy. `make restore-test-env-delete` reported `fa
 
 The gate passed: the restored service contains the expected commit and issue and accepts a new push.
 
+### Cluster state at milestone close
+
+Captured from an IAP SSH session on the control plane between 23:20 and 23:45 UTC on 2026-09-29, with `main` at `6aafeba`.
+
+Both nodes are `Ready` on Kubernetes 1.36.2 with containerd 2.3.6 (`kubectl get nodes -o wide`):
+
+![Both nodes Ready](../images/m4-cluster-nodes-ready.png)
+
+Every Flux Kustomization applied `6aafeba`, and both Helm releases are `Ready` (`kubectl get kustomizations,helmreleases -A`):
+
+![Flux Kustomizations Ready at 6aafeba](../images/m4-flux-kustomizations-ready.png)
+
+![cert-manager and Gitea Helm releases Ready](../images/m4-flux-helmreleases-ready.png)
+
+Every long-running pod is `Running`, and the service and backup pods are on the worker (`kubectl get pods -A -o wide`):
+
+![Pods in every namespace](../images/m4-cluster-pods.png)
+
+The last three hourly backup Jobs completed in 30 seconds each (`kubectl -n gitea get jobs`). The 23:07 run paused Gitea for 4 seconds, and the Deployment was ready again 21 seconds after the scale-up (`kubectl -n gitea logs job/gitea-backup-29845387`):
+
+![Three backup Jobs Complete](../images/m4-backup-jobs-complete.png)
+
+![Log of the 23:07 UTC backup run](../images/m4-backup-run-log.png)
+
+The backup network policies are in place next to the milestone 3 policies (`kubectl get networkpolicy -A`):
+
+![Network policies in the gitea and postgresql namespaces](../images/m4-network-policies.png)
+
+The live database holds the fixture repository and issue (`kubectl -n postgresql exec postgresql-0 -- psql -U gitea -c ...`):
+
+![Fixture repository row in PostgreSQL](../images/m4-postgresql-fixture-repository.png)
+
+![Fixture issue row in PostgreSQL](../images/m4-postgresql-fixture-issue.png)
+
+Ansible reaches both nodes through the IAP tunnels (`python3 scripts/run_with_iap.py ... ansible all -m ping`):
+
+![Ansible ping to both nodes](../images/m4-ansible-ping.png)
+
 ## Limitations
 
 - The test restore ran on the primary cluster and shares the worker with the live service. Milestone 5 runs the same Job on the recovery cluster.
