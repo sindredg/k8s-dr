@@ -46,6 +46,15 @@ Created the Healthchecks.io check `k8s-dr-backup` with a 1-hour period and a 1-h
 - `scripts/check_pins.py` now checks GHCR digests as well as Docker Hub digests.
 - Corrected decision 0007: other pods on the worker can reach the metadata server, and the decision records why that exposure is accepted.
 
+### Backup CronJob
+
+- Added the `gitea-backup` CronJob in `deploy/apps/gitea/backup.yaml`. It runs at minute 7 of every hour, one run at a time, with no retries and a 30-minute deadline.
+- `backup/backup.sh` scales Gitea to zero, streams `pg_dump` and the Gitea volume through `age` to both public keys, scales Gitea back to one, uploads each object with `Content-MD5` and `x-goog-if-generation-match: 0`, and uploads `manifest.json` last. It pings the heartbeat at start, on success with the pause duration, and on failure.
+- The script and the age public keys ship in a generated ConfigMap with Flux substitution disabled. `cluster-settings` gains `backup_cluster: primary` for the object prefix.
+- `backup.sops.yaml` holds the bucket name and the ping URL, encrypted for the SOPS key.
+- The Role can read the Gitea Deployment and Pods and patch only the `gitea` scale subresource.
+- Network policies allow the backup Pod to reach PostgreSQL, the metadata server on port 80, and any address on ports 443 and 6443. PostgreSQL admits it on port 5432. Tests list every allowed flow.
+
 ## Validation
 
 ### Bucket hardening applied

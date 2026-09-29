@@ -8,3 +8,14 @@ resources:
   - release.yaml
   - gateway.yaml
   - network-policies.yaml
+  - backup.sops.yaml
+  - backup.yaml
+configMapGenerator:
+  - name: gitea-backup
+    files:
+      - backup/backup.sh
+      - backup/recipients.txt
+generatorOptions:
+  # Keep Flux from substituting the shell variables in the script.
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
