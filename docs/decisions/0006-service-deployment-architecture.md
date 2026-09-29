@@ -46,7 +46,7 @@ The age private key becomes a recovery credential. Store it with the other recov
 | Sealed Secrets | The controller generates its key inside the cluster. A regional loss destroys that key unless it is backed up separately, which adds a recovery step. |
 | External Secrets with Secret Manager | Central audit and rotation, and the usual production choice. On self-managed Kubernetes it needs a service account key or workload identity federation with a public OIDC issuer, which is more setup than this lab needs. |
 
-Secrets in scope: the Gitea administrator password, the PostgreSQL password, and the Cloudflare API token for certificates. Milestone 4 adds the backup encryption password.
+Secrets in scope: the Gitea administrator password, the PostgreSQL password, and the Cloudflare API token for certificates. Milestone 4 adds the Healthchecks.io ping URL. Backups use separate age keys that never enter the cluster; see [decision 0007](0007-consistent-backups.md#encrypt-to-two-age-recipients-neither-in-the-cluster).
 
 ### Run PostgreSQL from the official image, not the chart's subchart
 
@@ -132,7 +132,7 @@ The `deploy/` tree holds shared manifests in `deploy/base/`, `deploy/infrastruct
 
 ## Deferred to milestone 4
 
-Recorded here so they are not lost:
+Recorded here so they are not lost. [Decision 0007](0007-consistent-backups.md) settles each item.
 
 - How to pause writes for a consistent backup: scale Gitea to zero, or dump and reconcile with `gitea doctor`.
 - A separate backup prefix per cluster, and a rule that stops a returning primary from uploading backups after failover.

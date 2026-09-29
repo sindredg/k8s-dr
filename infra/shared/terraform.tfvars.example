@@ -4,5 +4,9 @@ backup_bucket_location = "europe-west1"
 
 # Use user: for individual accounts, or group: for Google Groups.
 admin_member           = "user:REPLACE_WITH_CLUSTER_ADMIN_EMAIL@example.com"
-backup_operator_member = "user:REPLACE_WITH_BACKUP_OPERATOR_EMAIL@example.com"
 recovery_reader_member = "user:REPLACE_WITH_RECOVERY_READER_EMAIL@example.com"
+
+# Worker node service account of each cluster: <name_prefix>-worker@<project>.
+backup_clusters = {
+  primary = "serviceAccount:REPLACE_WITH_NAME_PREFIX-worker@REPLACE_WITH_PROJECT_ID.iam.gserviceaccount.com"
+}
