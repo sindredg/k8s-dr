@@ -1,0 +1,40 @@
+---
+# Flux Kustomizations for the test restore environment. No Flux path includes
+# this file: ansible/playbooks/restore_test_env.yml applies it and deletes it,
+# and pruning then removes everything below. Secrets are copied by the
+# playbook, so no decryption is needed. See docs/runbooks/backup-restore.md.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgresql-restore
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/restore-test/postgresql
+  prune: true
+  wait: true
+  timeout: 5m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gitea-restore
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: postgresql-restore
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/restore-test/gitea
+  prune: true
+  wait: true
+  timeout: 10m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings

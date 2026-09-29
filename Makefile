@@ -23,20 +23,28 @@ FLUX_GIT_BRANCH ?= main
 # Endpoint for the fixture targets. Empty means git_host from the primary
 # cluster settings; a drill sets the recovery host.
 GIT_HOST ?=
+# Full endpoint URL for the fixture targets, such as http://localhost:3000
+# for a port-forward. It overrides GIT_HOST.
+GIT_URL ?=
 INVENTORY := ansible/inventory/generated/hosts.json
 VENV := .venv
 # CI installs tools into the system Python and runs `make check BIN=`.
 BIN ?= $(VENV)/bin/
+# gcloud compute ssh arguments for the control plane, read when a target uses them.
+CONTROL_PLANE = $(shell python3 -c 'import json, sys; \
+	h = json.load(open(sys.argv[1]))["all"]["children"]["kube_control_plane"]["hosts"]["control-plane"]; \
+	print(h["gcp_instance_name"], "--zone", h["gcp_zone"], "--project", h["gcp_project"])' $(INVENTORY))
 IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
 PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
 # The fixture playbooks run on the operator machine against the public endpoint.
 FIXTURE_PLAYBOOK := SOPS_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)ansible-playbook -i localhost, \
-	$(if $(GIT_HOST),-e git_host=$(GIT_HOST))
-PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_fixtures write_check restore
+	$(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL))
+PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_fixtures write_check restore restore_test_env
 
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
-	create-fixtures check-fixtures write-check restore check pins
+	create-fixtures check-fixtures write-check restore restore-test-env \
+	restore-test-env-delete restore-test-forward check pins
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -77,6 +85,19 @@ restore: ## Restore a backup set into RESTORE_NAMESPACE through IAP
 	@test -r "$(BACKUP_AGE_KEY_FILE)" || { echo "BACKUP_AGE_KEY_FILE not readable: $(BACKUP_AGE_KEY_FILE)" >&2; exit 1; }
 	$(IAP) $(PLAYBOOK) ansible/playbooks/restore.yml -e restore_namespace="$(RESTORE_NAMESPACE)" \
 		-e restore_set="$(RESTORE_SET)" -e backup_age_key_file="$(BACKUP_AGE_KEY_FILE)"
+
+restore-test-env: ## Create the test restore namespaces through IAP
+	$(IAP) $(PLAYBOOK) ansible/playbooks/restore_test_env.yml
+
+restore-test-env-delete: ## Delete the test restore namespaces and their data through IAP
+	$(IAP) $(PLAYBOOK) ansible/playbooks/restore_test_env.yml -e restore_test_env_state=absent
+
+# Holds the terminal. Run the fixture targets with GIT_URL=http://localhost:3000
+# from a second terminal, then stop this with Ctrl+C.
+restore-test-forward: ## Forward localhost:3000 to the test restore Gitea through IAP
+	gcloud compute ssh $(CONTROL_PLANE) --tunnel-through-iap -- -L 3000:127.0.0.1:3000 \
+		sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl --namespace gitea-restore \
+		port-forward service/gitea-http 3000:3000
 
 check: ## Run the local unit tests, linters, and syntax checks
 	$(BIN)python -m unittest discover -s tests
