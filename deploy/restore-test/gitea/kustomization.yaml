@@ -1,0 +1,51 @@
+---
+# Gitea for the test restore, in gitea-restore, without the public Gateway
+# and the backup CronJob. The backup ServiceAccount, Role, and ConfigMap stay
+# for the restore Job. The playbook ansible/playbooks/restore_test_env.yml
+# copies the Secrets. See docs/runbooks/backup-restore.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitea-restore
+resources:
+  - ../../apps/gitea
+patches:
+  # The SOPS MAC covers the namespace, so an encrypted Secret cannot move.
+  - target:
+      kind: Secret
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: unused
+  - target:
+      group: gateway.networking.k8s.io
+    patch: |-
+      $patch: delete
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata:
+        name: unused
+  # A test copy must never write backup sets.
+  - target:
+      kind: CronJob
+    patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: unused
+  - target:
+      kind: HelmRelease
+      name: gitea
+    patch: |-
+      - op: replace
+        path: /spec/values/gitea/config/database/HOST
+        value: postgresql.postgresql-restore.svc.cluster.local:5432
+  - target:
+      kind: NetworkPolicy
+      name: allow-postgresql|allow-backup-egress
+    patch: |-
+      - op: replace
+        path: /spec/egress/0/to/0/namespaceSelector/matchLabels/kubernetes.io~1metadata.name
+        value: postgresql-restore

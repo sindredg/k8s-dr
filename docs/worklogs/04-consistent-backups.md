@@ -64,6 +64,14 @@ Created the Healthchecks.io check `k8s-dr-backup` with a 1-hour period and a 1-h
 - `RESTORE_NAMESPACE` has no default, so a restore cannot replace the live primary service by mistake.
 - Added the [backup and restore procedure](../runbooks/backup-restore.md).
 
+### Test restore environment
+
+- Added `deploy/restore-test/`: Kustomize overlays that copy PostgreSQL and Gitea into `postgresql-restore` and `gitea-restore`, and two Flux Kustomizations that no cluster path includes. The Gitea copy has no Gateway and no backup CronJob, and its network policies and database host point at the copies.
+- SOPS Secrets cannot move namespace, because the MAC covers the namespace (`sops --decrypt` reported `MAC mismatch` after the change). `ansible/playbooks/restore_test_env.yml` copies the four decrypted Secrets inside the cluster instead.
+- Added `make restore-test-env`, `make restore-test-env-delete`, and `make restore-test-forward`.
+- The fixture targets accept `GIT_URL`, such as `http://localhost:3000`, for an endpoint that is not HTTPS on port 443.
+- Extended the [backup and restore procedure](../runbooks/backup-restore.md#test-a-restore).
+
 ## Validation
 
 ### Bucket hardening applied

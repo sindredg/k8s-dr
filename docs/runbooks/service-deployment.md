@@ -275,6 +275,8 @@ The targets use `git_host` from `deploy/clusters/primary/cluster-settings.yaml`.
 make check-fixtures GIT_HOST=git-dr.sindrg.com
 ```
 
+For an endpoint that is not HTTPS on port 443, such as a port-forward, set `GIT_URL` instead, for example `GIT_URL=http://localhost:3000`.
+
 The fixture commit has fixed content, identity, and dates, so its SHA is recorded before the push. `scripts/fixture_commit.py` builds it, the create playbook fails if the SHA differs from the record, and a unit test fails if someone edits the commit fields without updating the SHA. The issue is `#1` because the repository starts empty.
 
 1. Create the fixtures. Requires `git`, `sops`, and the controller toolchain from `make venv`.
