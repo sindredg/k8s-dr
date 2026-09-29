@@ -4,6 +4,8 @@ Recover a stateful service after losing a region. This lab runs Gitea and Postgr
 
 The first target is recovery within a few hours. Faster recovery is a later experiment, based on the measured bottlenecks.
 
+**Status:** milestones 0 to 4 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups; a test restore took 43 seconds. Next is cold recovery in the second region. See [plan.md](plan.md).
+
 ## Target architecture
 
 ```mermaid
@@ -24,12 +26,12 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 
 | Tool | Responsibility |
 | --- | --- |
-| Terraform | VM, network, DNS, and backup infrastructure |
+| Terraform | VM, network, load balancer, and backup infrastructure |
 | Ansible and kubeadm | VM configuration, Kubernetes bootstrap, and the add-ons Flux depends on |
 | Flux and Helm | Deploy and reconcile the application layer from GitHub: cert-manager, PostgreSQL, and Gitea |
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
-| Offsite object storage | Application backups and recovery artifacts |
-| External health probe | Measure outage and restored service |
+| Offsite object storage | Hourly encrypted application backups |
+| External health probe | Measure outage and restored service (planned before the drill) |
 
 ## Recovery test
 
