@@ -214,6 +214,11 @@ class BackupTests(unittest.TestCase):
         )
         self.assertIn("${backup_cluster}", str(self.pod["containers"][0]["env"]))
 
+    def test_generated_configmap_names_its_namespace(self):
+        # Flux rejects a namespaced object without a namespace.
+        generator = self.kustomization["configMapGenerator"][0]
+        self.assertEqual(generator["namespace"], "gitea")
+
     def test_role_can_scale_only_gitea(self):
         rules = self.documents["Role", "gitea-backup"]["rules"]
         writes = [rule for rule in rules if set(rule["verbs"]) - {"get", "list", "watch"}]

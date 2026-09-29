@@ -12,6 +12,8 @@ resources:
   - backup.yaml
 configMapGenerator:
   - name: gitea-backup
+    # This Kustomization sets no default namespace.
+    namespace: gitea
     files:
       - backup/backup.sh
       - backup/recipients.txt
