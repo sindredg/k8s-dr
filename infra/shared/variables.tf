@@ -19,9 +19,19 @@ variable "backup_bucket_location" {
   }
 }
 
-variable "backup_operator_member" {
-  description = "IAM member allowed to manage backup objects. Keep independent of the state operator."
-  type        = string
+variable "backup_clusters" {
+  description = "Cluster name to the IAM member of its worker node service account. Each may create objects under <cluster>/ and read the whole bucket."
+  type        = map(string)
+
+  validation {
+    condition     = alltrue([for name in keys(var.backup_clusters) : can(regex("^[a-z][a-z0-9-]*$", name))])
+    error_message = "Cluster names must be lowercase letters, digits, and hyphens."
+  }
+
+  validation {
+    condition     = alltrue([for member in values(var.backup_clusters) : startswith(member, "serviceAccount:")])
+    error_message = "Backup writers must be service accounts."
+  }
 }
 
 variable "recovery_reader_member" {
