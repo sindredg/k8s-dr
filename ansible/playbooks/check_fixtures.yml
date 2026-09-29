@@ -18,7 +18,7 @@
   tasks:
     - name: Show the endpoint under test
       ansible.builtin.debug:
-        msg: "{{ fixture_user }}/{{ fixture_repository }} on https://{{ git_host }}/"
+        msg: "{{ fixture_user }}/{{ fixture_repository }} on {{ git_url }}/"
 
     - name: Read the fixture password
       ansible.builtin.import_tasks: tasks/fixture_password.yml

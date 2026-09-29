@@ -124,7 +124,7 @@
         - name: Report the acknowledged write
           ansible.builtin.debug:
             msg:
-              - "Push accepted at {{ write_check_acknowledged }} by https://{{ git_host }}/"
+              - "Push accepted at {{ write_check_acknowledged }} by {{ git_url }}/"
               - >-
                 Commit {{ write_check_sha.stdout }} on {{ fixture_branch }}:
                 Write check {{ write_check_started }}

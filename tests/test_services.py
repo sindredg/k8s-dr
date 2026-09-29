@@ -286,6 +286,46 @@ class RestoreTests(unittest.TestCase):
         ))
 
 
+class RestoreTestEnvironmentTests(unittest.TestCase):
+    ROOT = DEPLOY / "restore-test"
+
+    def overlay(self, name):
+        return yaml.safe_load((self.ROOT / name / "kustomization.yaml").read_text())
+
+    def test_overlays_copy_the_service_into_restore_namespaces(self):
+        for name in ("postgresql", "gitea"):
+            with self.subTest(name=name):
+                overlay = self.overlay(name)
+                self.assertEqual(overlay["namespace"], f"{name}-restore")
+                self.assertEqual(overlay["resources"], [f"../../apps/{name}"])
+
+    def test_gitea_copy_has_no_public_route_and_writes_no_backups(self):
+        deleted = {
+            patch["target"].get("kind", patch["target"].get("group"))
+            for patch in self.overlay("gitea")["patches"]
+            if "$patch: delete" in patch["patch"]
+        }
+        self.assertEqual(deleted, {"Secret", "gateway.networking.k8s.io", "CronJob"})
+
+    def test_cross_namespace_references_point_at_the_copies(self):
+        text = (self.ROOT / "gitea/kustomization.yaml").read_text()
+        self.assertIn("postgresql.postgresql-restore.svc.cluster.local:5432", text)
+        self.assertIn("value: postgresql-restore", text)
+        self.assertIn("value: gitea-restore", (self.ROOT / "postgresql/kustomization.yaml").read_text())
+
+    def test_flux_applies_the_overlays_only_on_request(self):
+        kustomizations = _by_name(self.ROOT / "flux.yaml")
+        self.assertEqual(
+            {name: k["spec"]["path"] for name, k in kustomizations.items()},
+            {
+                "postgresql-restore": "./deploy/restore-test/postgresql",
+                "gitea-restore": "./deploy/restore-test/gitea",
+            },
+        )
+        self.assertTrue(all(k["spec"]["prune"] for k in kustomizations.values()))
+        self.assertNotIn("restore-test", (CLUSTER / "sync.yaml").read_text())
+
+
 class GatewayTests(unittest.TestCase):
     def setUp(self):
         self.documents = {

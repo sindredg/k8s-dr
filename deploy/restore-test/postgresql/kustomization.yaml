@@ -1,0 +1,26 @@
+---
+# PostgreSQL for the test restore, in postgresql-restore. The playbook
+# ansible/playbooks/restore_test_env.yml copies the Secret. See
+# docs/runbooks/backup-restore.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: postgresql-restore
+resources:
+  - ../../apps/postgresql
+patches:
+  # The SOPS MAC covers the namespace, so an encrypted Secret cannot move.
+  - target:
+      kind: Secret
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: unused
+  - target:
+      kind: NetworkPolicy
+      name: allow-gitea|allow-gitea-backup
+    patch: |-
+      - op: replace
+        path: /spec/ingress/0/from/0/namespaceSelector/matchLabels/kubernetes.io~1metadata.name
+        value: gitea-restore

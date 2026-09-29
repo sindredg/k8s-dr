@@ -60,6 +60,51 @@ restored <set> in <n> seconds
 
 Record the set, the backup age, and the restore duration. Then run the fixture checks against the restored service before routing users to it.
 
+## Test a restore
+
+The test environment copies the service into the `gitea-restore` and `postgresql-restore` namespaces on the same cluster. It has no Gateway and no backup CronJob, so it serves no public traffic and writes no sets. It shares the worker with the live service.
+
+`make restore-test-env` creates the namespaces, copies the `postgresql-credentials`, `gitea-admin`, `gitea-database`, and `gitea-backup` Secrets from the live namespaces, and applies the Flux Kustomizations in `deploy/restore-test/flux.yaml`. SOPS Secrets cannot be applied in another namespace, because their MAC covers the namespace. Flux builds the overlays from the branch it tracks, so merge overlay changes before you run the test.
+
+1. Create the environment. The first Gitea install runs its migrations.
+
+   ```bash
+   make restore-test-env
+   ```
+
+   Expected: `failed=0`, and `deployment "gitea" successfully rolled out` for `gitea-restore`.
+
+2. Restore the newest set into it.
+
+   ```bash
+   make restore RESTORE_NAMESPACE=gitea-restore
+   ```
+
+   Expected: as in [Restore a set](#restore-a-set). Record the set, backup age, restore duration, and the `run_with_iap` elapsed time.
+
+3. In a second terminal, forward `localhost:3000` to the restored Gitea. The command holds the terminal.
+
+   ```bash
+   make restore-test-forward
+   ```
+
+4. Check the fixtures and push a new commit through the forward.
+
+   ```bash
+   make check-fixtures GIT_URL=http://localhost:3000
+   make write-check GIT_URL=http://localhost:3000
+   ```
+
+   Expected: both recaps end with `failed=0`. `check-fixtures` finds the fixture commit and issue; `write-check` prints the accepted push. The push reaches only the test copy.
+
+5. Stop the forward with Ctrl+C and delete the environment and its data.
+
+   ```bash
+   make restore-test-env-delete
+   ```
+
+   Expected: `failed=0`. `kubectl get namespace gitea-restore postgresql-restore` reports `NotFound`.
+
 ## Limitations
 
 - The restore replaces all data in the target pair. It does not merge.

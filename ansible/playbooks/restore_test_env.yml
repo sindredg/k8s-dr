@@ -1,0 +1,115 @@
+---
+# Creates or deletes the test restore environment: a copy of the service in
+# the gitea-restore and postgresql-restore namespaces, deployed by the Flux
+# Kustomizations in deploy/restore-test/flux.yaml. Run with
+# restore_test_env_state=absent to delete it. See
+# docs/runbooks/backup-restore.md.
+- name: Manage the test restore environment
+  hosts: kube_control_plane
+  gather_facts: false
+  become: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  vars:
+    restore_test_env_state: present
+    restore_test_flux: "{{ playbook_dir }}/../../deploy/restore-test/flux.yaml"
+    # Source namespace, Secret, and target namespace. SOPS Secrets cannot be
+    # moved to another namespace, so the playbook copies the decrypted ones.
+    restore_test_secrets:
+      - [postgresql, postgresql-credentials, postgresql-restore]
+      - [gitea, gitea-admin, gitea-restore]
+      - [gitea, gitea-database, gitea-restore]
+      - [gitea, gitea-backup, gitea-restore]
+  tasks:
+    - name: Require a known state
+      ansible.builtin.assert:
+        that: restore_test_env_state in ['present', 'absent']
+        quiet: true
+
+    - name: Create the test restore environment
+      when: restore_test_env_state == 'present'
+      block:
+        - name: Create the namespaces
+          ansible.builtin.command:
+            cmd: kubectl apply -f -
+            stdin: >-
+              {{ {'apiVersion': 'v1', 'kind': 'List', 'items': [
+                {'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {
+                  'name': 'postgresql-restore',
+                  'labels': {'app.kubernetes.io/part-of': 'k8s-dr-restore-test'}}},
+                {'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {
+                  'name': 'gitea-restore',
+                  'labels': {'app.kubernetes.io/part-of': 'k8s-dr-restore-test'}}}
+              ]} | to_json }}
+          register: restore_test_namespaces
+          changed_when: "'created' in restore_test_namespaces.stdout"
+
+        - name: Read the Secrets to copy
+          ansible.builtin.command: >-
+            kubectl get secret/{{ item[1] }} --namespace {{ item[0] }} --output=json
+          loop: "{{ restore_test_secrets }}"
+          register: restore_test_source_secrets
+          changed_when: false
+          no_log: true
+
+        - name: Copy the Secrets
+          ansible.builtin.command:
+            cmd: kubectl apply -f -
+            stdin: >-
+              {{ {
+                'apiVersion': 'v1',
+                'kind': 'Secret',
+                'metadata': {'name': item.item[1], 'namespace': item.item[2]},
+                'type': (item.stdout | from_json).type,
+                'data': (item.stdout | from_json).data
+              } | to_json }}
+          loop: "{{ restore_test_source_secrets.results }}"
+          changed_when: true
+          no_log: true
+
+        - name: Apply the Flux Kustomizations
+          ansible.builtin.command:
+            cmd: kubectl apply -f -
+            stdin: >-
+              {{ {'apiVersion': 'v1', 'kind': 'List', 'items':
+              lookup('ansible.builtin.file', restore_test_flux) | from_yaml_all | list} | to_json }}
+          register: restore_test_flux_apply
+          changed_when: "'unchanged' not in restore_test_flux_apply.stdout"
+
+        # A first Gitea install runs its database migrations.
+        - name: Wait for the test service
+          ansible.builtin.command: >-
+            kubectl wait --for=condition=Ready kustomization/{{ item }}
+            --namespace flux-system --timeout=900s
+          loop:
+            - postgresql-restore
+            - gitea-restore
+          changed_when: false
+
+        - name: Wait for Gitea
+          ansible.builtin.command: >-
+            kubectl rollout status deployment/gitea --namespace gitea-restore --timeout=300s
+          changed_when: false
+
+    - name: Delete the test restore environment
+      when: restore_test_env_state == 'absent'
+      block:
+        # Flux prunes each Kustomization's objects, including the Helm
+        # release, before the deletion completes.
+        - name: Delete the Flux Kustomizations
+          ansible.builtin.command: >-
+            kubectl delete kustomization/{{ item }} --namespace flux-system
+            --ignore-not-found --wait=true --timeout=600s
+          loop:
+            - gitea-restore
+            - postgresql-restore
+          changed_when: true
+
+        # Deleting the namespaces removes the copied Secrets and the volumes.
+        - name: Delete the namespaces
+          ansible.builtin.command: >-
+            kubectl delete namespace/{{ item }} --ignore-not-found --wait=true --timeout=600s
+          loop:
+            - gitea-restore
+            - postgresql-restore
+          changed_when: true
