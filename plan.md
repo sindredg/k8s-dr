@@ -8,7 +8,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | 1. Primary infrastructure | Reproducible VMs and network | Complete |
 | 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Complete |
 | 3. Service deployment | Gitea survives pod restarts | Complete |
-| 4. Consistent backups | Offsite data restores successfully | In progress |
+| 4. Consistent backups | Offsite data restores successfully | Complete |
 | 5. Cold recovery | Independent service in second region | Pending |
 | 6. Disaster drill | Measured RTO and RPO | Pending |
 | 7. Faster recovery | Optional improvement backed by measurements | Pending |
@@ -62,11 +62,11 @@ These changes are easier before the worker disk holds service data. See the [pre
 
 ## 4. Consistent backups
 
-- [ ] Capture PostgreSQL and Gitea repository and configuration data at a consistent point.
-- [ ] Store backups outside the primary region with timestamps and integrity checks.
-- [ ] Make failed or incomplete backup sets ineligible for restore.
-- [ ] Harden the backup bucket: a writer that cannot delete or overwrite objects, a retention policy longer than the backup interval plus the drill window with a recorded decision on locking it, an explicit soft-delete policy, and a lifecycle rule that expires noncurrent versions. See [decision 0006](docs/decisions/0006-service-deployment-architecture.md#deferred-to-milestone-4) and [decision 0007](docs/decisions/0007-consistent-backups.md).
-- [ ] Restore a backup into a separate test environment.
+- [x] Capture PostgreSQL and Gitea repository and configuration data at a consistent point.
+- [x] Store backups outside the primary region with timestamps and integrity checks.
+- [x] Make failed or incomplete backup sets ineligible for restore.
+- [x] Harden the backup bucket: a writer that cannot delete or overwrite objects, a retention policy longer than the backup interval plus the drill window with a recorded decision on locking it, an explicit soft-delete policy, and a lifecycle rule that expires noncurrent versions. See [decision 0006](docs/decisions/0006-service-deployment-architecture.md#deferred-to-milestone-4) and [decision 0007](docs/decisions/0007-consistent-backups.md).
+- [x] Restore a backup into a separate test environment.
 
 **Gate:** The restored service contains the expected commit and issue and accepts a new push. Record the backup age and restore duration.
 

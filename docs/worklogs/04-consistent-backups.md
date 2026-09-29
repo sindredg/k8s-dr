@@ -1,6 +1,6 @@
 # Consistent backups
 
-Status: In progress. The [milestone 4 gate](../../plan.md#4-consistent-backups) has not passed.
+Status: Complete. The [milestone gate](#milestone-gate) passed on 2026-09-29.
 
 ## Scope
 
@@ -122,4 +122,79 @@ deployment "gitea" successfully rolled out
 
 The newest set verified locally with the [runbook checks](../runbooks/backup-restore.md#check-the-backups): both digests matched the manifest, the backup key decrypted the volume archive and the offline key decrypted the dump, the volume archive contains `git/gitea-repositories/recovery-fixture/recovery-fixture.git` and `gitea/conf/app.ini`, and the dump starts with `PGDMP`.
 
-The milestone gate is pending.
+### First test restore: the wait loop missed the finished Job
+
+- **Symptom:** `make restore RESTORE_NAMESPACE=gitea-restore` kept printing `FAILED - RETRYING: Wait for the restore Job to finish` for about 25 minutes. A read-only `kubectl -n gitea-restore get job` showed the Job `Complete` in 41 seconds; its log ended with `restored primary/20260929T160701Z in 37 seconds`.
+- **Cause:** the `command` module splits arguments like a shell. It removed the double quotes in `jsonpath={.status.conditions[?(@.status=="True")].type}`, so kubectl received `@.status==True`, which matches no condition. Running the same argument through `ansible localhost -m command -a 'echo ...'` printed `@.status==True`.
+- **Fix:** single quotes around the expression, as `validate_services.yml` already uses. A test now requires single quotes around every jsonpath expression that contains a double quote.
+- **Verify:** the milestone gate run below finished the wait after three polls.
+
+The playbook's `always` block deleted the key Secret. The restore itself was correct; only the wait was wrong.
+
+## Milestone gate
+
+Run on 2026-09-29 from the operator machine with the wait-loop fix:
+
+```bash
+make restore-test-env
+make restore RESTORE_NAMESPACE=gitea-restore
+make restore-test-forward   # in the background
+make check-fixtures GIT_URL=http://localhost:3000
+make write-check GIT_URL=http://localhost:3000
+make restore-test-env-delete
+```
+
+`make restore-test-env` reported `failed=0` in 18 seconds. Its namespace and Flux tasks reported no change, because the environment from the first attempt still existed. The restore replaces the whole database and volume, so the checks below reflect only the restored set.
+
+`make restore` recap `failed=0`, `run_with_iap` elapsed 43 seconds. The Job log:
+
+```text
+2026-09-29T17:28:56Z restoring primary/20260929T170701Z; backup age at restore start 1315 seconds
+2026-09-29T17:28:57Z digests match the manifest
+2026-09-29T17:28:57Z both archives decrypt and read
+2026-09-29T17:29:01Z Gitea stopped
+DROP DATABASE
+CREATE DATABASE
+2026-09-29T17:29:02Z restored the database
+2026-09-29T17:29:02Z restored the Gitea volume
+2026-09-29T17:29:02Z resumed Gitea
+deployment "gitea" successfully rolled out
+2026-09-29T17:29:23Z restored primary/20260929T170701Z in 27 seconds
+```
+
+`make check-fixtures GIT_URL=http://localhost:3000`, recap `failed=0`:
+
+```text
+User recovery-fixture signed in.
+Repository recovery-fixture/recovery-fixture exists.
+Commit 3775f53a1042434d76ec940d3d49360e1b3a0847 is on main.
+Issue #1: Recovery fixture issue
+Newest commit on main: 9363cd271b9cfe9acf21a59597bc407a790b1a62 Write check 2026-09-27T22:18:50Z
+```
+
+`make write-check GIT_URL=http://localhost:3000`, recap `failed=0`:
+
+```text
+Push accepted at 2026-09-29T17:29:58Z by http://localhost:3000/
+Commit 302cb8a30cd6961eba60a66251be090cbd22cf55 on main: Write check 2026-09-29T17:29:56Z
+```
+
+The push reached only the test copy. `make restore-test-env-delete` reported `failed=0` in 33 seconds. A read-only check afterwards found neither restore namespace, only the five service Flux Kustomizations, and the live `gitea` Deployment at 1/1.
+
+| Measure | Result |
+| --- | --- |
+| Restored set | `primary/20260929T170701Z` |
+| Backup age at restore start | 1315 seconds (21 minutes 55 seconds) |
+| Restore duration, Job script | 27 seconds, of which Gitea startup took 21 |
+| Restore duration, `make restore` | 43 seconds |
+| Fixtures | Login, commit `3775f53`, and issue #1 present |
+| New push | Accepted at 2026-09-29T17:29:58Z |
+
+The gate passed: the restored service contains the expected commit and issue and accepts a new push.
+
+## Limitations
+
+- The test restore ran on the primary cluster and shares the worker with the live service. Milestone 5 runs the same Job on the recovery cluster.
+- The restore duration covers a set of about 390 KB. It grows with data size; milestone 6 measures it again inside the full recovery.
+- The checks ran through a port-forward, not through a Gateway and certificate. Milestone 5 tests the public recovery endpoint.
+- No scheduled restore test exists yet. Decision 0007 defers it until the manual restores show a need.
