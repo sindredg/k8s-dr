@@ -1,6 +1,6 @@
 # 0007: Consistent backups
 
-Status: Accepted on 2026-09-29. Implementation in progress; the [milestone 4 gate](../../plan.md#4-consistent-backups) has not passed.
+Status: Accepted on 2026-09-29. Implemented; the [milestone 4 gate](../worklogs/04-consistent-backups.md#milestone-gate) passed on 2026-09-29.
 
 Date: 2026-09-29
 
