@@ -32,4 +32,17 @@ gcloud compute ssh <control-plane> --zone <zone> --tunnel-through-iap -- \
 
 ## Validation
 
+### Before the merge
+
+On 2026-09-30, `kubectl describe nodes` reported these memory requests against about 3,808 MiB allocatable per node:
+
+| Node | Memory requests | Memory limits |
+| --- | --- | --- |
+| `k8sdr-primary-control-plane` | 100Mi (2%) | 0 (0%) |
+| `k8sdr-primary-worker` | 1100Mi (28%) | 9556Mi (250%) |
+
+The cluster has no Metrics API, so `kubectl top` is unavailable. The release adds 312 MiB of requests to the worker (Alloy, the operator, kube-state-metrics, one node-exporter) and 24 MiB to the control plane, which leaves the worker near 37%.
+
+### After the merge
+
 Not run yet.
