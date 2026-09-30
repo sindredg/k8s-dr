@@ -16,6 +16,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Kubernetes bootstrap architecture](decisions/0005-kubernetes-bootstrap-architecture.md) | Define the Milestone 2 automation, networking, storage, access, and validation design. |
 | [Service deployment architecture](decisions/0006-service-deployment-architecture.md) | Define Flux, secrets, PostgreSQL, Gitea, and public exposure for milestone 3. |
 | [Consistent backups](decisions/0007-consistent-backups.md) | Define the backup capture, format, encryption, writer access, retention, and alerting for milestone 4. |
+| [Cold recovery](decisions/0008-cold-recovery.md) | Define the hostnames, cluster selection, recovery root, and primary isolation for milestone 5. |
 | [Production readiness](production-readiness.md) | List what a production deployment adds to this lab. |
 | [Kubernetes bootstrap implementation plan](plans/2026-09-23-kubernetes-bootstrap.md) | Break Milestone 2 implementation into tested, reviewable tasks. |
 | [Primary infrastructure procedure](runbooks/primary-infrastructure.md) | Bootstrap state, apply the primary root, and check the milestone 1 gate. |

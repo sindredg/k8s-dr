@@ -84,7 +84,7 @@ Option A is selected. TLS terminates inside infrastructure the operator controls
 
 **Rejected: an external address on the worker VM.** It is cheapest, but it breaks the boundary that no VM has a public address.
 
-**Certificate limits.** Let's Encrypt allows five certificates for the same set of names every seven days. Rebuilds and drills issue new certificates. Use the staging issuer for rebuild tests, and issue `git.sindrg.com` and `git-dr.sindrg.com` as separate certificates.
+**Certificate limits.** Let's Encrypt allows five certificates for the same set of names every seven days. Rebuilds and drills issue new certificates. Use the staging issuer for rebuild tests, and issue each hostname as a separate certificate. [Decision 0008](0008-cold-recovery.md#serve-the-public-host-and-a-per-cluster-host-from-every-cluster) sets the hostnames each cluster serves.
 
 ### Restrict traffic with network policies
 
