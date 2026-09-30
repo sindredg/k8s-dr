@@ -1,0 +1,8 @@
+---
+# Holds no data, so Flux may prune it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: k8s-dr

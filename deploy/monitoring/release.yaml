@@ -1,0 +1,72 @@
+---
+# Cluster metrics sent to Grafana Cloud. See decision 0009.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k8s-monitoring
+  namespace: monitoring
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: k8s-monitoring
+      version: 4.5.2
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    cluster:
+      name: ${cluster_name}
+    destinations:
+      grafanaCloudMetrics:
+        type: prometheus
+        url: https://prometheus-prod-39-prod-eu-north-0.grafana.net/api/prom/push
+        auth:
+          type: basic
+        # The username and password come from the SOPS Secret.
+        secret:
+          create: false
+          name: grafana-cloud-metrics
+    # Kubelet, cAdvisor, and kube-state-metrics, filtered to what the
+    # Kubernetes Monitoring app uses.
+    clusterMetrics:
+      enabled: true
+      destinations: [grafanaCloudMetrics]
+      collector: alloy-metrics
+    hostMetrics:
+      enabled: true
+      destinations: [grafanaCloudMetrics]
+      collector: alloy-metrics
+      linuxHosts:
+        enabled: true
+    # Usage telemetry about the chart itself.
+    selfReporting:
+      enabled: false
+    collectors:
+      alloy-metrics:
+        presets: [statefulset]
+        alloy:
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {memory: 512Mi}
+    telemetryServices:
+      kube-state-metrics:
+        deploy: true
+        resources:
+          requests: {cpu: 10m, memory: 48Mi}
+          limits: {memory: 128Mi}
+      node-exporter:
+        deploy: true
+        resources:
+          requests: {cpu: 10m, memory: 24Mi}
+          limits: {memory: 64Mi}
+    alloy-operator:
+      resources:
+        requests: {cpu: 10m, memory: 48Mi}
+        limits: {memory: 128Mi}

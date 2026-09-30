@@ -44,9 +44,9 @@ A separate Flux Kustomization, `monitoring`, applies `deploy/monitoring` with `w
 
 A new `cluster-settings` key, `cluster_name`, sets the chart's `cluster.name`. The primary reports `cluster="primary"` and the recovery cluster `cluster="recovery"`, from the same manifests. When [decision 0008](0008-cold-recovery.md#share-the-flux-sync-definition-between-clusters) moves the sync definition to `deploy/sync/`, this Kustomization moves with it.
 
-### Use a write-only token as a recovery credential
+### Keep the token as a recovery credential
 
-A Grafana Cloud access policy token with only the `metrics:write` scope authenticates the remote write. The token and the stack's Prometheus instance ID are a SOPS Secret in `deploy/monitoring`. The token is also kept in the credential store, because the recovery cluster sends metrics with it. The Prometheus push URL is not secret and is set in the HelmRelease.
+A Grafana Cloud access policy token authenticates the remote write. The token and the stack's Prometheus instance ID are a SOPS Secret in `deploy/monitoring`. The token is also kept in the credential store, because the recovery cluster sends metrics with it. The Prometheus push URL is not secret and is set in the HelmRelease.
 
 ## Consequences
 

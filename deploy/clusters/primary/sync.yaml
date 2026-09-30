@@ -89,3 +89,29 @@ spec:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-settings
+---
+# Cluster metrics. Nothing depends on it and it does not wait, so a failed
+# chart or an unreachable Grafana Cloud cannot block the service. See
+# decision 0009.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: monitoring
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./deploy/monitoring
+  prune: true
+  wait: false
+  timeout: 5m
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
