@@ -44,7 +44,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check restore restore-test-env \
-	restore-test-env-delete restore-test-forward check pins
+	restore-test-env-delete restore-test-forward check pins surface
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -109,3 +109,6 @@ check: ## Run the local unit tests, linters, and syntax checks
 
 pins: ## Check that every pinned artifact still resolves upstream
 	$(BIN)python scripts/check_pins.py
+
+surface: ## Probe the public endpoint from outside (read-only)
+	scripts/check-public-surface.sh $(GIT_HOST)

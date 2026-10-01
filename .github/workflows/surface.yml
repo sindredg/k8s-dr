@@ -1,0 +1,40 @@
+---
+name: Public surface
+
+# Probes the running service from outside every day: TLS, headers, anonymous
+# access, closed ports, and certificate-issuance DNS. Needs no credential. A
+# failed run mails the repository owner. See decision 0010.
+"on":
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths: ["scripts/check-public-surface.sh", ".github/workflows/surface.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-surface
+  cancel-in-progress: false
+
+jobs:
+  surface:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # openssl and curl ship with the runner; dig queries CAA and DS.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bind9-dnsutils
+      # Known findings are listed in the script; a new or a fixed one fails.
+      - run: |
+          set -o pipefail
+          ./scripts/check-public-surface.sh | tee "$RUNNER_TEMP/surface.txt"
+      - if: always()
+        run: |
+          {
+            echo '```'
+            cat "$RUNNER_TEMP/surface.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
