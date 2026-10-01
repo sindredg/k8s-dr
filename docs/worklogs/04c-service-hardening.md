@@ -108,7 +108,19 @@ On 2026-10-01, after `main` reached `29ee60f` and the scope change was applied.
 
 `make validate-services` failed at 04:29:06 UTC with `The connection to the server 10.42.0.5:6443 was refused`. The VMs had started 36 seconds earlier and the API server was not listening yet. The gate step now waits for the health endpoint first. The service answered again about three minutes after the VMs started.
 
+### Flux, sign-in, and the scope apply
+
+Flux applied `main` at `51f97a4`, which includes the hardening change, and the anonymous API returned `403` while the health endpoint returned `200`. `terraform -chdir=infra/primary apply` changed the two instances and nothing else.
+
+![The infrastructure, gitea, and monitoring Kustomizations Ready at 51f97a4](../images/hardening-flux-ready.png)
+
+![The anonymous API returning 403 and the health endpoint 200](../images/hardening-signin-required.png)
+
+![Terraform apply with two resources changed](../images/hardening-scopes-apply.png)
+
 ### Policies and the metadata server
+
+![The network policies, with the three new ones about two minutes old](../images/hardening-network-policies.png)
 
 ```text
 $ kubectl get networkpolicy -A
@@ -142,6 +154,10 @@ $ kubectl -n default run metadata-check --rm -i --restart=Never --image=busybox:
     wget -T 5 -qO- http://169.254.169.254/
 computeMetadata/
 ```
+
+![The metadata server check timing out from the monitoring namespace](../images/hardening-metadata-blocked.png)
+
+![The control pod in the default namespace reaching the metadata server](../images/hardening-metadata-control.png)
 
 ### Not recorded yet
 
