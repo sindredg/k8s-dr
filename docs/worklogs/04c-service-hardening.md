@@ -100,6 +100,8 @@ On 2026-10-01, after `main` reached `29ee60f` and the scope change was applied.
 | Traefik under the egress policy | `curl -s -o /dev/null -w '%{http_code}' https://git.sindrg.com/user/login` | `200` after both VMs restarted, so Traefik loaded its configuration and reached Gitea with the policy in place |
 | Sign-in required | `curl` on `/api/v1/users/search` and `/explore/users` | `403` and `303` |
 | Fixtures | `make check-fixtures` | Passed: sign-in, repository, commit `3775f53`, and issue 1 |
+| Cluster validation | `make validate-cluster` at 04:35 UTC | Passed: `ok=10 failed=0`, every Deployment available, including Traefik, cert-manager, and the monitoring workloads |
+| Service validation | `make validate-services` at 04:36 UTC | Passed: `ok=13 failed=0`; the Flux Kustomizations are Ready and the HTTP listener redirects with `301` |
 | Public surface | `make surface` | 11 ok, 2 known open, 1 resolved (`anonymous-api`), 0 regressed. The resolved line is now removed from `KNOWN_OPEN`. |
 
 ### Validation ran before the API server was up
@@ -108,7 +110,6 @@ On 2026-10-01, after `main` reached `29ee60f` and the scope change was applied.
 
 ### Not recorded yet
 
-- The policy list and the Flux Kustomization status.
+- The policy list from `kubectl get networkpolicy`.
 - The metadata server check from `monitoring` and `default`.
-- `make validate-cluster` and `make validate-services` after the restart.
 - A completed backup with the narrowed scope.
