@@ -1,6 +1,6 @@
 # Cluster metrics before milestone 6
 
-Status: Implemented; validation pending.
+Status: Implemented; validated on 2026-10-01 except the active series count.
 
 ## Scope
 
@@ -45,4 +45,36 @@ The cluster has no Metrics API, so `kubectl top` is unavailable. The release add
 
 ### After the merge
 
-Not run yet.
+On 2026-10-01, after `main` reached `9f3ef3c`:
+
+| Gate step | Result |
+| --- | --- |
+| 2. Flux | `monitoring` Kustomization `Ready=True` at `main@sha1:9f3ef3c`; HelmRelease `k8s-monitoring` `Ready=True`, chart 4.5.2 installed |
+| 3. Workloads | `alloy-metrics-0` (2/2), the Alloy operator, kube-state-metrics, and one node-exporter per node, all `Running` with 0 restarts |
+| 4. Grafana Cloud | Cluster `primary` with 2 nodes and 13 namespaces, including `gitea` and `postgresql` with workloads and memory usage |
+| 5. Active series | Not recorded |
+| 6. Node memory | Control plane 124Mi (3%), worker 1462Mi (38%); both below 80% |
+
+![The monitoring Kustomization Ready at the merged revision](../images/metrics-flux-kustomization.png)
+
+![The k8s-monitoring HelmRelease installed](../images/metrics-helmrelease.png)
+
+![The monitoring pods Running on both nodes](../images/metrics-pods.png)
+
+![Grafana Cloud showing the primary cluster with two nodes](../images/metrics-grafana-clusters.png)
+
+![Both nodes with CPU and memory usage](../images/metrics-grafana-nodes.png)
+
+![Every namespace of the primary cluster, including gitea and postgresql](../images/metrics-grafana-namespaces.png)
+
+![Control-plane memory requests after the release](../images/metrics-memory-control-plane.png)
+
+![Worker memory requests after the release](../images/metrics-memory-worker.png)
+
+The worker's memory requests rose from 1100Mi to 1462Mi, 50Mi more than the 312Mi the release was sized at.
+
+The Kubernetes Overview page counts 1 cluster, 2 nodes, 13 namespaces, 25 workloads, and 51 containers, but its Pods tile shows "No data". The cause is not confirmed.
+
+![The Kubernetes Overview counts, with no data on the Pods tile](../images/metrics-grafana-overview.png)
+
+The plan step stays open until the active series count is recorded: run `count({cluster="primary"})` in Explore and expect well under 10,000.
