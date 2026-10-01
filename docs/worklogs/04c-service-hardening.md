@@ -1,6 +1,6 @@
 # Service hardening before milestone 6
 
-Status: Implemented; validation in progress.
+Status: Complete. The gate passed on 2026-10-01.
 
 ## Scope
 
@@ -159,6 +159,14 @@ computeMetadata/
 
 ![The control pod in the default namespace reaching the metadata server](../images/hardening-metadata-control.png)
 
-### Not recorded yet
+### Backup with the narrowed scope
 
-A completed backup with the narrowed scope. At 04:40 UTC the newest Job, `gitea-backup-29847127`, was `Complete`, but it ran at 04:07 UTC, before the VMs restarted with the new scopes at 04:28 UTC. The 05:07 UTC run is the first that uses the narrowed scope.
+The 05:07 UTC run, `gitea-backup-29847187`, was the first after the VMs restarted with the new scopes at 04:28 UTC. It completed, so `devstorage.read_write` allows the upload.
+
+```text
+$ kubectl -n gitea get jobs
+NAME                    STATUS     COMPLETIONS   DURATION   AGE
+gitea-backup-29847067   Complete   1/1           30s        126m
+gitea-backup-29847127   Complete   1/1           30s        66m
+gitea-backup-29847187   Complete   1/1           31s        6m15s
+```
