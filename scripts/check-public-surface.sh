@@ -29,7 +29,6 @@ PATHS=("/" "/user/login")
 # Findings that decision 0010 records as open. Delete a line when its finding
 # closes; the script fails on a listed finding that passes.
 KNOWN_OPEN=(
-  "anonymous-api the API answers anonymous requests until REQUIRE_SIGNIN_VIEW is deployed"
   "hsts no Strict-Transport-Security header"
   "caa no CAA record in the zone"
 )
