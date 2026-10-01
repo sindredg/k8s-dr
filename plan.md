@@ -78,6 +78,17 @@ Dashboards for the drill that remain readable after the primary region is lost. 
 
 **Gate:** The monitoring release is Ready; Grafana Cloud shows both nodes and the service pods for `cluster="primary"`; active series stay under the free-tier limit; node memory requests stay below 80% of allocatable.
 
+## Before milestone 6: service hardening
+
+Close the findings of a security review of the running service. See [decision 0010](docs/decisions/0010-service-hardening.md) and the [worklog](docs/worklogs/04c-service-hardening.md).
+
+- [ ] Require sign-in to view Gitea.
+- [ ] Restrict Traefik egress and deny the metadata server in `cert-manager` and `monitoring`.
+- [ ] Narrow the node OAuth scopes.
+- [ ] Check the public surface daily.
+
+**Gate:** Flux is Ready with the policies applied; Traefik serves after a restart; the anonymous API returns 401 or 403; the fixture checks pass; a pod in `monitoring` cannot reach the metadata server; a backup completes with the narrowed scope; the surface check reports no regression.
+
 ## 5. Cold recovery
 
 - [ ] Provision recovery-region VMs from Terraform with no primary-region dependency.
