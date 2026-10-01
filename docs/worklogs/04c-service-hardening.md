@@ -108,8 +108,57 @@ On 2026-10-01, after `main` reached `29ee60f` and the scope change was applied.
 
 `make validate-services` failed at 04:29:06 UTC with `The connection to the server 10.42.0.5:6443 was refused`. The VMs had started 36 seconds earlier and the API server was not listening yet. The gate step now waits for the health endpoint first. The service answered again about three minutes after the VMs started.
 
+### Flux, sign-in, and the scope apply
+
+Flux applied `main` at `51f97a4`, which includes the hardening change, and the anonymous API returned `403` while the health endpoint returned `200`. `terraform -chdir=infra/primary apply` changed the two instances and nothing else.
+
+![The infrastructure, gitea, and monitoring Kustomizations Ready at 51f97a4](../images/hardening-flux-ready.png)
+
+![The anonymous API returning 403 and the health endpoint 200](../images/hardening-signin-required.png)
+
+![Terraform apply with two resources changed](../images/hardening-scopes-apply.png)
+
+### Policies and the metadata server
+
+![The network policies, with the three new ones about two minutes old](../images/hardening-network-policies.png)
+
+```text
+$ kubectl get networkpolicy -A
+NAMESPACE      NAME                   POD-SELECTOR                          AGE
+cert-manager   deny-metadata-server   <none>                                22m
+flux-system    allow-egress           <none>                                4d9h
+flux-system    allow-scraping         <none>                                4d9h
+flux-system    allow-webhooks         app=notification-controller           4d9h
+gitea          allow-backup-egress    app.kubernetes.io/name=gitea-backup   41h
+gitea          allow-dns              <none>                                4d4h
+gitea          allow-postgresql       app.kubernetes.io/name=gitea          4d4h
+gitea          allow-traefik          app.kubernetes.io/name=gitea          4d4h
+gitea          default-deny           <none>                                4d4h
+monitoring     deny-metadata-server   <none>                                22m
+postgresql     allow-dns              <none>                                4d4h
+postgresql     allow-gitea            app.kubernetes.io/name=postgresql     4d4h
+postgresql     allow-gitea-backup     app.kubernetes.io/name=postgresql     41h
+postgresql     default-deny           <none>                                4d4h
+traefik        traefik-egress         <none>                                22m
+```
+
+A pod in `monitoring` cannot reach the metadata server, and the control pod in `default`, which has no policy, can:
+
+```text
+$ kubectl -n monitoring run metadata-check --rm -i --restart=Never --image=busybox:1.37.0 -- \
+    wget -T 5 -qO- http://169.254.169.254/
+wget: download timed out
+pod monitoring/metadata-check terminated (Error)
+
+$ kubectl -n default run metadata-check --rm -i --restart=Never --image=busybox:1.37.0 -- \
+    wget -T 5 -qO- http://169.254.169.254/
+computeMetadata/
+```
+
+![The metadata server check timing out from the monitoring namespace](../images/hardening-metadata-blocked.png)
+
+![The control pod in the default namespace reaching the metadata server](../images/hardening-metadata-control.png)
+
 ### Not recorded yet
 
-- The policy list from `kubectl get networkpolicy`.
-- The metadata server check from `monitoring` and `default`.
-- A completed backup with the narrowed scope.
+A completed backup with the narrowed scope. At 04:40 UTC the newest Job, `gitea-backup-29847127`, was `Complete`, but it ran at 04:07 UTC, before the VMs restarted with the new scopes at 04:28 UTC. The 05:07 UTC run is the first that uses the narrowed scope.
