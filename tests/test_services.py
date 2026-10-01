@@ -36,6 +36,7 @@ class ClusterSettingsTests(unittest.TestCase):
                 "git_host": "git.sindrg.com",
                 "git_issuer": "letsencrypt-production",
                 "backup_cluster": "primary",
+                "cluster_name": "primary",
             },
         )
 
@@ -48,7 +49,7 @@ class ClusterSettingsTests(unittest.TestCase):
             for kustomization in _sync().values()
             if "postBuild" in kustomization["spec"]
         }
-        self.assertEqual(substituted, {"./deploy/certificates", "./deploy/apps/gitea"})
+        self.assertEqual(substituted, {"./deploy/certificates", "./deploy/apps/gitea", "./deploy/monitoring"})
         for directory in substituted:
             for path in Path(directory).rglob("*.yaml"):
                 for variable in re.findall(r"\$\{(\w+)\}", path.read_text()):

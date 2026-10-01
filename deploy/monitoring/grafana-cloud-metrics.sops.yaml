@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: grafana-cloud-metrics
+    namespace: monitoring
+type: Opaque
+stringData:
+    username: ENC[AES256_GCM,data:1YNx0QiWYA==,iv:R7+/vgj5A9271lZ9lWj5h5Xx5apkZy7Tg50UsjnayhY=,tag:z2qfEGJRSVx0Nv/8FsE6+Q==,type:str]
+    password: ENC[AES256_GCM,data:x8q7AxJONc4sTutf+nQ+JVaTomi4ZMi8k48rX6cRhoLjFk74jtQ7YyvixOfeJrfDyI3keQRiPJ7iomolyC3SWp4WybNQ0DjOwLtJ1Ij6oXRUxwfsXE/aQw5El+rpgFTCHSMP9l9p8KCZHr4Ho+o4jugHhSSbKUOXVYFPSPmGhS0dOp1KALBe/8JyTFI3l29kRIO2EiW79DQMYg+q6/UfD/qSMP8=,iv:KQXdYVpHYEnN9RO6wROwrnYRWM/xBChHr8ErUGmTL48=,tag:SG89Wk4VVFZEmQWuDErqjA==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNcWFzU0ZSS2ZGaW9WTEpt
+            VVJWVWNiVEtMNnVNQUxaeDhBVi9CWTZpM2w0Cm9kWnpCVnBobkVackxHWFYzQnFQ
+            OEpYOVh0enJ4VW5UbFZnZG54MVZCb0EKLS0tIHhLU0tXRk5JQ1hGMUFYVXNzTm03
+            MExMY3BOem9XK0hEcHpPSWhXV1VWV1UKvmom07TVLWG4mNLGV1hDLlyQACngt/YO
+            nGXEg1DNT2gA/I8Flo6xtqUm0Sa9cm30vmV5kJPReVBw1XqACQrkgQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1cxdnhpr5c2nt2j7jncce24vaa3r55kjzej4x9x74h2f08janvaps2xfgr4
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-09-30T04:35:46Z"
+    mac: ENC[AES256_GCM,data:52h/u+O9ms+n2Qqx/x+Rf9YvKP3SeZwA42ylHh6uKlDYOyFQwJm3W6uVuND7gxUx9If1SyZMfcagXZyJijKgwH9neGUne354H5Ld1ZaqqSqi4gGtU8JL98coLIGtHY5c4fSmO30b2VOunxi3f03SewsbkfgSDisLK4Qx5TRqcxQ=,iv:DNwlzXVn6y/eGS2/IthbXEUcMW3p3xNPBxr89QBceAg=,tag:y6Po/yTkWBjohVLpCZZlQA==,type:str]
+    version: 3.13.3
