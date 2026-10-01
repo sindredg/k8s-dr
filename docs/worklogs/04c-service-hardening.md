@@ -1,6 +1,6 @@
 # Service hardening before milestone 6
 
-Status: Implemented; validation pending.
+Status: Implemented; validation in progress.
 
 ## Scope
 
@@ -85,10 +85,30 @@ Each VM stops and restarts, so the service is unavailable for a few minutes. Avo
 
 1. `terraform -chdir=infra/primary plan`. Expected: two instances updated in place, with only the scopes and `allow_stopping_for_update` changed.
 2. `terraform -chdir=infra/primary apply`.
-3. `make validate-cluster` and `make validate-services`. Expected: both pass.
+3. Wait until `curl -s -o /dev/null -w '%{http_code}' https://git.sindrg.com/api/healthz` prints `200`, about three minutes after the VMs start. Then run `make validate-cluster` and `make validate-services`. Expected: both pass.
 4. `gcloud compute instances describe <instance> --zone <zone> --format='value(serviceAccounts[0].scopes)'` for each node. Expected: `devstorage.read_write` on the worker and nothing on the control plane.
 5. After the next hourly backup: `kubectl -n gitea get jobs`. Expected: the newest Job is `Complete`, which proves the narrowed scope still allows the upload.
 
 ## Validation
 
-Not run yet.
+On 2026-10-01, after `main` reached `29ee60f` and the scope change was applied.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Node scopes | `gcloud compute instances list --format='table(name,status,lastStartTimestamp,serviceAccounts[0].scopes.list())'` | Worker: `devstorage.read_write`. Control plane: none. Both `RUNNING`, started at 04:28:29 and 04:28:31 UTC. |
+| Service after the restart | `curl -s -o /dev/null -w '%{http_code}' https://git.sindrg.com/api/healthz` | No answer at 04:29:44 UTC; `200` at 04:31:38 UTC |
+| Traefik under the egress policy | `curl -s -o /dev/null -w '%{http_code}' https://git.sindrg.com/user/login` | `200` after both VMs restarted, so Traefik loaded its configuration and reached Gitea with the policy in place |
+| Sign-in required | `curl` on `/api/v1/users/search` and `/explore/users` | `403` and `303` |
+| Fixtures | `make check-fixtures` | Passed: sign-in, repository, commit `3775f53`, and issue 1 |
+| Public surface | `make surface` | 11 ok, 2 known open, 1 resolved (`anonymous-api`), 0 regressed. The resolved line is now removed from `KNOWN_OPEN`. |
+
+### Validation ran before the API server was up
+
+`make validate-services` failed at 04:29:06 UTC with `The connection to the server 10.42.0.5:6443 was refused`. The VMs had started 36 seconds earlier and the API server was not listening yet. The gate step now waits for the health endpoint first. The service answered again about three minutes after the VMs started.
+
+### Not recorded yet
+
+- The policy list and the Flux Kustomization status.
+- The metadata server check from `monitoring` and `default`.
+- `make validate-cluster` and `make validate-services` after the restart.
+- A completed backup with the narrowed scope.
