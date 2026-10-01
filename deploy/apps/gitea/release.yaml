@@ -102,6 +102,9 @@ spec:
           SSL_MODE: disable
         service:
           DISABLE_REGISTRATION: true
+          # Anonymous visitors see only the sign-in page: no user list, no
+          # API, no explore pages. /api/healthz stays open for probes.
+          REQUIRE_SIGNIN_VIEW: true
         # One replica: sessions in the database survive a pod restart, the
         # cache stays in memory, and queues use LevelDB on the Gitea volume.
         session:

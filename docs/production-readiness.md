@@ -14,7 +14,7 @@ The target setting is an organization that must run Kubernetes on VMs it control
 | Secrets | SOPS with an offline age key | A secrets manager with rotation and audit, plus an offline recovery copy of its unseal or root material |
 | Traffic inside the cluster | TLS ends at Traefik. Gitea reaches PostgreSQL in plaintext on the pod network; network policies limit which pods can connect. | TLS or mutual TLS between services and to the database, with certificate rotation |
 | Cost control | Manual review in Cloud Billing | Budget alerts and ownership labels. See [decision 0004](decisions/0004-remove-budget-alert.md). |
-| Observability | Ansible output, cluster metrics in Grafana Cloud, a backup heartbeat, and an external probe (planned) | Metrics, logs, and alerts for backup age, certificate expiry, node health, and disk usage, routed to an on-call rotation |
+| Observability | Ansible output, cluster metrics in Grafana Cloud, a backup heartbeat, a daily check of the public surface, and an external probe (planned). No audit or access logs leave the nodes; see [decision 0010](decisions/0010-service-hardening.md). | Metrics, logs, and alerts for backup age, certificate expiry, node health, and disk usage, routed to an on-call rotation |
 | Supply chain | Images and packages pulled from public registries during recovery | Mirrored images and packages in a registry in each region, with signature or digest verification |
 | Cutover and failback | Manual DNS change, no failback | Automated DNS change with approval, a documented failback, and a fencing rule so a returning primary cannot serve or write backups |
 | Drills | One drill, repeated once | Scheduled drills with results tracked over time and runbook owners |

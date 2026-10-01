@@ -1,0 +1,17 @@
+---
+# Pods here need the Kubernetes API and the internet but never the node's
+# service account token, so egress excludes the metadata server. Host-network
+# pods are outside network policy. See decision 0010.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-metadata-server
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["169.254.169.254/32"]

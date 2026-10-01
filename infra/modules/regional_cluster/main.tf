@@ -4,6 +4,14 @@ locals {
   iap_tag    = "${var.name_prefix}-iap-ssh"
   web_tag    = "${var.name_prefix}-public-web"
   web_ports  = ["80", "443"]
+
+  # OAuth scopes cap what a token from the metadata server can do, whatever
+  # IAM grants the service account later. Only the worker calls a Google API:
+  # the backup and restore Jobs read and create Cloud Storage objects.
+  node_scopes = {
+    "control-plane" = []
+    "worker"        = ["storage-rw"]
+  }
 }
 
 resource "google_compute_network" "cluster" {
@@ -114,8 +122,12 @@ resource "google_compute_instance" "node" {
 
   service_account {
     email  = google_service_account.node[each.key].email
-    scopes = ["cloud-platform"]
+    scopes = local.node_scopes[each.key]
   }
+
+  # Changing the scopes stops and restarts the VM. The plan shows the change
+  # before it happens.
+  allow_stopping_for_update = true
 
   shielded_instance_config {
     enable_secure_boot          = true
