@@ -108,8 +108,41 @@ On 2026-10-01, after `main` reached `29ee60f` and the scope change was applied.
 
 `make validate-services` failed at 04:29:06 UTC with `The connection to the server 10.42.0.5:6443 was refused`. The VMs had started 36 seconds earlier and the API server was not listening yet. The gate step now waits for the health endpoint first. The service answered again about three minutes after the VMs started.
 
+### Policies and the metadata server
+
+```text
+$ kubectl get networkpolicy -A
+NAMESPACE      NAME                   POD-SELECTOR                          AGE
+cert-manager   deny-metadata-server   <none>                                22m
+flux-system    allow-egress           <none>                                4d9h
+flux-system    allow-scraping         <none>                                4d9h
+flux-system    allow-webhooks         app=notification-controller           4d9h
+gitea          allow-backup-egress    app.kubernetes.io/name=gitea-backup   41h
+gitea          allow-dns              <none>                                4d4h
+gitea          allow-postgresql       app.kubernetes.io/name=gitea          4d4h
+gitea          allow-traefik          app.kubernetes.io/name=gitea          4d4h
+gitea          default-deny           <none>                                4d4h
+monitoring     deny-metadata-server   <none>                                22m
+postgresql     allow-dns              <none>                                4d4h
+postgresql     allow-gitea            app.kubernetes.io/name=postgresql     4d4h
+postgresql     allow-gitea-backup     app.kubernetes.io/name=postgresql     41h
+postgresql     default-deny           <none>                                4d4h
+traefik        traefik-egress         <none>                                22m
+```
+
+A pod in `monitoring` cannot reach the metadata server, and the control pod in `default`, which has no policy, can:
+
+```text
+$ kubectl -n monitoring run metadata-check --rm -i --restart=Never --image=busybox:1.37.0 -- \
+    wget -T 5 -qO- http://169.254.169.254/
+wget: download timed out
+pod monitoring/metadata-check terminated (Error)
+
+$ kubectl -n default run metadata-check --rm -i --restart=Never --image=busybox:1.37.0 -- \
+    wget -T 5 -qO- http://169.254.169.254/
+computeMetadata/
+```
+
 ### Not recorded yet
 
-- The policy list from `kubectl get networkpolicy`.
-- The metadata server check from `monitoring` and `default`.
-- A completed backup with the narrowed scope.
+A completed backup with the narrowed scope. At 04:40 UTC the newest Job, `gitea-backup-29847127`, was `Complete`, but it ran at 04:07 UTC, before the VMs restarted with the new scopes at 04:28 UTC. The 05:07 UTC run is the first that uses the narrowed scope.
