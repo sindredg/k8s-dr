@@ -30,7 +30,6 @@ PATHS=("/" "/user/login")
 # closes; the script fails on a listed finding that passes.
 KNOWN_OPEN=(
   "hsts no Strict-Transport-Security header"
-  "caa no CAA record in the zone"
 )
 
 # Ports that only the private network may reach: SSH, the Kubernetes API, the
