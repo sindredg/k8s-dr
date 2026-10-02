@@ -1,6 +1,6 @@
 # 0010: Harden the running service
 
-Status: Proposed on 2026-10-01.
+Status: Accepted and implemented on 2026-10-01.
 
 Date: 2026-10-01
 

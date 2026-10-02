@@ -84,7 +84,7 @@ Close the findings of a security review of the running service. See [decision 00
 
 - [x] Require sign-in to view Gitea.
 - [x] Restrict Traefik egress and deny the metadata server in `cert-manager` and `monitoring`.
-- [ ] Narrow the node OAuth scopes.
+- [x] Narrow the node OAuth scopes.
 - [x] Check the public surface daily.
 
 **Gate:** Flux is Ready with the policies applied; Traefik serves after a restart; the anonymous API returns 401 or 403; the fixture checks pass; a pod in `monitoring` cannot reach the metadata server; a backup completes with the narrowed scope; the surface check reports no regression.
