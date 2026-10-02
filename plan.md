@@ -74,7 +74,7 @@ These changes are easier before the worker disk holds service data. See the [pre
 
 Dashboards for the drill that remain readable after the primary region is lost. See [decision 0009](docs/decisions/0009-cluster-metrics.md) and the [worklog](docs/worklogs/04b-cluster-metrics.md).
 
-- [ ] Send node, pod, and Kubernetes object metrics from each cluster to Grafana Cloud through Flux.
+- [x] Send node, pod, and Kubernetes object metrics from each cluster to Grafana Cloud through Flux.
 
 **Gate:** The monitoring release is Ready; Grafana Cloud shows both nodes and the service pods for `cluster="primary"`; active series stay under the free-tier limit; node memory requests stay below 80% of allocatable.
 
