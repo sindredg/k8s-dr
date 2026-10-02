@@ -1,4 +1,6 @@
-# 6. Backup and restore
+# 9. Backup and restore
+
+Status: built and validated on the primary cluster, including a test restore. Restoring into a recovery cluster is milestone 5.
 
 Every hour a CronJob captures the database and the Gitea volume as one consistent set, encrypts it, and uploads it to a bucket in another region. A restore Job reverses it. This is the only path by which data leaves the primary region.
 
@@ -38,7 +40,7 @@ primary/20260929T170701Z/
   manifest.json
 ```
 
-The prefix is the cluster name and the set name is its UTC start time. `manifest.json` lists each file's SHA-256 and size and is written last, so a set without a manifest is incomplete and a restore ignores it.
+The prefix is the cluster name from the [cluster settings](04-flux.md#per-cluster-settings), so the primary writes under `primary/` and a recovery cluster under `recovery/`. The set name is its UTC start time. `manifest.json` lists each file's SHA-256 and size and is written last, so a set without a manifest is incomplete and a restore ignores it.
 
 ## Encryption
 
@@ -55,6 +57,10 @@ Each archive is encrypted to two age public keys before it leaves the pod: a bac
 | Versioning and soft delete | On; soft delete keeps removed objects for 7 days |
 
 The Job gets its token from the metadata server. No service account key exists.
+
+### Fencing
+
+After a failover, the operator removes `primary` from `backup_clusters` in `infra/shared` and applies it. A primary that comes back can then no longer write backups, and a restore never has to choose between two clusters' sets under one prefix.
 
 ## Alerting
 
@@ -78,7 +84,7 @@ Everything above the scale-down changes nothing, so a wrong key or a damaged set
 
 The backup age private key is sent from the operator machine into a Secret that exists only while the Job runs. The playbook suspends the backup CronJob for the duration and deletes the Secret afterwards, even on failure.
 
-The namespace has no default. `gitea` replaces a live service; `gitea-restore` is a test copy.
+The namespace has no default. `gitea` replaces a live service; `gitea-restore` is a test copy. A restore reads the `primary/` prefix by default, whichever cluster runs it, which is what a recovery cluster needs.
 
 ## Test restores
 
@@ -90,5 +96,7 @@ The namespace has no default. `gitea` replaces a live service; `gitea-restore` i
 - The retention policy is unlocked.
 - Test restores are run by hand, not on a schedule.
 - Gitea is unavailable for a few seconds every hour.
+
+A recovery cluster starts its own hourly backups as soon as Flux deploys the CronJob, before any data is restored. Those early sets hold an empty service; they land under `recovery/` and do not affect a restore from `primary/`.
 
 See [decision 0007](../decisions/0007-consistent-backups.md) and the [backup and restore runbook](../runbooks/backup-restore.md).

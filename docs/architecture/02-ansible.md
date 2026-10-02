@@ -1,6 +1,8 @@
 # 2. Ansible
 
-Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, and runs the operator's routine checks. It runs on the operator machine. Nothing is installed on the nodes to support it beyond SSH and Python.
+Status: built for the primary cluster. Selecting a cluster with `CLUSTER` is designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
+
+Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, and runs the operator's routine checks. The same playbook builds the primary and the recovery cluster. It runs on the operator machine. Nothing is installed on the nodes to support it beyond SSH and Python.
 
 ## How it reaches the nodes
 
@@ -29,6 +31,10 @@ sequenceDiagram
 | `ansible.cfg` | Points at the generated inventory, keeps caches inside the repository, and turns on SSH pipelining. |
 
 The inventory and `known_hosts` are generated files and are ignored by Git.
+
+### Choosing the cluster
+
+One variable, `CLUSTER`, selects the Terraform root, the inventory, the Flux cluster directory, and the default hostname for the fixture checks. It defaults to `primary`; recovery commands set `CLUSTER=recovery`. Each cluster has its own inventory file, so a stale inventory cannot send a recovery command to the primary.
 
 ## The bootstrap playbook
 
@@ -73,7 +79,7 @@ Every version is pinned in `ansible/playbooks/group_vars/all.yml`: Kubernetes, c
 | `make bootstrap` | Build or repair the cluster |
 | `make validate-cluster` | Read-only: nodes, add-ons, Flux |
 | `make validate-services` | Read-only: certificates, PostgreSQL, Gitea, routes, policies |
-| `make restore` | Run the [restore Job](06-backup-and-restore.md) |
+| `make restore` | Run the [restore Job](09-backup-and-restore.md) |
 | `make restore-test-env` | Create or delete the test restore namespaces |
 
 | Runs locally against the public endpoint | Purpose |
@@ -81,7 +87,7 @@ Every version is pinned in `ansible/playbooks/group_vars/all.yml`: Kubernetes, c
 | `make create-fixtures` | Create the fixture user, repository, commit, and issue |
 | `make check-fixtures` | Read-only: prove the fixtures exist |
 | `make write-check` | Push a commit and print its time, for the data-loss measurement |
-| `make surface` | Probe the [public surface](07-monitoring-and-checks.md) |
+| `make surface` | Probe the [public surface](11-monitoring-and-checks.md) |
 
 ## How secrets pass through
 

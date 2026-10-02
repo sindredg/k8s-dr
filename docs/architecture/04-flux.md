@@ -1,5 +1,7 @@
 # 4. Flux
 
+Status: built on the primary cluster. The shared `deploy/sync` directory and `deploy/clusters/recovery` are designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built; today the sync definition is `deploy/clusters/primary/sync.yaml`.
+
 Flux makes the cluster match the `deploy/` directory on the `main` branch. Nobody runs `kubectl apply` for the application: a merge is the deployment.
 
 ## The loop
@@ -27,17 +29,17 @@ Flux reads the public repository anonymously over HTTPS. It holds no GitHub cred
 
 ## How it is installed and managed
 
-The Ansible `flux` role applies the pinned Flux release, creates the `sops-age` Secret, and applies one `GitRepository` and one root `Kustomization` that points at `deploy/clusters/primary`. From then on Flux manages itself from Git, and Ansible only touches it again to rotate the key or change the branch.
+The Ansible `flux` role applies the pinned Flux release, creates the `sops-age` Secret, and applies one `GitRepository` and one root `Kustomization` that points at `deploy/clusters/<cluster>`. From then on Flux manages itself from Git, and Ansible only touches it again to rotate the key or change the branch.
 
 To test a branch before merging, run `make bootstrap FLUX_GIT_BRANCH=<branch>`.
 
 ## The Kustomization tree
 
-The root Kustomization applies `deploy/clusters/primary`, which defines five more. Each is applied and health-checked on its own.
+The root Kustomization applies the cluster's directory, which holds two things: that cluster's settings, and a reference to `deploy/sync`, the list of Kustomizations every cluster runs. Because both clusters read the same list, a recovery cluster cannot drift from the primary's layout. Each Kustomization is applied and health-checked on its own.
 
 ```mermaid
 flowchart TB
-    root["flux-system<br/>deploy/clusters/primary"] --> infra["infrastructure<br/>cert-manager, Traefik policy"]
+    root["flux-system<br/>deploy/clusters/primary or recovery"] --> infra["infrastructure<br/>cert-manager, Traefik policy"]
     root --> pg["postgresql"]
     root --> mon["monitoring"]
     infra --> certs["certificates<br/>issuers, Cloudflare token, git-tls"]
@@ -57,7 +59,15 @@ Arrows are `dependsOn`: a Kustomization is not applied until the ones it depends
 
 ## Per-cluster settings
 
-`deploy/clusters/primary/cluster-settings.yaml` is a ConfigMap with the values that differ between clusters: the hostname, the certificate issuer, the backup prefix, and the cluster name. Flux substitutes them into manifests as `${git_host}` and similar. A recovery cluster gets its own directory and settings and reuses everything else.
+Each cluster directory has a `cluster-settings.yaml` ConfigMap with the only values that differ between clusters. Flux substitutes them into manifests as `${git_host}` and similar. Everything else under `deploy/` is shared.
+
+| Setting | Primary | Recovery | Used for |
+| --- | --- | --- | --- |
+| `git_host` | `git.sindrg.com` | `git.sindrg.com` | The public name, Gitea's URLs, and a certificate |
+| `git_cluster_host` | `git-primary.sindrg.com` | `git-dr.sindrg.com` | Reaching one cluster directly, and a second certificate |
+| `git_issuer` | Production | Production, or staging for rebuild tests | Which Let's Encrypt issuer signs the certificates |
+| `backup_cluster` | `primary` | `recovery` | The prefix this cluster writes backups under |
+| `cluster_name` | `primary` | `recovery` | The label on its metrics |
 
 ## Secrets
 
@@ -79,13 +89,7 @@ Every Kustomization has `prune: true`: deleting a manifest from Git deletes the 
 
 ## Charts
 
-| Release | Chart version | Source |
-| --- | --- | --- |
-| cert-manager | v1.21.2 | Jetstack |
-| Gitea | 12.7.0 | Gitea |
-| k8s-monitoring | 4.5.2 | Grafana |
-
-Chart versions are pinned. The PostgreSQL and backup tool images are pinned by digest; the `busybox` init container is pinned by tag only.
+Three of the Kustomizations contain a `HelmRelease`. The [Helm page](05-helm.md) covers how those work.
 
 ## Limits
 

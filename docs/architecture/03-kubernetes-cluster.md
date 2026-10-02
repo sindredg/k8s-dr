@@ -1,6 +1,8 @@
 # 3. Kubernetes cluster
 
-A kubeadm cluster with one control-plane node and one worker. This page covers what runs on the nodes before any application: the runtime, pod networking, storage, and the ingress proxy.
+Status: built on the primary cluster. A recovery cluster is the same cluster built from the same code.
+
+A kubeadm cluster with one control-plane node and one worker. This page covers what runs on the nodes before any application: the runtime, pod networking, network policies, and storage. The ingress proxy has [its own page](06-traffic-and-certificates.md).
 
 ## Nodes
 
@@ -45,9 +47,34 @@ The inventory script refuses to continue if any two overlap.
 
 ## Pod networking
 
-Calico, installed by the Tigera operator. Pods on different nodes talk through a VXLAN overlay, so the VPC needs no routes for pod addresses. BGP is off. Calico also enforces the Kubernetes NetworkPolicy objects described on the [service page](05-service.md).
+Calico, installed by the Tigera operator. Pods on different nodes talk through a VXLAN overlay, so the VPC needs no routes for pod addresses. BGP is off. Calico also enforces Kubernetes NetworkPolicy objects.
 
 Traffic between pods is not encrypted. It stays inside one VPC.
+
+## Network policies
+
+The `gitea` and `postgresql` namespaces deny all traffic by default. These are the only flows allowed.
+
+```mermaid
+flowchart LR
+    traefik["Traefik"] -- "3000" --> gitea["Gitea"]
+    gitea -- "5432" --> pg["PostgreSQL"]
+    backup["Backup and restore Job"] -- "5432" --> pg
+    backup -- "443, 6443" --> out["Cloud Storage, Healthchecks.io, Kubernetes API"]
+    backup -- "80" --> meta["Metadata server"]
+    gitea -. "53" .-> dns["Cluster DNS"]
+    pg -. "53" .-> dns
+```
+
+| Namespace | Policy |
+| --- | --- |
+| `gitea`, `postgresql` | Default deny, plus the flows above |
+| `traefik` | Egress only to cluster DNS, the Kubernetes API, and Gitea |
+| `cert-manager`, `monitoring` | All egress except the metadata server |
+| `flux-system` | Flux's own policies, which allow all egress |
+| `kube-system`, Calico, Local Path Provisioner | None |
+
+The metadata server matters because it hands the node's service account token to any pod that can reach it. Only the backup and restore Job needs that token. Flux owns every policy, so a recovery cluster gets the same ones. A unit test compares the allowed flows to a fixed list.
 
 ## Storage
 
@@ -58,21 +85,7 @@ flowchart LR
 
 The Local Path Provisioner turns each claim into a directory on the worker's dedicated data disk. The disk is separate from the boot disk, so rebuilding the VM keeps the data. The provisioner is restricted to the worker node and to that one path.
 
-This is node-local storage. It does not replicate, and a volume cannot move to another node. The [offsite backup](06-backup-and-restore.md) is the only copy outside the region.
-
-## Ingress proxy
-
-Traefik is the single way in. It runs on the worker and binds host ports 80 and 443, which is where the load balancer delivers traffic.
-
-| Setting | Value |
-| --- | --- |
-| Routing API | Gateway API only. The Ingress and Traefik CRD providers are off. |
-| Entry points | `web` on 8000 and `websecure` on 8443 inside the pod, exposed as host ports 80 and 443 |
-| Internal check port | NodePort 30080 for the HTTP entry point, reachable only inside the VPC |
-| Dashboard | Off |
-| Update strategy | Replace the pod, because two pods cannot bind the same host ports |
-
-Ansible installs Traefik with Helm because Flux depends on nothing here, but the certificates and routes that Traefik serves come from Flux.
+This is node-local storage. It does not replicate, and a volume cannot move to another node. The [offsite backup](09-backup-and-restore.md) is the only copy outside the region.
 
 ## Who installs what
 

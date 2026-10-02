@@ -4,7 +4,7 @@ Recover a stateful service after losing a region. This lab runs Gitea and Postgr
 
 The first target is recovery within a few hours. Faster recovery is a later experiment, based on the measured bottlenecks.
 
-**Status:** milestones 0 to 4 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups; a test restore took 43 seconds. Next is cold recovery in the second region. See [plan.md](plan.md).
+**Status:** milestones 0 to 4 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups; a test restore took 43 seconds. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. Cold recovery in the second region (milestone 5) is in progress: designed, not built. See [plan.md](plan.md).
 
 ## Target architecture
 
@@ -28,9 +28,13 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | --- | --- |
 | Terraform | VM, network, load balancer, and backup infrastructure |
 | Ansible and kubeadm | VM configuration, Kubernetes bootstrap, and the add-ons Flux depends on |
-| Flux and Helm | Deploy and reconcile the application layer from GitHub: cert-manager, PostgreSQL, and Gitea |
+| Flux and Helm | Deploy and reconcile the application layer from GitHub: cert-manager, PostgreSQL, Gitea, backups, monitoring, and network policies |
+| Traefik and cert-manager | Route HTTPS through the Gateway API with Let's Encrypt certificates |
+| SOPS and age | Keep secrets encrypted in the public repository; encrypt backups to keys the cluster does not hold |
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
-| Offsite object storage | Hourly encrypted application backups |
+| Offsite object storage | Hourly encrypted application backups, with a Healthchecks.io heartbeat that alerts when they stop |
+| Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
+| GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, and a daily scan of the public surface |
 | External health probe | Measure outage and restored service (planned before the drill) |
 
 ## Recovery test
