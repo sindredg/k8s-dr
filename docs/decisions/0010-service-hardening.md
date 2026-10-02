@@ -81,4 +81,4 @@ Each needs its own decision record.
 1. **Detection.** The cluster ships metrics only. There is no API server audit log, no Gitea or Traefik access log outside the node, and no alert, so a compromise inside the cluster would go unnoticed.
 2. **The in-cluster SOPS key.** `flux-system/sops-age` decrypts every secret in the public repository, and the same key encrypts `recovery/`. A separate operator key for `recovery/` would limit what a cluster compromise reveals.
 3. **The Cloudflare token.** It can edit the whole `sindrg.com` zone. A delegated subzone for ACME challenges would limit it.
-4. **Project isolation.** The project also holds a Firebase service account with a project-level token creator role, and a `default` network with SSH and RDP open to the internet. No VM uses that network. Removing both is an operator action outside Terraform.
+4. **Project isolation.** The project also holds a Firebase service account with a project-level token creator role. It has no keys. The binding stays for now as an accepted risk; a dedicated project for the lab would remove it. The `default` network's SSH and RDP rules were deleted on 2026-10-02.

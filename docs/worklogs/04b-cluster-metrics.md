@@ -1,6 +1,6 @@
 # Cluster metrics before milestone 6
 
-Status: Implemented; validated on 2026-10-01 except the active series count.
+Status: Complete. The gate passed on 2026-10-02.
 
 ## Scope
 
@@ -52,7 +52,7 @@ On 2026-10-01, after `main` reached `9f3ef3c`:
 | 2. Flux | `monitoring` Kustomization `Ready=True` at `main@sha1:9f3ef3c`; HelmRelease `k8s-monitoring` `Ready=True`, chart 4.5.2 installed |
 | 3. Workloads | `alloy-metrics-0` (2/2), the Alloy operator, kube-state-metrics, and one node-exporter per node, all `Running` with 0 restarts |
 | 4. Grafana Cloud | Cluster `primary` with 2 nodes and 13 namespaces, including `gitea` and `postgresql` with workloads and memory usage |
-| 5. Active series | Not recorded |
+| 5. Active series | About 2,750, rising to about 3,090, on 2026-10-02; under the 10,000 limit |
 | 6. Node memory | Control plane 124Mi (3%), worker 1462Mi (38%); both below 80% |
 
 ![The monitoring Kustomization Ready at the merged revision](../images/metrics-flux-kustomization.png)
@@ -77,4 +77,8 @@ The Kubernetes Overview page counts 1 cluster, 2 nodes, 13 namespaces, 25 worklo
 
 ![The Kubernetes Overview counts, with no data on the Pods tile](../images/metrics-grafana-overview.png)
 
-The plan step stays open until the active series count is recorded: run `count({cluster="primary"})` in Explore and expect well under 10,000.
+### Active series
+
+On 2026-10-02, `count({cluster="primary"})` in Explore stayed near 2,750 for 25 minutes and then rose to about 3,090. Both values are well under the free-tier limit of 10,000. The cause of the rise is not confirmed.
+
+![The active series count over 30 minutes, between 2,750 and 3,090](../images/metrics-active-series.png)

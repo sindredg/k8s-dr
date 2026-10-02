@@ -1,6 +1,6 @@
 # 0009: Cluster metrics in Grafana Cloud
 
-Status: Proposed on 2026-09-30.
+Status: Accepted on 2026-09-30. Implemented on the primary cluster on 2026-10-01.
 
 Date: 2026-09-30
 
