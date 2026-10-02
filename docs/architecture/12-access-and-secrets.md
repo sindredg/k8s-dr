@@ -1,4 +1,6 @@
-# 8. Access and secrets
+# 12. Access and secrets
+
+Status: built. A recovery cluster uses the same identities and keys.
 
 Who can do what, which keys exist, and what each one unlocks.
 
@@ -28,7 +30,7 @@ Nothing else has administrative access. There are no service account keys, no SS
 
 | Identity | Can do | Cannot do |
 | --- | --- | --- |
-| Worker node service account | Read the backup bucket; create objects under its own prefix | Delete or overwrite backups; call any other Google API |
+| Worker node service account, one per cluster | Read the backup bucket; create objects under its own cluster's prefix | Delete or overwrite backups; call any other Google API |
 | Control-plane node service account | Nothing; it has no API scope | |
 | Flux | Read the public repository anonymously; cluster admin inside the cluster | Write to Git |
 | Backup Job service account | Scale the `gitea` Deployment and read pods in its namespace | Anything else in the cluster |

@@ -1,6 +1,8 @@
 # 1. Infrastructure
 
-Terraform creates everything in Google Cloud: the buckets, the network, the two VMs, and the load balancer. It creates nothing inside the VMs; that is [Ansible's job](02-ansible.md).
+Status: the bootstrap, shared, and primary roots are built. The recovery root is designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
+
+Terraform creates everything in Google Cloud: the buckets, the networks, the VMs, and the load balancers. It creates nothing inside the VMs; that is [Ansible's job](02-ansible.md).
 
 ## Roots
 
@@ -13,9 +15,11 @@ flowchart LR
     shared --> iam["Project IAM for the administrator"]
     primary["infra/primary"] --> module["modules/regional_cluster"]
     primary --> disk["Worker data disk"]
-    recovery["infra/recovery, planned"] -.-> module
+    recovery["infra/recovery"] --> module
+    recovery --> rdisk["Recovery data disk"]
     statebucket -. "holds the state of" .-> shared
     statebucket -. "holds the state of" .-> primary
+    statebucket -. "holds the state of" .-> recovery
 ```
 
 | Root | Creates | Lifetime |
@@ -23,13 +27,15 @@ flowchart LR
 | `infra/bootstrap` | The state bucket and the operator's access to it | Permanent. Starts with local state, then migrates into the bucket it created. |
 | `infra/shared` | The backup bucket, its IAM, and the administrator's IAP, OS Login, and instance admin roles | Permanent. Shared by every region. |
 | `infra/primary` | The Finland cluster through the module, plus the worker data disk | Permanent. The data disk has `prevent_destroy`. |
-| `infra/recovery` (planned) | The Belgium cluster through the same module | Created for a drill, destroyed afterwards. |
+| `infra/recovery` | The Belgium cluster through the same module, plus its own data disk | Created for a drill or a disaster, destroyed afterwards. Its disk has no `prevent_destroy`. |
 
 Both buckets are in Belgium (`europe-west1`), so losing Finland loses neither the state nor the backups. Each root stores its state under its own prefix in the state bucket.
 
+The recovery root mirrors the primary root: the same module, the same outputs, a different region, name prefix, and subnet. Nothing in it refers to a primary resource, so it applies while Finland is down.
+
 ## What the module creates
 
-`modules/regional_cluster` is one cluster in one region. The primary and the planned recovery root call it with different inputs.
+`modules/regional_cluster` is one cluster in one region. The primary and recovery roots call it with different inputs, so the two clusters cannot drift apart.
 
 ```mermaid
 flowchart TB
@@ -69,7 +75,9 @@ Nothing else reaches the nodes. The Kubernetes API listens on the control plane'
 
 ## How it connects to the next layer
 
-`make inventory` reads the root's outputs (instance names, private addresses, project, zone, subnet) and writes the Ansible inventory. Terraform and Ansible share nothing else.
+`make inventory` reads the selected root's outputs (instance names, private addresses, project, zone, subnet) and writes the Ansible inventory for that cluster. Terraform and Ansible share nothing else.
+
+The backup bucket's access list, `backup_clusters` in `infra/shared`, names each cluster's worker service account. A recovery worker is added after its root is applied, because the grant needs the account to exist.
 
 ## Limits
 

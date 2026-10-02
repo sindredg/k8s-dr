@@ -1,4 +1,6 @@
-# 7. Monitoring and checks
+# 11. Monitoring and checks
+
+Status: built, except the external uptime probe, which [decision 0002](../decisions/0002-recovery-contract.md) requires and which is not chosen yet.
 
 What watches the system, from inside and from outside, and what does not.
 
@@ -28,6 +30,7 @@ flowchart LR
     end
 
     surface -- "probe from outside" --> cluster
+    probe["Uptime probe, every minute"] -- "probe from outside" --> cluster
     gha -- "mail on failure" --> owner
 ```
 
@@ -35,6 +38,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | Cluster metrics | In the cluster, stored in Grafana Cloud | Node, pod, and object state, during and after a failure | No |
 | Backup heartbeat | Healthchecks.io | Whether a backup completed in the last two hours | Yes |
+| Uptime probe | An external service, every minute | When the service stopped answering and when it came back | Yes |
 | Public surface scan | GitHub Actions, daily | Whether the outside view has regressed | Yes, by workflow failure mail |
 | Pin check | GitHub Actions, weekly | Whether a pinned download has disappeared upstream | Yes, by workflow failure mail |
 | Validation playbooks | Operator machine, on demand | Whether the cluster and service are healthy now | No |
@@ -43,7 +47,11 @@ flowchart LR
 
 Flux installs Grafana's `k8s-monitoring` chart into the `monitoring` namespace. One Alloy collector scrapes the kubelet, cAdvisor, node-exporter, and kube-state-metrics and sends the result to Grafana Cloud. The data lives outside both regions, so the dashboards survive the loss of the cluster they describe.
 
-Only metrics are collected. Logs, traces, and the chart's own telemetry are off. The collector configuration is in Git, not in the Grafana Cloud UI, so a recovery cluster gets the same one. Metrics are labelled with the cluster name from the cluster settings.
+Only metrics are collected. Logs, traces, and the chart's own telemetry are off. The collector configuration is in Git, not in the Grafana Cloud UI, so a recovery cluster gets the same one. Metrics are labelled with the cluster name from the cluster settings, so the primary and a recovery cluster appear side by side in the same dashboards.
+
+## Uptime probe
+
+An external probe requests the public endpoint every minute. Its first failed check starts the recovery clock and its first success after cutover helps stop it, so it must run outside both regions. It uses `/api/healthz`, which stays open without sign-in. The service that runs it is not chosen yet.
 
 ## Public surface scan
 
@@ -78,7 +86,6 @@ The unit tests in `tests/` read the manifests, the Terraform module, and the Ans
 ## Not covered
 
 - **Logs.** No API server audit log, and no Gitea or Traefik access log leaves the node. A compromise inside the cluster would not be noticed.
-- **Uptime.** No external probe measures availability minute by minute. One is planned before the drill, because it measures recovery time.
 - **Metric alerts.** Nothing alerts on node health, disk usage, or a failed Flux reconcile.
 
 See [decision 0009](../decisions/0009-cluster-metrics.md) and [decision 0010](../decisions/0010-service-hardening.md).
