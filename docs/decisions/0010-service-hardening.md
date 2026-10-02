@@ -63,7 +63,6 @@ The script has three outcomes. A probe that could not run is inconclusive and ne
 | Open finding | State |
 | --- | --- |
 | `hsts` | No `Strict-Transport-Security` header. A response header filter on the HTTPS route can add it. |
-| `caa` | No CAA record in `sindrg.com`, so any certificate authority may issue for the zone. The fix is a DNS record for `letsencrypt.org`. |
 
 Trade-off: the check sees only what an outside client sees. During a drill it probes whichever cluster `git.sindrg.com` points to, and reports inconclusive results while neither answers.
 

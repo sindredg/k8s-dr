@@ -170,3 +170,19 @@ gitea-backup-29847067   Complete   1/1           30s        126m
 gitea-backup-29847127   Complete   1/1           30s        66m
 gitea-backup-29847187   Complete   1/1           31s        6m15s
 ```
+
+### CAA record
+
+On 2026-10-02, two CAA records were added to `sindrg.com` in Cloudflare: Let's Encrypt may issue certificates, and no authority may issue wildcard certificates.
+
+```text
+$ dig +short CAA sindrg.com
+0 issuewild ";"
+0 issue "letsencrypt.org"
+```
+
+![The two CAA records in the Cloudflare zone](../images/hardening-caa-cloudflare.png)
+
+![dig returning the two CAA records](../images/hardening-caa-dig.png)
+
+`make surface` then reported `RESOLVED caa`. With the line removed from `KNOWN_OPEN`, it reports 13 ok and 1 known open (`hsts`).
