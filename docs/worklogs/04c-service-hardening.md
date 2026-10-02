@@ -186,3 +186,19 @@ $ dig +short CAA sindrg.com
 ![dig returning the two CAA records](../images/hardening-caa-dig.png)
 
 `make surface` then reported `RESOLVED caa`. With the line removed from `KNOWN_OPEN`, it reports 13 ok and 1 known open (`hsts`).
+
+### Default network rules
+
+On 2026-10-02, `gcloud compute firewall-rules delete default-allow-ssh default-allow-rdp` removed the two rules that opened SSH and RDP to the internet on the unused `default` network. Afterwards:
+
+```text
+$ gcloud compute firewall-rules list --format='table(name,network,sourceRanges.list(),allowed[].map().firewall_rule().list())'
+NAME                         NETWORK            SOURCE_RANGES    ALLOW
+default-allow-icmp           default            0.0.0.0/0        icmp
+default-allow-internal       default            10.128.0.0/9     tcp:0-65535,udp:0-65535,icmp
+k8sdr-primary-iap-ssh        k8sdr-primary-vpc  35.235.240.0/20  tcp:22
+k8sdr-primary-node-internal  k8sdr-primary-vpc  10.42.0.0/24     icmp,udp,tcp
+k8sdr-primary-public-web     k8sdr-primary-vpc  0.0.0.0/0        tcp:80,tcp:443
+```
+
+The Firebase service account's token creator role stays as an accepted risk. See [decision 0010](../decisions/0010-service-hardening.md#not-decided).
