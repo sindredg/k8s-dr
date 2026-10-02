@@ -4,6 +4,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 
 | Document | Purpose |
 | --- | --- |
+| [Architecture](architecture/README.md) | Explain how each layer works and connects, with diagrams: infrastructure, Ansible, the cluster, Flux, the service, backups, monitoring, and access. |
 | [Primary infrastructure worklog](worklogs/01-primary-infrastructure.md) | Record milestone 1 changes and validation. |
 | [Kubernetes bootstrap worklog](worklogs/02-kubernetes-bootstrap.md) | Record milestone 2 changes and validation. |
 | [Service deployment worklog](worklogs/03-service-deployment.md) | Record milestone 3 preparation, changes, and validation. |
