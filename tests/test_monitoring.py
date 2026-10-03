@@ -19,6 +19,19 @@ def _release():
     return _documents(MONITORING / "release.yaml")[0]
 
 
+class UptimeProbeTests(unittest.TestCase):
+    def test_probe_checks_the_public_name_every_minute_with_tls_validation(self):
+        # Decision 0002 measures the RTO from a one-minute external probe. An
+        # invalid certificate on a recovery cluster must not count as up.
+        shared = Path("infra/shared/main.tf").read_text()
+        probe = shared[shared.index('resource "google_monitoring_uptime_check_config" "git"'):]
+        for setting in ('period       = "60s"', 'path         = "/api/healthz"', "validate_ssl = true"):
+            with self.subTest(setting=setting):
+                self.assertIn(setting, probe)
+        self.assertIn("host       = var.probe_host", probe)
+        self.assertIn('default     = "git.sindrg.com"', Path("infra/shared/variables.tf").read_text())
+
+
 class MonitoringKustomizationTests(unittest.TestCase):
     def test_monitoring_is_independent_of_the_service(self):
         # A failed chart or an unreachable Grafana Cloud must not block Gitea,
