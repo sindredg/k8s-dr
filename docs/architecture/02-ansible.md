@@ -1,6 +1,6 @@
 # 2. Ansible
 
-Status: built for the primary cluster. Selecting a cluster with `CLUSTER` is designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
+Status: built for the primary cluster. `CLUSTER` selects the cluster ([decision 0008](../decisions/0008-cold-recovery.md)); no playbook has run against a recovery cluster.
 
 Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, and runs the operator's routine checks. The same playbook builds the primary and the recovery cluster. It runs on the operator machine. Nothing is installed on the nodes to support it beyond SSH and Python.
 

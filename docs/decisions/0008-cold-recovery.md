@@ -73,5 +73,31 @@ Before the gate checks, stop both primary VMs with `gcloud compute instances sto
 
 ## Known limits
 
-- The recovery cluster's hourly backup CronJob starts with the bootstrap, so a set taken before the restore contains an empty service. Restore reads the `primary/` prefix, so this does not affect milestone 5. Failback in a later milestone must pick a set taken after the restore.
+- (Superseded by the amendment below.) The recovery cluster's hourly backup CronJob starts with the bootstrap, so a set taken before the restore contains an empty service. Restore reads the `primary/` prefix, so this does not affect milestone 5. Failback in a later milestone must pick a set taken after the restore.
 - Gitea answers requests for `git_cluster_host` but writes `git.sindrg.com` into links and redirects. The fixture checks use the API and Git over HTTPS, which follow the requested host. The gate confirms this.
+
+## Amendment: recovery backups stay suspended until the cutover
+
+Date: 2026-10-03
+
+A backup taken on a recovery cluster before its restore would publish a complete but empty `recovery/` set. It would also ping the Healthchecks.io check that both clusters share, and silence the alert for the primary's missing backups while the primary is down.
+
+`cluster-settings` therefore carries `backup_suspend`, which sets `suspend` on the backup CronJob. The primary sets `"false"` and the recovery cluster `"true"`.
+
+| Phase | Recovery CronJob | Heartbeat |
+| --- | --- | --- |
+| Bootstrap to verified restore | Suspended | Alerts for the stopped primary |
+| Milestone 5 gate, no cutover | Suspended | Alerts until the primary restarts |
+| After a DNS cutover in a drill or a real loss | Enabled by a reviewed change of `backup_suspend` to `"false"` in `deploy/clusters/recovery/cluster-settings.yaml` | The recovery cluster pings the same check, which then reports on the serving cluster |
+
+The recovery cluster keeps the prefix `recovery/` and the shared ping URL in both phases. One check for the serving cluster needs no second credential. Its limit is that it cannot tell which cluster sent a ping.
+
+`restore.yml` resumes the CronJob only if it was running before the restore, so a restore cannot enable backups as a side effect. A failed restore leaves them suspended.
+
+| Option | Trade-off |
+| --- | --- |
+| A settings key that Flux substitutes (selected) | One reviewed line enables backups. Flux owns the field, so `kubectl patch` does not persist. |
+| A recovery-only overlay that deletes the CronJob | No new key, but the recovery cluster would need its own Flux path, which the shared sync definition removes. |
+| A second Healthchecks.io check for the recovery cluster | Separates the two heartbeats, but adds a credential that the recovery store must hold and a check that is silent most of the time. |
+
+The milestone 5 gate checks that a bootstrap and a restore leave the CronJob suspended and write no `recovery/` object. The milestone 6 drill exercises the change that enables it.

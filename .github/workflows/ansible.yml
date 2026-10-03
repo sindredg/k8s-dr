@@ -36,3 +36,5 @@ jobs:
       - run: terraform -chdir=infra/shared validate -no-color
       - run: terraform -chdir=infra/primary init -backend=false -input=false
       - run: terraform -chdir=infra/primary validate -no-color
+      - run: terraform -chdir=infra/recovery init -backend=false -input=false
+      - run: terraform -chdir=infra/recovery validate -no-color

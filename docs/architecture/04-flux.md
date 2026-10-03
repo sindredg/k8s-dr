@@ -1,6 +1,6 @@
 # 4. Flux
 
-Status: built on the primary cluster. `deploy/clusters/recovery` and the `git_cluster_host` setting are designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
+Status: built on the primary cluster. `deploy/clusters/recovery` is written ([decision 0008](../decisions/0008-cold-recovery.md)) and has not been applied to a cluster.
 
 Flux makes the cluster match the `deploy/` directory on the `main` branch. Nobody runs `kubectl apply` for the application: a merge is the deployment.
 

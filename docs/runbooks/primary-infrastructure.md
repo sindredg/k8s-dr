@@ -162,6 +162,7 @@ Prices vary by billing currency, discounts, and traffic. Use the [Google Cloud p
 
 The calculator may show NAT and egress outside the Compute Engine section. Include them once. Exclude tax and promotional credits from the estimate, and note your billing account's actual currency. Backup volume, state versions, snapshots, storage operations, load balancer data processing, and future recovery drills can increase cost. The buckets remain billable after the VMs stop.
 
-## Future Belgium cluster
+## Recovery root
 
-Milestone 5 can instantiate `infra/modules/regional_cluster` from a separate recovery root and GCS state prefix. Pass a Belgium region and zone, a new VPC name prefix, and a non-overlapping CIDR. The recovery root creates its own worker data disk and can leave it unprotected so a drill can be destroyed. The module creates the VPC, NAT, service accounts, and VMs. The recovery root consumes no Finland VM, network, or state outputs, and it must expose the same outputs as `infra/primary` so the inventory script works unchanged. The project-level administrator grants and the backup bucket stay in `infra/shared`. Retrieve verified application backups from the Belgium bucket using the independently stored recovery identity. No recovery VMs are defined in milestone 1.
+`infra/recovery` instantiates the same `infra/modules/regional_cluster` module in Belgium with its own state prefix, name prefix, and subnet. It reads no Finland VM, network, or state output, exposes the same outputs as `infra/primary`, and owns an unprotected worker data disk so a drill can be destroyed. The project-level administrator grants and the backup bucket stay in `infra/shared`. See the [regional recovery runbook](regional-recovery.md) for the commands.
+
