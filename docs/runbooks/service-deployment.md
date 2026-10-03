@@ -269,7 +269,7 @@ Three make targets run on the operator machine against the public HTTPS endpoint
 | `make check-fixtures` | No | Fails unless the fixture user signs in, the repository exists, the recorded commit is on the default branch, and the recorded issue has the expected title. Prints the newest commit on the default branch. |
 | `make write-check` | Yes | Pushes one new commit as the fixture user and prints the UTC time the push was accepted. That time is the last acknowledged write for the RPO measurement. |
 
-The targets use `git_host` from `deploy/clusters/primary/cluster-settings.yaml`. To check another endpoint, such as the recovery host, set `GIT_HOST`:
+The targets use `git_host` from the `cluster-settings.yaml` of `CLUSTER`, which is `git.sindrg.com` on both clusters. To reach one cluster directly, set `GIT_HOST` to its own name:
 
 ```bash
 make check-fixtures GIT_HOST=git-dr.sindrg.com

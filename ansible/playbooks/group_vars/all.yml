@@ -18,7 +18,7 @@ traefik_http_node_port: 30080
 # Flux reads this public repository anonymously; see decision 0006.
 flux_git_url: "https://github.com/sindredg/k8s-dr.git"
 flux_git_branch: "main"
-# Selects deploy/clusters/<name>. The recovery cluster overrides it.
+# Selects deploy/clusters/<name>. The Makefile passes CLUSTER.
 flux_cluster: "primary"
 # The Flux controllers this project uses. install.yaml also ships the idle
 # image automation controllers.

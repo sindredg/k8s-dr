@@ -37,6 +37,14 @@ Checked before the merge: `kubectl kustomize deploy/apps/gitea`, substituted wit
 
 Not yet shown on a cluster: that the existing `git.sindrg.com` listeners keep serving while `git-cluster-tls` is being issued. A first install has the same order (the Gateway exists before `git-tls` does), so this is expected to hold.
 
+### Cluster selection and recovery settings
+
+- `CLUSTER ?= primary` in the `Makefile` selects the Terraform root `infra/$(CLUSTER)`, the inventory `ansible/inventory/generated/$(CLUSTER)/hosts.json`, the Flux directory through `flux_cluster`, and the settings file that gives the fixture targets their default host.
+- The inventory moved from `ansible/inventory/generated/hosts.json` to a directory per cluster. The IAP runner keeps `known_hosts` beside the inventory, so host keys are per cluster too. Run `make inventory` once after this change to write the primary inventory at its new path.
+- `deploy/clusters/recovery/` holds the recovery settings: `git_host` `git.sindrg.com`, `git_cluster_host` `git-dr.sindrg.com`, backup prefix `recovery`, and `backup_suspend` `"true"`.
+
+Checked before the merge: `make -n bootstrap CLUSTER=recovery` prints the recovery inventory and `-e flux_cluster=recovery`; `kubectl kustomize deploy/clusters/recovery` renders the same five Flux Kustomizations as the primary.
+
 ## Gate
 
 Not run. The steps are added with the changes they check.

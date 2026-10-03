@@ -3,7 +3,11 @@
 # Real identifiers are read from Terraform and gcloud at run time and are
 # never stored here.
 
-TF_DIR ?= infra/primary
+# Selects the Terraform root, the generated inventory, the Flux cluster
+# directory, and the default fixture host. Recovery commands set
+# CLUSTER=recovery. See decision 0008.
+CLUSTER ?= primary
+TF_DIR ?= infra/$(CLUSTER)
 SSH_KEY ?= $$HOME/.ssh/google_compute_engine
 # Age private key that decrypts the SOPS files. Flux receives it at bootstrap;
 # the fixture targets use it locally. Keep it outside the repository and in the
@@ -20,13 +24,16 @@ RESTORE_NAMESPACE ?=
 RESTORE_SET ?=
 # Branch Flux reconciles. Override it to test a pushed branch before merging.
 FLUX_GIT_BRANCH ?= main
-# Endpoint for the fixture targets. Empty means git_host from the primary
-# cluster settings; a drill sets the recovery host.
+# Endpoint for the fixture targets. Empty means git_host from the settings
+# of CLUSTER; set git-dr.sindrg.com to reach a recovery cluster before the
+# DNS cutover.
 GIT_HOST ?=
 # Full endpoint URL for the fixture targets, such as http://localhost:3000
 # for a port-forward. It overrides GIT_HOST.
 GIT_URL ?=
-INVENTORY := ansible/inventory/generated/hosts.json
+# One inventory per cluster, so a stale file cannot send a recovery command
+# to the primary.
+INVENTORY := ansible/inventory/generated/$(CLUSTER)/hosts.json
 VENV := .venv
 # CI installs tools into the system Python and runs `make check BIN=`.
 BIN ?= $(VENV)/bin/
@@ -38,7 +45,7 @@ IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
 PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
 # The fixture playbooks run on the operator machine against the public endpoint.
 FIXTURE_PLAYBOOK := SOPS_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)ansible-playbook -i localhost, \
-	$(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL))
+	-e fixture_cluster=$(CLUSTER) $(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL))
 PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_fixtures write_check restore restore_test_env
 
 .DEFAULT_GOAL := help
@@ -53,7 +60,7 @@ venv: ## Install the pinned controller toolchain
 	python3 -m venv $(VENV)
 	$(VENV)/bin/pip install -r ansible/requirements.txt
 
-inventory: ## Generate the ignored inventory from TF_DIR outputs
+inventory: ## Generate the ignored inventory of CLUSTER from TF_DIR outputs
 	$(BIN)python scripts/prepare_ansible_inventory.py --terraform-dir $(TF_DIR) \
 		--ssh-user "$$(gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)')" \
 		--ssh-key "$(SSH_KEY)" --output $(INVENTORY)
@@ -63,7 +70,8 @@ age-key:
 
 bootstrap: age-key ## Run bootstrap.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/bootstrap.yml \
-		-e sops_age_key_file="$(FLUX_AGE_KEY_FILE)" -e flux_git_branch="$(FLUX_GIT_BRANCH)"
+		-e sops_age_key_file="$(FLUX_AGE_KEY_FILE)" -e flux_git_branch="$(FLUX_GIT_BRANCH)" \
+		-e flux_cluster=$(CLUSTER)
 
 validate-cluster: ## Run validate_cluster.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/validate_cluster.yml -v

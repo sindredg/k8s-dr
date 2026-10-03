@@ -4,10 +4,12 @@
 # such as the recovery host, or -e git_url=<url> for a URL with another scheme
 # or port, such as a port-forward to the test restore.
 fixture_repo_root: "{{ playbook_dir | dirname | dirname }}"
+# The cluster whose settings give the default host. The Makefile passes
+# CLUSTER.
+fixture_cluster: primary
 git_host: >-
-  {{ (lookup('ansible.builtin.file',
-  fixture_repo_root ~ '/deploy/clusters/primary/cluster-settings.yaml')
-  | from_yaml).data.git_host }}
+  {{ (lookup('ansible.builtin.file', fixture_repo_root ~ '/deploy/clusters/'
+  ~ fixture_cluster ~ '/cluster-settings.yaml') | from_yaml).data.git_host }}
 git_url: "https://{{ git_host }}"
 fixture_api: "{{ git_url }}/api/v1"
 fixture_clone_url: >-
