@@ -43,3 +43,9 @@ variable "admin_member" {
   description = "IAM user or group allowed to administer nodes in every region through IAP and OS Login."
   type        = string
 }
+
+variable "probe_host" {
+  description = "Public name the uptime probe requests. It stays the same across a cutover."
+  type        = string
+  default     = "git.sindrg.com"
+}

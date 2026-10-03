@@ -121,6 +121,17 @@
             fail_msg: "git push exited {{ write_check_push.rc }}: {{ write_check_push.stderr }}"
             quiet: true
 
+        # The drill's write log. scripts/drill_report.py computes the data
+        # loss from it, so it must stay on the operator machine.
+        - name: Append the acknowledged write to the drill log
+          ansible.builtin.lineinfile:
+            path: "{{ write_check_log }}"
+            line: "{{ write_check_acknowledged }}\t{{ write_check_sha.stdout }}\t{{ git_url }}"
+            insertafter: EOF
+            create: true
+            mode: "0600"
+          when: write_check_log | default('') | length > 0
+
         - name: Report the acknowledged write
           ansible.builtin.debug:
             msg:

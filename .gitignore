@@ -45,6 +45,7 @@ ansible/.cache/
 inventory/generated/
 ansible/inventory/generated/
 .rendered/
+.drill/
 *.retry
 backups/
 restore-work/
