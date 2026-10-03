@@ -1,6 +1,6 @@
 # Cold recovery
 
-Status: Complete. The gate passed on 2026-10-03. The recovery environment is still running; its removal is recorded below when done.
+Status: Complete. The gate passed on 2026-10-03, and the recovery environment is removed.
 
 ## Scope
 
@@ -175,7 +175,7 @@ The next hourly run wrote the set `primary/20261003T190701Z` with a manifest.
 | --- | --- | --- |
 | Infrastructure | `terraform -chdir=infra/recovery apply recovery.tfplan` | `Apply complete! Resources: 20 added, 0 changed, 0 destroyed.` |
 | Backup grants | `terraform -chdir=infra/shared apply shared.tfplan` | `Apply complete! Resources: 2 added, 0 changed, 0 destroyed.` The plan targeted the two grants, so it left the uptime check of decision 0011 unapplied. |
-| DNS | `dig +short git-dr.sindrg.com @1.1.1.1` | The recovery address |
+| DNS | `dig +short git-dr.sindrg.com @1.1.1.1` | The recovery address. The record was created with TTL `Auto`, not 1 min; see [Limitations](#limitations). |
 | Bootstrap | `make bootstrap CLUSTER=recovery` | Control plane `ok=75 failed=0`, worker `ok=63 failed=0`; 19:05:40 to 19:12:22, 402 s |
 | Cluster | `make validate-cluster CLUSTER=recovery` | `ok=10 failed=0`, 18 s |
 | Services | `make validate-services CLUSTER=recovery` | `ok=13 failed=0`, 24 s |
@@ -183,6 +183,14 @@ The next hourly run wrote the set `primary/20261003T190701Z` with a manifest.
 | Certificates | `kubectl get certificates -n gitea` | `git-tls` for `git.sindrg.com` and `git-cluster-tls` for `git-dr.sindrg.com`, both Ready from `letsencrypt-production` before any DNS change to `git.sindrg.com` |
 | Backups suspended | `kubectl get cronjob/gitea-backup -n gitea -o jsonpath='{.spec.suspend}'`; `kubectl get jobs -n gitea` | `true`; no Jobs |
 | No recovery set | `gcloud storage ls gs://<bucket>/recovery/` | `One or more URLs matched no objects.` |
+
+The backup grants, applied:
+
+![Terraform reports two resources added in the shared root](../images/milestone5-backup-grants-apply.png)
+
+The Cloudflare records during the gate. `git.sindrg.com` stays on the primary address:
+
+![Cloudflare DNS records for git-dr, git-primary, and git, all DNS only](../images/milestone5-cloudflare-records.png)
 
 ### Isolation (step 5)
 
@@ -268,10 +276,20 @@ These are stage timings, not an RTO. No external probe ran, and `git.sindrg.com`
 
 ### Removal of the recovery environment (step 8)
 
-Not done yet.
+| Step | Command | Result |
+| --- | --- | --- |
+| Remove the backup grants | `terraform -chdir=infra/shared apply shared-teardown.tfplan`, a plan that targets the two grants | `Apply complete! Resources: 0 added, 0 changed, 2 destroyed.` |
+| Delete the `git-dr` record | `dig +short git-dr.sindrg.com @1.1.1.1` | No answer |
+| Destroy the recovery root | `terraform -chdir=infra/recovery apply recovery-destroy.tfplan` | `Apply complete! Resources: 0 added, 0 changed, 20 destroyed.` |
+| Nothing left | `gcloud compute instances list`; disks, addresses, and networks filtered for `recovery`; `terraform -chdir=infra/recovery state list` | Only the two primary VMs, both `RUNNING`; no recovery disk, address, or network; empty state |
+| Primary unaffected | `curl https://git.sindrg.com/api/healthz` at 19:49 | 200 |
+
+![Terraform reports two resources destroyed in the shared root](../images/milestone5-backup-grants-destroy.png)
+
+The recovery environment existed from about 19:03 to 19:49, under an hour.
 
 ## Limitations
 
 - The gate did not change `git.sindrg.com` or enable recovery backups. Both belong to the milestone 6 drill.
 - The `infra/shared` grants were applied and are removed with `-target`, so the uptime check stays out until [decision 0011](../decisions/0011-external-uptime-probe.md) is accepted.
-- The `git-primary` and `git-dr` DNS records are created by hand in Cloudflare.
+- The `git-primary` and `git-dr` DNS records are created by hand in Cloudflare. In this gate `git-dr` had TTL `Auto` instead of 1 min. That did not affect the checks, because the name was new and is never cut over. The drill must set 1 min on any record it changes.
