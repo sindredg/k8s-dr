@@ -34,6 +34,13 @@ GIT_URL ?=
 # One inventory per cluster, so a stale file cannot send a recovery command
 # to the primary.
 INVENTORY := ansible/inventory/generated/$(CLUSTER)/hosts.json
+# Offline renders of every Flux path, for kubeconform. Ignored by Git.
+RENDER_DIR := .rendered
+KUBECONFORM ?= kubeconform
+# Schemas for Flux, cert-manager, and Gateway API objects, pinned to one
+# commit of the datreeio CRD catalog.
+CRD_SCHEMAS := https://raw.githubusercontent.com/datreeio/CRDs-catalog/d373c2da9702bc9509a004db83e57263fe3bdfc1/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+KUBERNETES_VERSION = $(shell sed -n 's/^kubernetes_version: "\(.*\)"/\1/p' ansible/playbooks/group_vars/all.yml)
 VENV := .venv
 # CI installs tools into the system Python and runs `make check BIN=`.
 BIN ?= $(VENV)/bin/
@@ -51,7 +58,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check restore restore-test-env \
-	restore-test-env-delete restore-test-forward check pins surface
+	restore-test-env-delete restore-test-forward check manifests pins surface
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -114,6 +121,12 @@ check: ## Run the local unit tests, linters, and syntax checks
 	for playbook in $(PLAYBOOKS); do \
 		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \
 	done
+
+manifests: ## Render every Flux path for every cluster and validate it offline
+	rm -rf $(RENDER_DIR)
+	$(BIN)python scripts/check_manifests.py --output $(RENDER_DIR)
+	$(KUBECONFORM) -strict -summary -kubernetes-version $(KUBERNETES_VERSION) \
+		-schema-location default -schema-location '$(CRD_SCHEMAS)' $(RENDER_DIR)
 
 pins: ## Check that every pinned artifact still resolves upstream
 	$(BIN)python scripts/check_pins.py

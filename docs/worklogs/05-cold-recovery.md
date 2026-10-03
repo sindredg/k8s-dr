@@ -60,6 +60,15 @@ Checked without applying:
 | The root is valid | `terraform -chdir=infra/recovery validate` | `Success! The configuration is valid.` |
 | The plan creates only recovery resources | `terraform -chdir=infra/recovery plan -lock=false` against the remote state, with `europe-west1-b` and a subnet that does not overlap the primary | `Plan: 20 to add, 0 to change, 0 to destroy.` |
 
+### Offline manifest validation
+
+`make manifests` and a CI step render every Flux path for both clusters, apply the cluster settings, require a namespace on every namespaced object, and validate the output with kubeconform 0.8.0 in strict mode. The CRD schemas come from one pinned commit of the datreeio catalog. Unit tests include a ConfigMap without a namespace that the check must reject. See the [service deployment runbook](../runbooks/service-deployment.md#check-the-manifests-offline) for what the check cannot prove.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Both clusters render and validate | `make manifests` | `Summary: 130 resources found in 16 files - Valid: 130, Invalid: 0, Errors: 0, Skipped: 0` |
+| A schema error is rejected | kubeconform on a CronJob with `suspend: maybe` | `Invalid: 1`: `at '/spec/suspend': got string, want null or boolean` |
+
 ## Gate
 
 Not run. Steps 1 and 2 check the changes to the primary. Steps 3 to 8 are the milestone gate: the recovered service passes the fixture checks while the primary is stopped.
