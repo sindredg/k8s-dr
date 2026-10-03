@@ -26,6 +26,17 @@ Checked before the merge, without a cluster:
 
 `envsubst` stands in for Flux's substitution here. The cluster check after the merge is in the gate below.
 
+### Per-cluster hostname
+
+- `cluster-settings` gains `git_cluster_host`; the primary sets `git-primary.sindrg.com`.
+- A second Certificate, `git-cluster-tls`, covers that name. Each name has its own certificate, so a cluster build uses one `git.sindrg.com` certificate of the five that Let's Encrypt allows per week.
+- The `gitea` Gateway gains the listeners `http-cluster` and `https-cluster` for that name. Both HTTPRoutes attach to the listeners of both names.
+- `validate_services.yml` waits for both certificates, requires each route to be accepted by both listeners, and checks the HTTP redirect for both names.
+
+Checked before the merge: `kubectl kustomize deploy/apps/gitea`, substituted with the primary settings, renders four listeners (`git.sindrg.com` and `git-primary.sindrg.com` on 8000 and 8443) and both names on each route.
+
+Not yet shown on a cluster: that the existing `git.sindrg.com` listeners keep serving while `git-cluster-tls` is being issued. A first install has the same order (the Gateway exists before `git-tls` does), so this is expected to hold.
+
 ## Gate
 
 Not run. The steps are added with the changes they check.
@@ -40,3 +51,14 @@ Not run. The steps are added with the changes they check.
    ```
 
    Expected: validation passes and the command prints `false`. The next hourly run writes a `primary/` set.
+
+2. Create the `git-primary` DNS record as in the [service deployment runbook](../runbooks/service-deployment.md#public-endpoint), then check the primary through its own name:
+
+   ```bash
+   dig +short git-primary.sindrg.com @1.1.1.1
+   make validate-services
+   make check-fixtures GIT_HOST=git-primary.sindrg.com
+   make check-fixtures
+   ```
+
+   Expected: the primary's public address; validation shows `git-tls` and `git-cluster-tls` Ready from `letsencrypt-production`; the fixture checks pass through both names.

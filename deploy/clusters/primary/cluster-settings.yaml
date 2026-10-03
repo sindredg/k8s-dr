@@ -8,6 +8,9 @@ metadata:
   namespace: flux-system
 data:
   git_host: git.sindrg.com
+  # Reaches this cluster directly, whatever git_host resolves to. See
+  # decision 0008.
+  git_cluster_host: git-primary.sindrg.com
   git_issuer: letsencrypt-production
   # Prefix for this cluster's backup sets. See decision 0007.
   backup_cluster: primary

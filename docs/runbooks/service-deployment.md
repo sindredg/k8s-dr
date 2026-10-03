@@ -62,12 +62,12 @@ The load balancer bills a forwarding rule and a static address every hour while 
 
    Expected: `404` for both. The HTTPS request uses Traefik's default self-signed certificate, so `-k` is required until cert-manager issues one.
 
-6. Create the DNS record in the Cloudflare dashboard for `sindrg.com`:
+6. Create two DNS records in the Cloudflare dashboard for `sindrg.com`, one named `git` and one named for the cluster: `git-primary` on the primary, `git-dr` on a recovery cluster. On a recovery cluster, create only `git-dr`; `git` moves at the cutover. See [decision 0008](../decisions/0008-cold-recovery.md#serve-the-public-host-and-a-per-cluster-host-from-every-cluster).
 
    | Field | Value |
    | --- | --- |
    | Type | `A` |
-   | Name | `git` |
+   | Name | `git`, then `git-primary` or `git-dr` |
    | IPv4 address | The value of `$PUBLIC_WEB` |
    | Proxy status | DNS only |
    | TTL | 1 min |
@@ -81,7 +81,7 @@ The load balancer bills a forwarding rule and a static address every hour while 
    curl -sS -o /dev/null -w '%{http_code}\n' http://git.sindrg.com/
    ```
 
-   Expected: the public address, then `404`.
+   Expected: the public address, then `404`. Repeat for the cluster's own name.
 
 ## Flux and SOPS
 
