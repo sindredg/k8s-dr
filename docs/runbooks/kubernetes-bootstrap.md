@@ -58,7 +58,7 @@ Do not commit or share the generated inventory, the generated `known_hosts` file
    git status --short ansible/inventory
    ```
 
-   Expected: the script writes `ansible/inventory/generated/hosts.json`, and `git status` prints nothing for it. The file contains real node names and private addresses. It stays ignored by Git. Do not share it.
+   Expected: the script writes `ansible/inventory/generated/primary/hosts.json`, and `git status` prints nothing for it. Each cluster has its own inventory: `make inventory CLUSTER=recovery` reads `infra/recovery` and writes `ansible/inventory/generated/recovery/hosts.json`, and every later command against that cluster needs `CLUSTER=recovery`. The file contains real node names and private addresses. It stays ignored by Git. Do not share it.
 
 ## Confirm the boot image
 
