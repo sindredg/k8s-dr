@@ -12,6 +12,24 @@ Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `
 - A verified backup set contains PostgreSQL data and Gitea repositories and configuration from one consistent recovery point. Its timestamp and integrity check are recorded.
 - The fixture user, repository, commit, and issue identifiers are in `recovery/fixtures.yaml`, and the last acknowledged write time from `make write-check` is recorded outside the failed region. See [recovery fixtures](service-deployment.md#recovery-fixtures).
 
+Check the preconditions that a machine can check, before the primary is isolated:
+
+```bash
+make preflight
+```
+
+Expected: every line is `ok`, the summary reports `0 failed, 0 missing`, and the exit status is `0`. `MISSING` names a prerequisite that is absent, such as a key file or a local Terraform file. `FAIL` names a check that ran and failed. The one `manual` line asks for a dashboard sign-in that the command cannot test. The command reads state, the bucket, the service, and the Cloudflare API, and changes nothing. In a real loss of the primary, the `fixtures` line fails; the other lines still apply.
+
+| Line | What passes |
+| --- | --- |
+| `git-source` | GitHub serves the branch that Flux reads |
+| `key-sops`, `key-backup` | Each local age key is a recipient that the repository encrypts for |
+| `fixture-secret` | The fixture password decrypts |
+| `state-shared`, `state-recovery` | `terraform plan` reads each remote state |
+| `backup-set` | The newest complete set matches its manifest, both archives decrypt, and it is within the RPO |
+| `fixtures` | `make check-fixtures` passes on the serving cluster |
+| `cloudflare-token`, `cloudflare-zone` | The certificate token is active for at least a week, and `git.sindrg.com` is DNS only with a 60-second TTL |
+
 If any prerequisite is missing, record it as a blocked drill. Do not route users to an unverified restore.
 
 ## Procedure

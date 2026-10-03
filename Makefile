@@ -66,7 +66,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
-	restore-test-env-delete restore-test-forward check manifests pins surface
+	restore-test-env-delete restore-test-forward check manifests pins surface preflight
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -150,6 +150,9 @@ manifests: ## Render every Flux path for every cluster and validate it offline
 
 pins: ## Check that every pinned artifact still resolves upstream
 	$(BIN)python scripts/check_pins.py
+
+preflight: ## Check every recovery dependency from this machine (read-only)
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" BACKUP_AGE_KEY_FILE="$(BACKUP_AGE_KEY_FILE)" scripts/preflight.sh
 
 surface: ## Probe the public endpoint from outside (read-only)
 	scripts/check-public-surface.sh $(GIT_HOST)
