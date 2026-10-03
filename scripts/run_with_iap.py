@@ -14,7 +14,7 @@ import sys
 import time
 
 
-DEFAULT_INVENTORY = Path("ansible/inventory/generated/hosts.json")
+DEFAULT_INVENTORY = Path("ansible/inventory/generated/primary/hosts.json")
 REQUIRED_HOSTS = {
     "kube_control_plane": "control-plane",
     "kube_workers": "worker",

@@ -1,0 +1,23 @@
+---
+# Values that differ between the primary and recovery clusters. Flux
+# substitutes them into the certificates and gitea Kustomizations.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-settings
+  namespace: flux-system
+data:
+  # The public name, so that Gitea builds correct URLs after the DNS
+  # cutover. See decision 0008.
+  git_host: git.sindrg.com
+  # Reaches this cluster directly before the cutover.
+  git_cluster_host: git-dr.sindrg.com
+  # Use letsencrypt-staging for rebuild tests that skip the fixture checks.
+  git_issuer: letsencrypt-production
+  # Prefix for this cluster's backup sets. See decision 0007.
+  backup_cluster: recovery
+  # Set to "false" only after the restore passes the fixture and write
+  # checks. A bootstrap alone must not write a set or ping the heartbeat.
+  backup_suspend: "true"
+  # Grafana Cloud cluster label. See decision 0009.
+  cluster_name: recovery

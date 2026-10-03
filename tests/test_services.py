@@ -7,6 +7,7 @@ import yaml
 DEPLOY = Path("deploy")
 APPS = DEPLOY / "apps"
 CLUSTER = DEPLOY / "clusters/primary"
+RECOVERY = DEPLOY / "clusters/recovery"
 SYNC = DEPLOY / "sync/sync.yaml"
 
 
@@ -43,21 +44,55 @@ class ClusterSettingsTests(unittest.TestCase):
             },
         )
 
+    def test_recovery_serves_the_public_host_with_backups_suspended(self):
+        # See decision 0008. The recovery cluster differs from the primary
+        # only in its own hostname, its backup prefix and suspension, and its
+        # metrics label.
+        settings = _by_name(RECOVERY / "cluster-settings.yaml")["cluster-settings"]
+        self.assertEqual(settings["metadata"]["namespace"], "flux-system")
+        self.assertEqual(
+            settings["data"],
+            {
+                "git_host": "git.sindrg.com",
+                "git_cluster_host": "git-dr.sindrg.com",
+                "git_issuer": "letsencrypt-production",
+                "backup_cluster": "recovery",
+                "backup_suspend": "true",
+                "cluster_name": "recovery",
+            },
+        )
+
+    def test_every_cluster_applies_the_shared_sync_definition(self):
+        clusters = sorted(path.name for path in (DEPLOY / "clusters").iterdir())
+        self.assertEqual(clusters, ["primary", "recovery"])
+        for cluster in clusters:
+            with self.subTest(cluster=cluster):
+                directory = DEPLOY / "clusters" / cluster
+                self.assertEqual(
+                    sorted(path.name for path in directory.iterdir()),
+                    ["cluster-settings.yaml", "kustomization.yaml"],
+                )
+                kustomization = yaml.safe_load((directory / "kustomization.yaml").read_text())
+                self.assertEqual(
+                    kustomization["resources"], ["../../base", "cluster-settings.yaml", "../../sync"]
+                )
+
     def test_every_substituted_variable_is_defined(self):
         # Flux leaves an undefined ${var} in place, which would publish a
         # literal placeholder as the hostname.
-        defined = set(_by_name(CLUSTER / "cluster-settings.yaml")["cluster-settings"]["data"])
         substituted = {
             kustomization["spec"]["path"]
             for kustomization in _sync().values()
             if "postBuild" in kustomization["spec"]
         }
         self.assertEqual(substituted, {"./deploy/certificates", "./deploy/apps/gitea", "./deploy/monitoring"})
-        for directory in substituted:
-            for path in Path(directory).rglob("*.yaml"):
-                for variable in re.findall(r"\$\{(\w+)\}", path.read_text()):
-                    with self.subTest(path=str(path), variable=variable):
-                        self.assertIn(variable, defined)
+        for cluster in (CLUSTER, RECOVERY):
+            defined = set(_by_name(cluster / "cluster-settings.yaml")["cluster-settings"]["data"])
+            for directory in substituted:
+                for path in Path(directory).rglob("*.yaml"):
+                    for variable in re.findall(r"\$\{(\w+)\}", path.read_text()):
+                        with self.subTest(cluster=cluster.name, path=str(path), variable=variable):
+                            self.assertIn(variable, defined)
 
     def test_certificate_takes_host_and_issuer_from_settings(self):
         certificate = _by_name(DEPLOY / "certificates/git-certificate.yaml")["git-tls"]

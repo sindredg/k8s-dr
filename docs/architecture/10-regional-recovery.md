@@ -1,6 +1,6 @@
 # 10. Regional recovery
 
-Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The recovery root, the recovery cluster settings, and the per-cluster hostnames are not built, and no drill has run.
+Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The recovery root, the recovery cluster settings, and the per-cluster hostnames are written. No recovery cluster has been built, and no drill has run.
 
 This is what the project exists to prove: after losing the primary region, the service comes back in another region from code and one backup, inside a measured time and with a measured data loss.
 
