@@ -1,6 +1,8 @@
 ---
-# The Gitea Gateway listener in deploy/apps/gitea references this Secret.
-# Each cluster sets git_host and git_issuer in its cluster-settings ConfigMap.
+# The Gitea Gateway listeners in deploy/apps/gitea reference these Secrets.
+# Each cluster sets git_host, git_cluster_host, and git_issuer in its
+# cluster-settings ConfigMap. One certificate per name keeps each within the
+# Let's Encrypt limit for an exact set of names. See decision 0008.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -10,6 +12,19 @@ spec:
   secretName: git-tls
   dnsNames:
     - ${git_host}
+  issuerRef:
+    kind: ClusterIssuer
+    name: ${git_issuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: git-cluster-tls
+  namespace: gitea
+spec:
+  secretName: git-cluster-tls
+  dnsNames:
+    - ${git_cluster_host}
   issuerRef:
     kind: ClusterIssuer
     name: ${git_issuer}

@@ -37,16 +37,19 @@
       changed_when: false
 
     # A first DNS-01 order waits for Cloudflare propagation.
-    - name: Wait for the Gitea certificate
+    - name: Wait for the Gitea certificates
       ansible.builtin.command: >-
-        kubectl wait --for=condition=Ready certificate/git-tls
+        kubectl wait --for=condition=Ready certificate/{{ item }}
         --namespace gitea --timeout=600s
+      loop:
+        - git-tls
+        - git-cluster-tls
       changed_when: false
 
-    - name: Show the Gitea certificate issuer, names, and expiry
+    - name: Show the Gitea certificate issuers, names, and expiry
       ansible.builtin.command: >-
-        kubectl get certificate/git-tls --namespace gitea
-        --output=custom-columns=ISSUER:.spec.issuerRef.name,NAMES:.spec.dnsNames,EXPIRES:.status.notAfter
+        kubectl get certificates --namespace gitea
+        --output=custom-columns=NAME:.metadata.name,ISSUER:.spec.issuerRef.name,NAMES:.spec.dnsNames,EXPIRES:.status.notAfter
       changed_when: false
 
     - name: Wait for PostgreSQL
@@ -76,6 +79,8 @@
         --namespace gitea --timeout=180s
       changed_when: false
 
+    # Each route attaches to the listener for git_host and the listener for
+    # git_cluster_host, so it reports one status per listener.
     - name: Require both Gitea routes to be accepted
       ansible.builtin.command: >-
         kubectl get httproute {{ item }} --namespace gitea
@@ -85,7 +90,7 @@
         - gitea-https-redirect
       register: validate_gitea_route
       changed_when: false
-      until: validate_gitea_route.stdout == "True"
+      until: validate_gitea_route.stdout == "True True"
       retries: 30
       delay: 5
 
@@ -101,28 +106,32 @@
         'networkpolicy.networking.k8s.io/default-deny'
         not in validate_network_policies.stdout_lines
 
-    - name: Read the Gitea hostname from the cluster settings
+    - name: Read the Gitea hostnames from the cluster settings
       ansible.builtin.command: >-
         kubectl get configmap/cluster-settings --namespace flux-system
-        --output=jsonpath={.data.git_host}
-      register: validate_git_host
+        --output=jsonpath={.data.{{ item }}}
+      loop:
+        - git_host
+        - git_cluster_host
+      register: validate_git_hosts
       changed_when: false
-      failed_when: validate_git_host.stdout == ""
+      failed_when: validate_git_hosts.stdout == ""
 
-    # The request travels from the control plane to Traefik's private
-    # NodePort, so it exercises the HTTP listener and the redirect route.
-    - name: Require the HTTP listener to redirect to HTTPS
+    # The requests travel from the control plane to Traefik's private
+    # NodePort, so they exercise the HTTP listeners and the redirect route.
+    - name: Require the HTTP listeners to redirect to HTTPS
       ansible.builtin.uri:
         url: >-
           http://{{ hostvars[groups['kube_workers'] | first].node_internal_ip
           }}:{{ traefik_http_node_port }}/
         method: GET
         headers:
-          Host: "{{ validate_git_host.stdout }}"
+          Host: "{{ item }}"
         follow_redirects: none
         status_code: 301
+      loop: "{{ validate_git_hosts.results | map(attribute='stdout') | list }}"
       register: validate_redirect
       changed_when: false
       failed_when: >-
         validate_redirect.status != 301 or
-        not validate_redirect.location.startswith('https://' ~ validate_git_host.stdout ~ '/')
+        not validate_redirect.location.startswith('https://' ~ item ~ '/')

@@ -35,6 +35,7 @@ class ClusterSettingsTests(unittest.TestCase):
             settings["data"],
             {
                 "git_host": "git.sindrg.com",
+                "git_cluster_host": "git-primary.sindrg.com",
                 "git_issuer": "letsencrypt-production",
                 "backup_cluster": "primary",
                 "backup_suspend": "false",
@@ -63,6 +64,19 @@ class ClusterSettingsTests(unittest.TestCase):
         self.assertEqual(certificate["metadata"]["namespace"], "gitea")
         self.assertEqual(certificate["spec"]["dnsNames"], ["${git_host}"])
         self.assertEqual(certificate["spec"]["issuerRef"]["name"], "${git_issuer}")
+
+    def test_each_hostname_has_its_own_certificate(self):
+        # Let's Encrypt limits certificates per exact set of names, so a
+        # shared certificate would tie the public name to every cluster build.
+        certificates = _by_name(DEPLOY / "certificates/git-certificate.yaml")
+        self.assertEqual(
+            {name: c["spec"]["dnsNames"] for name, c in certificates.items()},
+            {"git-tls": ["${git_host}"], "git-cluster-tls": ["${git_cluster_host}"]},
+        )
+        for certificate in certificates.values():
+            self.assertEqual(certificate["metadata"]["namespace"], "gitea")
+            self.assertEqual(certificate["spec"]["secretName"], certificate["metadata"]["name"])
+            self.assertEqual(certificate["spec"]["issuerRef"]["name"], "${git_issuer}")
 
 
 class ServiceKustomizationTests(unittest.TestCase):
@@ -369,13 +383,38 @@ class GatewayTests(unittest.TestCase):
 
     def test_http_redirects_and_https_reaches_gitea(self):
         redirect = self.documents["HTTPRoute", "gitea-https-redirect"]["spec"]
-        self.assertEqual(redirect["parentRefs"], [{"name": "gitea", "sectionName": "http"}])
+        self.assertEqual(
+            redirect["parentRefs"],
+            [{"name": "gitea", "sectionName": "http"}, {"name": "gitea", "sectionName": "http-cluster"}],
+        )
         self.assertEqual(
             redirect["rules"][0]["filters"][0]["requestRedirect"], {"scheme": "https", "statusCode": 301}
         )
         route = self.documents["HTTPRoute", "gitea"]["spec"]
-        self.assertEqual(route["parentRefs"], [{"name": "gitea", "sectionName": "https"}])
+        self.assertEqual(
+            route["parentRefs"],
+            [{"name": "gitea", "sectionName": "https"}, {"name": "gitea", "sectionName": "https-cluster"}],
+        )
         self.assertEqual(route["rules"][0]["backendRefs"], [{"name": "gitea-http", "port": 3000}])
+        for spec in (redirect, route):
+            self.assertEqual(spec["hostnames"], ["${git_host}", "${git_cluster_host}"])
+
+    def test_cluster_host_has_its_own_listeners_and_certificate(self):
+        # The per-cluster name reaches one cluster whatever the public name
+        # resolves to. See decision 0008.
+        listeners = {
+            listener["name"]: listener
+            for listener in self.documents["Gateway", "gitea"]["spec"]["listeners"]
+        }
+        self.assertEqual(set(listeners), {"http", "https", "http-cluster", "https-cluster"})
+        self.assertEqual(listeners["http-cluster"]["hostname"], "${git_cluster_host}")
+        self.assertEqual(listeners["http-cluster"]["port"], 8000)
+        https = listeners["https-cluster"]
+        self.assertEqual((https["hostname"], https["port"]), ("${git_cluster_host}", 8443))
+        self.assertEqual(
+            https["tls"],
+            {"mode": "Terminate", "certificateRefs": [{"kind": "Secret", "name": "git-cluster-tls"}]},
+        )
 
 
 class NetworkPolicyTests(unittest.TestCase):
