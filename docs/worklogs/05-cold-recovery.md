@@ -1,6 +1,6 @@
 # Cold recovery
 
-Status: In progress. The gate has not run.
+Status: Complete. The gate passed on 2026-10-03. The recovery environment is still running; its removal is recorded below when done.
 
 ## Scope
 
@@ -71,7 +71,7 @@ Checked without applying:
 
 ## Gate
 
-Not run. Steps 1 and 2 check the changes to the primary. Steps 3 to 8 are the milestone gate: the recovered service passes the fixture checks while the primary is stopped.
+Passed on 2026-10-03; see [Validation](#validation). Steps 1 and 2 check the changes to the primary. Steps 3 to 8 are the milestone gate: the recovered service passes the fixture checks while the primary is stopped.
 
 1. After the merge, confirm that Flux applied the revision and that the primary CronJob is not suspended:
 
@@ -135,8 +135,143 @@ Not run. Steps 1 and 2 check the changes to the primary. Steps 3 to 8 are the mi
    make check-fixtures
    ```
 
+   Wait until `curl -s -o /dev/null -w '%{http_code}' https://git.sindrg.com/api/healthz` prints `200` before validating; the API server needs about three minutes after a start.
+
    Expected: all pass. The primary does not hold the commit that step 6 pushed to the recovery cluster; this gate does not fail back.
 
 8. Remove the recovery environment with the [teardown steps](../runbooks/regional-recovery.md#remove-the-recovery-environment).
 
    Expected: 2 grants destroyed in `infra/shared`, then 20 resources destroyed in `infra/recovery`.
+
+## Validation
+
+All times are UTC on 2026-10-03. Both clusters ran `main` at `17e10f3`.
+
+### Primary after the merge (steps 1 and 2)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Flux applied the revision | `kubectl get kustomization -n flux-system` | All six Ready at `main@sha1:17e10f3b` |
+| Services | `make validate-services` | `ok=13 failed=0`, 50 s |
+| Backups not suspended | `kubectl get cronjob/gitea-backup -n gitea -o jsonpath='{.spec.suspend}'` | `false` |
+| Certificates | `kubectl get certificates -n gitea` | `git-cluster-tls` for `git-primary.sindrg.com` Ready from `letsencrypt-production`. `git-tls` kept its expiry of 2026-12-25, so it was not reissued. |
+| Per-cluster name | `make check-fixtures GIT_HOST=git-primary.sindrg.com` | `failed=0` |
+
+The `git.sindrg.com` listeners kept serving while the new certificate was issued, which the per-cluster hostname section left open.
+
+### Last write and backup (step 3)
+
+```text
+$ make write-check
+Push accepted at 2026-10-03T19:00:24Z by https://git.sindrg.com/
+Commit 766bd4445975b21db19983561b26a06243eeff06 on main: Write check 2026-10-03T19:00:21Z
+```
+
+The next hourly run wrote the set `primary/20261003T190701Z` with a manifest.
+
+### Recovery cluster (step 4)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Infrastructure | `terraform -chdir=infra/recovery apply recovery.tfplan` | `Apply complete! Resources: 20 added, 0 changed, 0 destroyed.` |
+| Backup grants | `terraform -chdir=infra/shared apply shared.tfplan` | `Apply complete! Resources: 2 added, 0 changed, 0 destroyed.` The plan targeted the two grants, so it left the uptime check of decision 0011 unapplied. |
+| DNS | `dig +short git-dr.sindrg.com @1.1.1.1` | The recovery address |
+| Bootstrap | `make bootstrap CLUSTER=recovery` | Control plane `ok=75 failed=0`, worker `ok=63 failed=0`; 19:05:40 to 19:12:22, 402 s |
+| Cluster | `make validate-cluster CLUSTER=recovery` | `ok=10 failed=0`, 18 s |
+| Services | `make validate-services CLUSTER=recovery` | `ok=13 failed=0`, 24 s |
+| Nodes and Flux | `kubectl get nodes`, `kubectl get kustomization -n flux-system` | Both nodes Ready on v1.36.2; all six Kustomizations Ready at `main@sha1:17e10f3b` |
+| Certificates | `kubectl get certificates -n gitea` | `git-tls` for `git.sindrg.com` and `git-cluster-tls` for `git-dr.sindrg.com`, both Ready from `letsencrypt-production` before any DNS change to `git.sindrg.com` |
+| Backups suspended | `kubectl get cronjob/gitea-backup -n gitea -o jsonpath='{.spec.suspend}'`; `kubectl get jobs -n gitea` | `true`; no Jobs |
+| No recovery set | `gcloud storage ls gs://<bucket>/recovery/` | `One or more URLs matched no objects.` |
+
+### Isolation (step 5)
+
+`gcloud compute instances stop` ran from 19:29:09 to 19:30:28.
+
+```text
+NAME                          ZONE             STATUS
+k8sdr-recovery-control-plane  europe-west1-b   RUNNING
+k8sdr-recovery-worker         europe-west1-b   RUNNING
+k8sdr-primary-control-plane   europe-north1-a  TERMINATED
+k8sdr-primary-worker          europe-north1-a  TERMINATED
+```
+
+`curl --max-time 10 https://git-primary.sindrg.com/` got no response.
+
+### Restore and checks while the primary was stopped (step 6)
+
+```text
+$ make restore CLUSTER=recovery RESTORE_NAMESPACE=gitea
+2026-10-03T19:31:10Z restoring primary/20261003T190701Z; backup age at restore start 1449 seconds
+2026-10-03T19:31:11Z digests match the manifest
+2026-10-03T19:31:11Z both archives decrypt and read
+2026-10-03T19:31:34Z restored primary/20261003T190701Z in 24 seconds
+control-plane              : ok=15   changed=5    unreachable=0    failed=0    skipped=1
+run_with_iap: started 2026-10-03T19:30:55Z, finished 2026-10-03T19:31:41Z, elapsed 47s, exit 0
+```
+
+The skipped task is `Resume the backup CronJob unless it was suspended before`.
+
+```text
+$ make check-fixtures GIT_HOST=git-dr.sindrg.com
+User recovery-fixture signed in.
+Repository recovery-fixture/recovery-fixture exists.
+Commit 3775f53a1042434d76ec940d3d49360e1b3a0847 is on main.
+Issue #1: Recovery fixture issue
+Newest commit on main: 766bd4445975b21db19983561b26a06243eeff06 Write check 2026-10-03T19:00:21Z
+localhost                  : ok=15   changed=0    unreachable=0    failed=0
+
+$ make write-check GIT_HOST=git-dr.sindrg.com
+Push accepted at 2026-10-03T19:31:54Z by https://git-dr.sindrg.com/
+Commit 2bf76c74aaa9bbab3f714f6ea26f726aca35afa6 on main: Write check 2026-10-03T19:31:52Z
+localhost                  : ok=16   changed=7    unreachable=0    failed=0
+```
+
+The restored HEAD is the write from step 3, so no acknowledged write was lost:
+
+```text
+$ python3 scripts/drill_report.py rpo --restored-sha 766bd4445975b21db19983561b26a06243eeff06 \
+    --isolated-at 2026-10-03T19:29:09Z --backup-set 20261003T190701Z
+Last acknowledged primary write: 2026-10-03T19:00:24Z 766bd4445975b21db19983561b26a06243eeff06
+Restored HEAD acknowledged:      2026-10-03T19:00:24Z 766bd4445975b21db19983561b26a06243eeff06
+Observed data loss:              0h 00m 00s
+Acknowledged writes lost:        0
+Potential loss window:           0h 22m 08s (backup age at isolation)
+```
+
+This gate made one write and then waited for a backup, so the zero is by construction. The milestone 6 drill measures data loss with writes every five minutes.
+
+After the restore, `suspend` was still `true`, the only Job in `gitea` was `gitea-restore`, and the bucket had no `recovery/` object. The fixture checks follow the requested host: Gitea served the API and Git over HTTPS through `git-dr.sindrg.com` while configured for `git.sindrg.com`, which decision 0008 listed as a limit to confirm.
+
+### Primary restart (step 7)
+
+`gcloud compute instances start` ran from 19:32:15 to 19:32:26.
+
+- **Symptom:** `make validate-cluster` at 19:32:33 failed on its first task: `The connection to the server 10.42.0.5:6443 was refused`.
+- **Confirmed cause:** the validation ran seven seconds after the start command returned, before the API server was up. The [hardening worklog](04c-service-hardening.md#validation-ran-before-the-api-server-was-up) records the same symptom after a restart.
+- **Fix:** wait for the service. `https://git.sindrg.com/api/healthz` returned 200 at 19:35:08, about three minutes after the start.
+- **Verification:** `make validate-cluster` at 19:35:17: `ok=10 failed=0`. `make validate-services`: `ok=13 failed=0`. `make check-fixtures`: `failed=0`, newest commit `766bd44`.
+
+The primary does not hold commit `2bf76c7`, which went to the recovery cluster. This gate does not fail back.
+
+### Gate result
+
+The recovered service passed the same fixture and write checks through its own endpoint while both primary VMs were stopped. The [milestone 5](../../plan.md#5-cold-recovery) gate is met.
+
+| Stage | Duration |
+| --- | --- |
+| Bootstrap, including the Flux reconcile | 402 s |
+| Restore command | 47 s, of which the restore Job took 24 s |
+| Primary stopped | 19:29:09 to 19:32:15 |
+
+These are stage timings, not an RTO. No external probe ran, and `git.sindrg.com` stayed on the primary.
+
+### Removal of the recovery environment (step 8)
+
+Not done yet.
+
+## Limitations
+
+- The gate did not change `git.sindrg.com` or enable recovery backups. Both belong to the milestone 6 drill.
+- The `infra/shared` grants were applied and are removed with `-target`, so the uptime check stays out until [decision 0011](../decisions/0011-external-uptime-probe.md) is accepted.
+- The `git-primary` and `git-dr` DNS records are created by hand in Cloudflare.

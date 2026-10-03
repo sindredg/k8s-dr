@@ -1,6 +1,6 @@
 # 0008: Cold recovery
 
-Status: Proposed on 2026-09-30.
+Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03.
 
 Date: 2026-09-30
 
