@@ -37,7 +37,7 @@ Check the hourly backups and restore a backup set with the restore Job. [Decisio
 
 1. Suspends the target's backup CronJob, if it has one, and waits for a running backup to finish.
 2. Creates the `gitea-restore-key` Secret from the backup age key and starts the `gitea-restore` Job.
-3. Prints the Job log, deletes the key Secret, and resumes the CronJob, whether the Job passed or failed.
+3. Prints the Job log and deletes the key Secret, whether the Job passed or failed. It resumes the CronJob only if the CronJob was running before the restore. A recovery cluster keeps backups suspended through `backup_suspend` in its `cluster-settings` until the restore is verified.
 
 The Job selects the newest set with a manifest, or the set that `RESTORE_SET` names. It checks every size and SHA-256 digest against the manifest and decrypts both archives before it changes anything. It then stops Gitea, drops and recreates the `gitea` database, restores the dump, replaces the Gitea volume, and starts Gitea. If a step fails after the database is dropped, Gitea stays stopped; fix the cause and run the restore again.
 

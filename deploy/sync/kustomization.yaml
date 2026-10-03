@@ -1,0 +1,8 @@
+---
+# The Flux Kustomizations every cluster runs. Each cluster directory under
+# deploy/clusters includes this directory, so a recovery cluster cannot drift
+# from the primary's layout. See decision 0008.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - sync.yaml

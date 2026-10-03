@@ -49,6 +49,8 @@ metadata:
   name: gitea-backup
   namespace: gitea
 spec:
+  # Flux substitutes a bare true or false from the cluster settings.
+  suspend: ${backup_suspend}
   schedule: "7 * * * *"
   timeZone: Etc/UTC
   concurrencyPolicy: Forbid
