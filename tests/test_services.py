@@ -7,6 +7,7 @@ import yaml
 DEPLOY = Path("deploy")
 APPS = DEPLOY / "apps"
 CLUSTER = DEPLOY / "clusters/primary"
+RECOVERY = DEPLOY / "clusters/recovery"
 SYNC = DEPLOY / "sync/sync.yaml"
 
 
@@ -35,6 +36,7 @@ class ClusterSettingsTests(unittest.TestCase):
             settings["data"],
             {
                 "git_host": "git.sindrg.com",
+                "git_cluster_host": "git-primary.sindrg.com",
                 "git_issuer": "letsencrypt-production",
                 "backup_cluster": "primary",
                 "backup_suspend": "false",
@@ -42,27 +44,74 @@ class ClusterSettingsTests(unittest.TestCase):
             },
         )
 
+    def test_recovery_serves_the_public_host_with_backups_suspended(self):
+        # See decision 0008. The recovery cluster differs from the primary
+        # only in its own hostname, its backup prefix and suspension, and its
+        # metrics label.
+        settings = _by_name(RECOVERY / "cluster-settings.yaml")["cluster-settings"]
+        self.assertEqual(settings["metadata"]["namespace"], "flux-system")
+        self.assertEqual(
+            settings["data"],
+            {
+                "git_host": "git.sindrg.com",
+                "git_cluster_host": "git-dr.sindrg.com",
+                "git_issuer": "letsencrypt-production",
+                "backup_cluster": "recovery",
+                "backup_suspend": "true",
+                "cluster_name": "recovery",
+            },
+        )
+
+    def test_every_cluster_applies_the_shared_sync_definition(self):
+        clusters = sorted(path.name for path in (DEPLOY / "clusters").iterdir())
+        self.assertEqual(clusters, ["primary", "recovery"])
+        for cluster in clusters:
+            with self.subTest(cluster=cluster):
+                directory = DEPLOY / "clusters" / cluster
+                self.assertEqual(
+                    sorted(path.name for path in directory.iterdir()),
+                    ["cluster-settings.yaml", "kustomization.yaml"],
+                )
+                kustomization = yaml.safe_load((directory / "kustomization.yaml").read_text())
+                self.assertEqual(
+                    kustomization["resources"], ["../../base", "cluster-settings.yaml", "../../sync"]
+                )
+
     def test_every_substituted_variable_is_defined(self):
         # Flux leaves an undefined ${var} in place, which would publish a
         # literal placeholder as the hostname.
-        defined = set(_by_name(CLUSTER / "cluster-settings.yaml")["cluster-settings"]["data"])
         substituted = {
             kustomization["spec"]["path"]
             for kustomization in _sync().values()
             if "postBuild" in kustomization["spec"]
         }
         self.assertEqual(substituted, {"./deploy/certificates", "./deploy/apps/gitea", "./deploy/monitoring"})
-        for directory in substituted:
-            for path in Path(directory).rglob("*.yaml"):
-                for variable in re.findall(r"\$\{(\w+)\}", path.read_text()):
-                    with self.subTest(path=str(path), variable=variable):
-                        self.assertIn(variable, defined)
+        for cluster in (CLUSTER, RECOVERY):
+            defined = set(_by_name(cluster / "cluster-settings.yaml")["cluster-settings"]["data"])
+            for directory in substituted:
+                for path in Path(directory).rglob("*.yaml"):
+                    for variable in re.findall(r"\$\{(\w+)\}", path.read_text()):
+                        with self.subTest(cluster=cluster.name, path=str(path), variable=variable):
+                            self.assertIn(variable, defined)
 
     def test_certificate_takes_host_and_issuer_from_settings(self):
         certificate = _by_name(DEPLOY / "certificates/git-certificate.yaml")["git-tls"]
         self.assertEqual(certificate["metadata"]["namespace"], "gitea")
         self.assertEqual(certificate["spec"]["dnsNames"], ["${git_host}"])
         self.assertEqual(certificate["spec"]["issuerRef"]["name"], "${git_issuer}")
+
+    def test_each_hostname_has_its_own_certificate(self):
+        # Let's Encrypt limits certificates per exact set of names, so a
+        # shared certificate would tie the public name to every cluster build.
+        certificates = _by_name(DEPLOY / "certificates/git-certificate.yaml")
+        self.assertEqual(
+            {name: c["spec"]["dnsNames"] for name, c in certificates.items()},
+            {"git-tls": ["${git_host}"], "git-cluster-tls": ["${git_cluster_host}"]},
+        )
+        for certificate in certificates.values():
+            self.assertEqual(certificate["metadata"]["namespace"], "gitea")
+            self.assertEqual(certificate["spec"]["secretName"], certificate["metadata"]["name"])
+            self.assertEqual(certificate["spec"]["issuerRef"]["name"], "${git_issuer}")
 
 
 class ServiceKustomizationTests(unittest.TestCase):
@@ -369,13 +418,38 @@ class GatewayTests(unittest.TestCase):
 
     def test_http_redirects_and_https_reaches_gitea(self):
         redirect = self.documents["HTTPRoute", "gitea-https-redirect"]["spec"]
-        self.assertEqual(redirect["parentRefs"], [{"name": "gitea", "sectionName": "http"}])
+        self.assertEqual(
+            redirect["parentRefs"],
+            [{"name": "gitea", "sectionName": "http"}, {"name": "gitea", "sectionName": "http-cluster"}],
+        )
         self.assertEqual(
             redirect["rules"][0]["filters"][0]["requestRedirect"], {"scheme": "https", "statusCode": 301}
         )
         route = self.documents["HTTPRoute", "gitea"]["spec"]
-        self.assertEqual(route["parentRefs"], [{"name": "gitea", "sectionName": "https"}])
+        self.assertEqual(
+            route["parentRefs"],
+            [{"name": "gitea", "sectionName": "https"}, {"name": "gitea", "sectionName": "https-cluster"}],
+        )
         self.assertEqual(route["rules"][0]["backendRefs"], [{"name": "gitea-http", "port": 3000}])
+        for spec in (redirect, route):
+            self.assertEqual(spec["hostnames"], ["${git_host}", "${git_cluster_host}"])
+
+    def test_cluster_host_has_its_own_listeners_and_certificate(self):
+        # The per-cluster name reaches one cluster whatever the public name
+        # resolves to. See decision 0008.
+        listeners = {
+            listener["name"]: listener
+            for listener in self.documents["Gateway", "gitea"]["spec"]["listeners"]
+        }
+        self.assertEqual(set(listeners), {"http", "https", "http-cluster", "https-cluster"})
+        self.assertEqual(listeners["http-cluster"]["hostname"], "${git_cluster_host}")
+        self.assertEqual(listeners["http-cluster"]["port"], 8000)
+        https = listeners["https-cluster"]
+        self.assertEqual((https["hostname"], https["port"]), ("${git_cluster_host}", 8443))
+        self.assertEqual(
+            https["tls"],
+            {"mode": "Terminate", "certificateRefs": [{"kind": "Secret", "name": "git-cluster-tls"}]},
+        )
 
 
 class NetworkPolicyTests(unittest.TestCase):
