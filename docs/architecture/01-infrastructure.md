@@ -1,6 +1,6 @@
 # 1. Infrastructure
 
-Status: the bootstrap, shared, and primary roots are built. The recovery root is designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
+Status: the bootstrap, shared, and primary roots are built. The recovery root `infra/recovery` is written and planned but not applied; see [decision 0008](../decisions/0008-cold-recovery.md).
 
 Terraform creates everything in Google Cloud: the buckets, the networks, the VMs, and the load balancers. It creates nothing inside the VMs; that is [Ansible's job](02-ansible.md).
 

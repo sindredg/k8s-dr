@@ -1,0 +1,11 @@
+project_id    = "REPLACE_WITH_PROJECT_ID"
+name_prefix   = "k8sdr-recovery"
+recovery_zone = "europe-west1-b"
+# Choose an unused private range that does not overlap the primary subnet or
+# the cluster pod and service ranges.
+recovery_subnet_cidr = "REPLACE_WITH_UNUSED_PRIVATE_CIDR"
+
+# Use the same member as admin_member in infra/shared.
+admin_member = "user:REPLACE_WITH_CLUSTER_ADMIN_EMAIL@example.com"
+
+# Leave boot_image unset to use the tested image pinned in the module.
