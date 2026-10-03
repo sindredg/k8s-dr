@@ -12,6 +12,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Consistent backups worklog](worklogs/04-consistent-backups.md) | Record milestone 4 changes and validation. |
 | [Cluster metrics worklog](worklogs/04b-cluster-metrics.md) | Record the metrics setup before milestone 6 and its validation. |
 | [Service hardening worklog](worklogs/04c-service-hardening.md) | Record the security review, the hardening before milestone 6, and its validation. |
+| [Cold recovery worklog](worklogs/05-cold-recovery.md) | Record milestone 5 changes and validation. |
 | [Use kubeadm](decisions/0001-use-kubeadm.md) | Explain the cluster bootstrap choice and its trade-offs. |
 | [Recovery contract](decisions/0002-recovery-contract.md) | Define recovery targets, checks, architecture, and alternatives. |
 | [Regional infrastructure and state](decisions/0003-regional-infrastructure-and-state.md) | Explain the reusable module and offsite state decisions. |

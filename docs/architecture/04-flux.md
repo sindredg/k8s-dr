@@ -1,6 +1,6 @@
 # 4. Flux
 
-Status: built on the primary cluster. The shared `deploy/sync` directory and `deploy/clusters/recovery` are designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built; today the sync definition is `deploy/clusters/primary/sync.yaml`.
+Status: built on the primary cluster. `deploy/clusters/recovery` and the `git_cluster_host` setting are designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
 
 Flux makes the cluster match the `deploy/` directory on the `main` branch. Nobody runs `kubectl apply` for the application: a merge is the deployment.
 
@@ -67,6 +67,7 @@ Each cluster directory has a `cluster-settings.yaml` ConfigMap with the only val
 | `git_cluster_host` | `git-primary.sindrg.com` | `git-dr.sindrg.com` | Reaching one cluster directly, and a second certificate |
 | `git_issuer` | Production | Production, or staging for rebuild tests | Which Let's Encrypt issuer signs the certificates |
 | `backup_cluster` | `primary` | `recovery` | The prefix this cluster writes backups under |
+| `backup_suspend` | `false` | `true` until a restore is verified | Whether the backup CronJob is suspended |
 | `cluster_name` | `primary` | `recovery` | The label on its metrics |
 
 ## Secrets

@@ -4,7 +4,7 @@ import unittest
 import yaml
 
 MONITORING = Path("deploy/monitoring")
-SYNC = Path("deploy/clusters/primary/sync.yaml")
+SYNC = Path("deploy/sync/sync.yaml")
 
 
 def _documents(path):
