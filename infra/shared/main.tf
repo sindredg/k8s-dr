@@ -110,3 +110,34 @@ resource "google_project_iam_member" "admin" {
   role     = each.key
   member   = var.admin_member
 }
+
+# External probe for the RTO measurement. It follows the public name, so it
+# reports on whichever cluster serves it. See decision 0011.
+resource "google_monitoring_uptime_check_config" "git" {
+  project      = var.project_id
+  display_name = "git-healthz"
+  period       = "60s"
+  timeout      = "10s"
+
+  # Three regions is the minimum the API accepts.
+  selected_regions = ["EUROPE", "USA_VIRGINIA", "ASIA_PACIFIC"]
+
+  http_check {
+    path         = "/api/healthz"
+    port         = 443
+    use_ssl      = true
+    validate_ssl = true
+
+    accepted_response_status_codes {
+      status_class = "STATUS_CLASS_2XX"
+    }
+  }
+
+  monitored_resource {
+    type = "uptime_url"
+    labels = {
+      project_id = var.project_id
+      host       = var.probe_host
+    }
+  }
+}

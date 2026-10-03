@@ -13,6 +13,8 @@ Simulate the loss of the primary region, execute the [regional recovery runbook]
 - `.drill/` is ignored by Git and stays on the operator machine.
 - `make preflight` checks every recovery dependency from the operator machine without changing anything, and tells a missing prerequisite from a failed check. See the [regional recovery runbook](../runbooks/regional-recovery.md#preconditions).
 
+- [Decision 0011](../decisions/0011-external-uptime-probe.md) proposes the external probe: a Cloud Monitoring uptime check on `https://git.sindrg.com/api/healthz` every 60 seconds, in `infra/shared`. `terraform -chdir=infra/shared plan -lock=false` reports `Plan: 1 to add, 0 to change, 0 to destroy.` It is not applied, and the command that reads its results has not been run.
+
 First run of the preflight, with the recovery root planned but not applied:
 
 ```text

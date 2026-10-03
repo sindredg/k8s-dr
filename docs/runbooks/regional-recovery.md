@@ -6,7 +6,7 @@ Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `
 
 ## Preconditions
 
-- The primary service is isolated for the drill, and an external health probe is running.
+- The primary service is isolated for the drill, and the external uptime check from [decision 0011](../decisions/0011-external-uptime-probe.md) is applied and passing.
 - The operator can access the external source repository, remote Terraform state, recovery-region credentials, offsite backup storage, and DNS or endpoint controls without using the primary region.
 - The SOPS age key and the backup age key are on the operator machine, restored from the credential store if needed. The defaults are `~/.config/k8s-dr/age.agekey` and `~/.config/k8s-dr/backup.agekey`.
 - A verified backup set contains PostgreSQL data and Gitea repositories and configuration from one consistent recovery point. Its timestamp and integrity check are recorded.
@@ -83,7 +83,7 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
    terraform -chdir=infra/shared apply shared.tfplan
    ```
 
-   Expected: `Plan: 2 to add, 0 to change, 0 to destroy`: one object creator grant limited to `recovery/` and one object viewer grant.
+   Expected: `Plan: 2 to add, 0 to change, 0 to destroy`: one object creator grant limited to `recovery/` and one object viewer grant. If the uptime check is not applied yet, the plan also adds it.
 
 5. Create the `git-dr` DNS record for the recovery address, as in the [service deployment runbook](service-deployment.md#public-endpoint). Leave `git.sindrg.com` unchanged.
 
