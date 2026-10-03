@@ -136,6 +136,19 @@ The age private key is a recovery credential. Without it, a recovered cluster ca
 
 To encrypt a new secret, write it as `<name>.sops.yaml` under `deploy/` and run `sops --encrypt --in-place <file>` before `git add`. SOPS reads the recipient from `.sops.yaml`. To rotate the key, add the new public key to `.sops.yaml`, run `sops updatekeys` on every encrypted file, rerun `make bootstrap` with the new key file, and then remove the old public key.
 
+### Check the manifests offline
+
+`make manifests` repeats what Flux does before it applies anything, for both clusters and without credentials. CI runs it on every pull request.
+
+1. It builds every Flux Kustomization path with `kubectl kustomize`, including the test restore overlays.
+2. It substitutes `${var}` from that cluster's `cluster-settings` and fails on an undefined variable.
+3. It fails if a namespaced object has no namespace and its Flux Kustomization sets no `targetNamespace`. Kustomize builds such an object; Flux rejects it on the cluster.
+4. It validates the result with kubeconform in strict mode against the schemas for the pinned Kubernetes version and for the Flux, cert-manager, and Gateway API kinds. No kind is skipped.
+
+It needs `kubectl` and `kubeconform` on the `PATH`; set `KUBECONFORM=<path>` to use another binary.
+
+The check cannot prove that Flux reconciles the result. It does not decrypt SOPS files, so it reads Secret values as ciphertext. It does not template the Helm charts, so wrong HelmRelease values pass. It does not know the CRD versions installed on a cluster, admission policies, or anything about the running state.
+
 ## cert-manager and certificates
 
 Flux installs cert-manager from its Helm chart through the `infrastructure` Kustomization. The `certificates` Kustomization runs after it and applies the SOPS-encrypted Cloudflare token, the `letsencrypt-staging` and `letsencrypt-production` ClusterIssuers, and the `git-tls` Certificate for `git.sindrg.com` in the `gitea` namespace. Both issuers solve DNS-01 through Cloudflare, so the cluster needs no inbound port for issuance.
