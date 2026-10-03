@@ -60,6 +60,16 @@
       register: restore_cronjob
       changed_when: false
 
+    # A recovery cluster keeps backups suspended through its cluster settings
+    # until the restore is verified, so the playbook must not resume them.
+    - name: Read whether backups are already suspended
+      ansible.builtin.command: >-
+        kubectl get cronjob/gitea-backup --namespace {{ restore_namespace }}
+        --output=jsonpath={.spec.suspend}
+      register: restore_cronjob_suspended
+      when: restore_cronjob.stdout != ""
+      changed_when: false
+
     - name: Restore with backups paused
       block:
         # A backup run would start Gitea in the middle of the restore.
@@ -141,11 +151,13 @@
             --ignore-not-found
           changed_when: true
 
-        - name: Resume the backup CronJob
+        - name: Resume the backup CronJob unless it was suspended before
           ansible.builtin.command: >-
             kubectl patch cronjob/gitea-backup --namespace {{ restore_namespace }}
             --type=merge --patch '{"spec":{"suspend":false}}'
-          when: restore_cronjob.stdout != ""
+          when:
+            - restore_cronjob.stdout != ""
+            - restore_cronjob_suspended.stdout != "true"
           changed_when: true
 
     - name: Require the restore Job to complete

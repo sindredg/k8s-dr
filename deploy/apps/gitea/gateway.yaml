@@ -1,7 +1,8 @@
 ---
 # Traefik (Ansible-owned) serves this Gateway on its web (8000) and websecure
 # (8443) entry points, which the worker exposes as host ports 80 and 443.
-# The certificate Secret is in this namespace, so no ReferenceGrant is needed.
+# The certificate Secrets are in this namespace, so no ReferenceGrant is needed.
+# Each cluster serves the public name and its own name. See decision 0008.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -29,6 +30,25 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same
+    - name: http-cluster
+      protocol: HTTP
+      port: 8000
+      hostname: ${git_cluster_host}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https-cluster
+      protocol: HTTPS
+      port: 8443
+      hostname: ${git_cluster_host}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: git-cluster-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -39,8 +59,11 @@ spec:
   parentRefs:
     - name: gitea
       sectionName: http
+    - name: gitea
+      sectionName: http-cluster
   hostnames:
     - ${git_host}
+    - ${git_cluster_host}
   rules:
     - filters:
         - type: RequestRedirect
@@ -57,8 +80,11 @@ spec:
   parentRefs:
     - name: gitea
       sectionName: https
+    - name: gitea
+      sectionName: https-cluster
   hostnames:
     - ${git_host}
+    - ${git_cluster_host}
   rules:
     - backendRefs:
         - name: gitea-http

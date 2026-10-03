@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -124,7 +125,7 @@ class PrepareAnsibleInventoryTests(unittest.TestCase):
 class TerraformOutputContractTests(unittest.TestCase):
     # Every regional root must expose the same outputs so one inventory
     # script serves the primary and recovery clusters.
-    REGIONAL_ROOTS = ("infra/primary",)
+    REGIONAL_ROOTS = ("infra/primary", "infra/recovery")
 
     def test_regional_roots_declare_every_required_output(self):
         for root in self.REGIONAL_ROOTS:
@@ -132,6 +133,21 @@ class TerraformOutputContractTests(unittest.TestCase):
             for name in module.REQUIRED_OUTPUTS:
                 with self.subTest(root=root, output=name):
                     self.assertIn(f'output "{name}"', declared)
+
+    def test_regional_roots_declare_the_same_outputs(self):
+        declared = {
+            root: re.findall(r'(?m)^output "(\w+)"', Path(root, "outputs.tf").read_text())
+            for root in self.REGIONAL_ROOTS
+        }
+        self.assertEqual(declared["infra/recovery"], declared["infra/primary"])
+
+    def test_recovery_root_is_independent_and_destroyable(self):
+        # A drill ends with terraform destroy, and a recovery must not read
+        # anything from the lost region. See decision 0008.
+        text = "".join(path.read_text() for path in sorted(Path("infra/recovery").glob("*.tf")))
+        self.assertNotIn("prevent_destroy", text.replace("# No prevent_destroy", ""))
+        self.assertNotIn("terraform_remote_state", text)
+        self.assertIn('prefix = "recovery"', Path("infra/recovery/backend.hcl.example").read_text())
 
 
 if __name__ == "__main__":

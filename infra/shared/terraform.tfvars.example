@@ -7,6 +7,9 @@ admin_member           = "user:REPLACE_WITH_CLUSTER_ADMIN_EMAIL@example.com"
 recovery_reader_member = "user:REPLACE_WITH_RECOVERY_READER_EMAIL@example.com"
 
 # Worker node service account of each cluster: <name_prefix>-worker@<project>.
+# Add recovery only after infra/recovery is applied: the grant fails until the
+# account exists. Remove primary after a failover to fence it.
 backup_clusters = {
   primary = "serviceAccount:REPLACE_WITH_NAME_PREFIX-worker@REPLACE_WITH_PROJECT_ID.iam.gserviceaccount.com"
+  # recovery = "serviceAccount:REPLACE_WITH_RECOVERY_NAME_PREFIX-worker@REPLACE_WITH_PROJECT_ID.iam.gserviceaccount.com"
 }

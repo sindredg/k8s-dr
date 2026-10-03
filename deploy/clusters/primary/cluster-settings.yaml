@@ -8,8 +8,14 @@ metadata:
   namespace: flux-system
 data:
   git_host: git.sindrg.com
+  # Reaches this cluster directly, whatever git_host resolves to. See
+  # decision 0008.
+  git_cluster_host: git-primary.sindrg.com
   git_issuer: letsencrypt-production
   # Prefix for this cluster's backup sets. See decision 0007.
   backup_cluster: primary
+  # Suspends the backup CronJob. A recovery cluster starts suspended and
+  # enables backups only after a verified restore. See decision 0008.
+  backup_suspend: "false"
   # Grafana Cloud cluster label. See decision 0009.
   cluster_name: primary

@@ -144,7 +144,7 @@ def parse_args(argv=None):
     parser.add_argument("--ssh-key", required=True, type=Path)
     parser.add_argument(
         "--output",
-        default=Path("ansible/inventory/generated/hosts.json"),
+        default=Path("ansible/inventory/generated/primary/hosts.json"),
         type=Path,
     )
     return parser.parse_args(argv)

@@ -151,7 +151,7 @@ class DeployTreeTests(unittest.TestCase):
                     self.assertTrue((path.parent / resource).exists())
 
     def test_every_flux_kustomization_path_has_a_kustomization_file(self):
-        for path in Path("deploy/clusters").rglob("*.yaml"):
+        for path in Path("deploy/sync").rglob("*.yaml"):
             for document in yaml.safe_load_all(path.read_text()):
                 if document and document.get("apiVersion", "").startswith("kustomize.toolkit.fluxcd.io/"):
                     with self.subTest(path=str(path), name=document["metadata"]["name"]):
@@ -160,7 +160,7 @@ class DeployTreeTests(unittest.TestCase):
     def test_certificates_wait_for_cert_manager_and_decrypt_secrets(self):
         documents = {
             document["metadata"]["name"]: document
-            for document in yaml.safe_load_all(Path("deploy/clusters/primary/sync.yaml").read_text())
+            for document in yaml.safe_load_all(Path("deploy/sync/sync.yaml").read_text())
         }
         infrastructure = documents["infrastructure"]["spec"]
         self.assertTrue(infrastructure["wait"])

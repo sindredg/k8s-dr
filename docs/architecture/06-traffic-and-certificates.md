@@ -1,6 +1,6 @@
 # 6. Traffic and certificates
 
-Status: built on the primary cluster for `git.sindrg.com`. The per-cluster hostnames `git-primary.sindrg.com` and `git-dr.sindrg.com` are designed in [decision 0008](../decisions/0008-cold-recovery.md) and not built.
+Status: built on the primary cluster for `git.sindrg.com`. The per-cluster hostnames from [decision 0008](../decisions/0008-cold-recovery.md) are in the manifests; neither `git-primary.sindrg.com` nor `git-dr.sindrg.com` is validated on a cluster.
 
 How a request reaches Gitea, and how the certificate that protects it is issued.
 
