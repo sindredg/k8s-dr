@@ -74,3 +74,21 @@ The external probe checks every minute. During a drill, create identifiable test
 - Before declaring DR ready: recover while primary access is blocked and pass the same checks through the canonical hostname.
 
 Implementation details such as exact VM machine type, certificate issuer, and public endpoint resource belong to their respective milestones and must be validated before provisioning.
+
+## Amendment: measure data loss from a write log
+
+Date: 2026-10-03
+
+The RPO row above compares the last acknowledged write with "the newest test write present after restore". Once the recovery cluster accepts pushes, the newest write is a recovery write, and one manually recorded write shows little about data loss.
+
+The drill therefore keeps a log on the operator machine. `make write-loop` pushes a write check every five minutes before isolation and appends each acknowledged commit and its UTC time. After the restore, and before any write to the recovery copy, `make check-fixtures` reports the restored HEAD.
+
+| Measure | Definition |
+| --- | --- |
+| Observed data loss | From the last write acknowledged before isolation to the acknowledgement time of the restored HEAD, both read from the log. Target: at most 2 hours. |
+| Potential loss window | Backup age at isolation: isolation time minus the restored set's timestamp. Reported separately. |
+| Lost writes | Every write acknowledged before isolation and after the restored HEAD. |
+
+The drill also records the UTC start and end of each stage (detection, provisioning, bootstrap, Flux reconcile, restore, verification, DNS cutover, probe recovery) with the failures, retries, and manual actions in each. The worklog explains any gap between the stage durations and the RTO that the external probe measures.
+
+`scripts/drill_report.py` computes both from the local logs. The trade-off is a second record beside the probe: the stage timeline depends on the operator recording each stage, so the probe remains the source for the RTO.

@@ -34,6 +34,20 @@ GIT_URL ?=
 # One inventory per cluster, so a stale file cannot send a recovery command
 # to the primary.
 INVENTORY := ansible/inventory/generated/$(CLUSTER)/hosts.json
+# Local drill records, ignored by Git: the write log and the stage timeline.
+# See scripts/drill_report.py.
+DRILL_DIR ?= .drill
+# File that write-check appends each acknowledged write to. Empty logs nothing;
+# write-loop sets it.
+WRITE_LOG ?=
+WRITE_INTERVAL ?= 300
+# Offline renders of every Flux path, for kubeconform. Ignored by Git.
+RENDER_DIR := .rendered
+KUBECONFORM ?= kubeconform
+# Schemas for Flux, cert-manager, and Gateway API objects, pinned to one
+# commit of the datreeio CRD catalog.
+CRD_SCHEMAS := https://raw.githubusercontent.com/datreeio/CRDs-catalog/d373c2da9702bc9509a004db83e57263fe3bdfc1/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+KUBERNETES_VERSION = $(shell sed -n 's/^kubernetes_version: "\(.*\)"/\1/p' ansible/playbooks/group_vars/all.yml)
 VENV := .venv
 # CI installs tools into the system Python and runs `make check BIN=`.
 BIN ?= $(VENV)/bin/
@@ -45,13 +59,14 @@ IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
 PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
 # The fixture playbooks run on the operator machine against the public endpoint.
 FIXTURE_PLAYBOOK := SOPS_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)ansible-playbook -i localhost, \
-	-e fixture_cluster=$(CLUSTER) $(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL))
+	-e fixture_cluster=$(CLUSTER) $(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL)) \
+	$(if $(WRITE_LOG),-e write_check_log=$(abspath $(WRITE_LOG)))
 PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_fixtures write_check restore restore_test_env
 
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
-	create-fixtures check-fixtures write-check restore restore-test-env \
-	restore-test-env-delete restore-test-forward check pins surface
+	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
+	restore-test-env-delete restore-test-forward check manifests pins surface preflight
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -88,6 +103,18 @@ check-fixtures: age-key ## Check the recovery fixtures (read-only)
 write-check: age-key ## Push a commit as the fixture user; print its UTC time
 	$(FIXTURE_PLAYBOOK) ansible/playbooks/write_check.yml
 
+# Runs until interrupted. A failed push is expected once the primary is
+# isolated; the loop keeps going so that the log shows when writes stopped.
+# The recipe calls the playbook directly: make -n would run a recursive make.
+write-loop: age-key ## Push a write check every WRITE_INTERVAL seconds and log each to DRILL_DIR
+	@mkdir -p -m 700 $(DRILL_DIR)
+	@while true; do \
+		$(FIXTURE_PLAYBOOK) -e write_check_log=$(abspath $(DRILL_DIR)/writes.tsv) \
+			ansible/playbooks/write_check.yml \
+			|| echo "write check failed at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"; \
+		sleep $(WRITE_INTERVAL); \
+	done
+
 restore: ## Restore a backup set into RESTORE_NAMESPACE through IAP
 	@test -n "$(RESTORE_NAMESPACE)" || { echo "Set RESTORE_NAMESPACE to gitea or gitea-restore" >&2; exit 1; }
 	@test -r "$(BACKUP_AGE_KEY_FILE)" || { echo "BACKUP_AGE_KEY_FILE not readable: $(BACKUP_AGE_KEY_FILE)" >&2; exit 1; }
@@ -115,8 +142,17 @@ check: ## Run the local unit tests, linters, and syntax checks
 		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \
 	done
 
+manifests: ## Render every Flux path for every cluster and validate it offline
+	rm -rf $(RENDER_DIR)
+	$(BIN)python scripts/check_manifests.py --output $(RENDER_DIR)
+	$(KUBECONFORM) -strict -summary -kubernetes-version $(KUBERNETES_VERSION) \
+		-schema-location default -schema-location '$(CRD_SCHEMAS)' $(RENDER_DIR)
+
 pins: ## Check that every pinned artifact still resolves upstream
 	$(BIN)python scripts/check_pins.py
+
+preflight: ## Check every recovery dependency from this machine (read-only)
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" BACKUP_AGE_KEY_FILE="$(BACKUP_AGE_KEY_FILE)" scripts/preflight.sh
 
 surface: ## Probe the public endpoint from outside (read-only)
 	scripts/check-public-surface.sh $(GIT_HOST)
