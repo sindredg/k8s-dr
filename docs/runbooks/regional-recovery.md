@@ -16,7 +16,21 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
 ## Procedure
 
-1. Record the outage start time from the external probe and the last successful write time. Record every manual action during recovery.
+1. Before isolation, start the write loop in a second terminal and leave it running. It pushes a write check every five minutes and appends each acknowledged write to `.drill/writes.tsv` on the operator machine.
+
+   ```bash
+   make write-loop
+   ```
+
+   Record the isolation time and the first failed probe time in UTC. Record each stage as it starts and ends, and every failure, retry, and manual action in the stage where it happened:
+
+   ```bash
+   python3 scripts/drill_report.py stage provisioning start
+   python3 scripts/drill_report.py stage provisioning note --note "plan showed 21 resources; reran init"
+   python3 scripts/drill_report.py stage provisioning end
+   ```
+
+   The stages are `detection`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `dns-cutover`, and `probe-recovery`. Stop the write loop once its pushes fail.
 
 2. Select the newest backup set that has a manifest, and record its name. The name is its recovery-point timestamp in UTC. Exclude sets without a manifest.
 
@@ -98,17 +112,33 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
    ```bash
    make check-fixtures GIT_HOST=git-dr.sindrg.com
+   ```
+
+   Expected: the recap ends with `failed=0`. Record the newest commit that it reports before anything writes to the recovery copy: it is the restored HEAD, and the data-loss report needs it. Then push a new commit:
+
+   ```bash
    make write-check GIT_HOST=git-dr.sindrg.com
    ```
 
-   Expected: both recaps end with `failed=0`. These sign in, find the known commit and issue, and push a new commit. Record the newest commit that `check-fixtures` reports; it is the newest recovered write. Investigate any failure before proceeding. Repeat the two commands from step 6 and expect the same results: the restore must not have enabled backups.
+   Expected: `failed=0`. Together these sign in, find the known commit and issue, and push a new commit. Investigate any failure before proceeding. Repeat the two commands from step 6 and expect the same results: the restore must not have enabled backups.
 
 9. Cut over. Change the Cloudflare DNS target for `git.sindrg.com` to the recovery address. Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
 
    1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml`. Do not use `kubectl patch`; Flux reverts it.
    2. Fence the primary: remove `primary` from `backup_clusters` in `infra/shared/terraform.tfvars` and apply `infra/shared`, so a primary that returns cannot write backups.
 
-10. Compute RTO from the first failed external probe to the time all checks pass through `git.sindrg.com`. Compute observed RPO from the last acknowledged primary test write to the newest test write recovered. Also report the potential data-loss window from the backup recovery point to outage start. Record timestamps, calculations, failures, manual steps, and cost in the drill worklog created for milestone 6.
+10. Compute the results and record them in the [drill worklog](../worklogs/06-disaster-drill.md).
+
+    ```bash
+    python3 scripts/drill_report.py rpo --restored-sha <restored HEAD> \
+      --isolated-at <isolation time, such as 2026-10-10T12:00:00Z> --backup-set <restored set>
+    python3 scripts/drill_report.py timeline
+    ```
+
+    - RTO runs from the first failed external probe to the time all checks pass through `git.sindrg.com`.
+    - Observed data loss runs from the last write acknowledged before isolation to the acknowledgement time of the restored HEAD. The report lists every acknowledged write that the restore lost. Writes after isolation went to the recovery cluster and are ignored, so a recovery push cannot hide a lost primary write.
+    - The potential loss window is the backup age at isolation. Report it separately.
+    - Explain any gap between the sum of the stage durations and the externally measured RTO. Record failures, manual steps, and cost.
 
 ## Remove the recovery environment
 

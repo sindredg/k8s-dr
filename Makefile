@@ -34,6 +34,13 @@ GIT_URL ?=
 # One inventory per cluster, so a stale file cannot send a recovery command
 # to the primary.
 INVENTORY := ansible/inventory/generated/$(CLUSTER)/hosts.json
+# Local drill records, ignored by Git: the write log and the stage timeline.
+# See scripts/drill_report.py.
+DRILL_DIR ?= .drill
+# File that write-check appends each acknowledged write to. Empty logs nothing;
+# write-loop sets it.
+WRITE_LOG ?=
+WRITE_INTERVAL ?= 300
 # Offline renders of every Flux path, for kubeconform. Ignored by Git.
 RENDER_DIR := .rendered
 KUBECONFORM ?= kubeconform
@@ -52,12 +59,13 @@ IAP := python3 scripts/run_with_iap.py --inventory $(INVENTORY) --
 PLAYBOOK := $(BIN)ansible-playbook -i $(INVENTORY)
 # The fixture playbooks run on the operator machine against the public endpoint.
 FIXTURE_PLAYBOOK := SOPS_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)ansible-playbook -i localhost, \
-	-e fixture_cluster=$(CLUSTER) $(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL))
+	-e fixture_cluster=$(CLUSTER) $(if $(GIT_HOST),-e git_host=$(GIT_HOST)) $(if $(GIT_URL),-e git_url=$(GIT_URL)) \
+	$(if $(WRITE_LOG),-e write_check_log=$(abspath $(WRITE_LOG)))
 PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_fixtures write_check restore restore_test_env
 
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
-	create-fixtures check-fixtures write-check restore restore-test-env \
+	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
 	restore-test-env-delete restore-test-forward check manifests pins surface
 
 help: ## List targets
@@ -94,6 +102,18 @@ check-fixtures: age-key ## Check the recovery fixtures (read-only)
 
 write-check: age-key ## Push a commit as the fixture user; print its UTC time
 	$(FIXTURE_PLAYBOOK) ansible/playbooks/write_check.yml
+
+# Runs until interrupted. A failed push is expected once the primary is
+# isolated; the loop keeps going so that the log shows when writes stopped.
+# The recipe calls the playbook directly: make -n would run a recursive make.
+write-loop: age-key ## Push a write check every WRITE_INTERVAL seconds and log each to DRILL_DIR
+	@mkdir -p -m 700 $(DRILL_DIR)
+	@while true; do \
+		$(FIXTURE_PLAYBOOK) -e write_check_log=$(abspath $(DRILL_DIR)/writes.tsv) \
+			ansible/playbooks/write_check.yml \
+			|| echo "write check failed at $$(date -u +%Y-%m-%dT%H:%M:%SZ)"; \
+		sleep $(WRITE_INTERVAL); \
+	done
 
 restore: ## Restore a backup set into RESTORE_NAMESPACE through IAP
 	@test -n "$(RESTORE_NAMESPACE)" || { echo "Set RESTORE_NAMESPACE to gitea or gitea-restore" >&2; exit 1; }
