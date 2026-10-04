@@ -18,6 +18,6 @@ data:
   backup_cluster: recovery
   # Set to "false" only after the restore passes the fixture and write
   # checks. A bootstrap alone must not write a set or ping the heartbeat.
-  backup_suspend: "true"
+  backup_suspend: "false"
   # Grafana Cloud cluster label. See decision 0009.
   cluster_name: recovery
