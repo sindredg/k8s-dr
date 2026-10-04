@@ -35,7 +35,7 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | Offsite object storage | Hourly encrypted application backups, with a Healthchecks.io heartbeat that alerts when they stop |
 | Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
 | GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, and a daily scan of the public surface |
-| External health probe | Measure outage and restored service (planned before the drill) |
+| External health probe | Measure outage and restored service from outside the cluster |
 
 ## Recovery test
 

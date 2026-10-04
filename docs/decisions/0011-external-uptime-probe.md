@@ -1,6 +1,6 @@
 # 0011: External uptime probe
 
-Status: Proposed on 2026-10-03. The check is written and planned, not applied.
+Status: Accepted on 2026-10-03. The check is applied, and the command under [Reading the results](#reading-the-results) returned passing checks from all three regions on 2026-10-04.
 
 Date: 2026-10-03
 
@@ -46,7 +46,20 @@ curl -sS -G "https://monitoring.googleapis.com/v3/projects/${PROJECT_ID}/timeSer
   jq -r '.timeSeries[] | .metric.labels.checker_location as $l | .points[] | "\(.interval.endTime) \($l) \(.value.boolValue)"' | sort
 ```
 
-The RTO starts at the earliest `false` line and stops when the fixture checks pass through `git.sindrg.com`. The first `true` line after the cutover shows when the probe saw the service again. This command has not been run: the check does not exist yet.
+The RTO starts at the earliest `false` line and stops when the fixture checks pass through `git.sindrg.com`. The first `true` line after the cutover shows when the probe saw the service again.
+
+The command ran on 2026-10-04 with a ten-minute interval and the service up. Every line was `true`. The first lines:
+
+```text
+2026-10-04T08:31:00Z apac-singapore true
+2026-10-04T08:31:00Z eur-belgium true
+2026-10-04T08:31:00Z usa-virginia true
+2026-10-04T08:31:10Z apac-singapore true
+2026-10-04T08:31:10Z eur-belgium true
+2026-10-04T08:31:10Z usa-virginia true
+```
+
+Each region reports a point every 10 seconds, although `gcloud monitoring uptime describe` shows `period: 60s`. Hypothesis, not confirmed: the metric repeats the latest result between checks. Until a drill shows otherwise, treat the first `false` line as accurate to the 60-second period, not to 10 seconds. The command has not been run across an outage.
 
 ## Consequences
 

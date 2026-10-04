@@ -24,7 +24,7 @@ The [project plan](../plan.md) defines milestone scope and validation gates. The
 | [Cold recovery](decisions/0008-cold-recovery.md) | Define the hostnames, cluster selection, recovery root, and primary isolation for milestone 5. |
 | [Cluster metrics](decisions/0009-cluster-metrics.md) | Send node, pod, and Kubernetes object metrics to Grafana Cloud from each cluster. |
 | [Service hardening](decisions/0010-service-hardening.md) | Require sign-in, restrict pod egress and node scopes, and check the public surface daily. |
-| [External uptime probe](decisions/0011-external-uptime-probe.md) | Proposed: measure the outage with a Cloud Monitoring uptime check. |
+| [External uptime probe](decisions/0011-external-uptime-probe.md) | Measure the outage with a Cloud Monitoring uptime check. |
 | [Production readiness](production-readiness.md) | List what a production deployment adds to this lab. |
 | [Kubernetes bootstrap implementation plan](plans/2026-09-23-kubernetes-bootstrap.md) | Break Milestone 2 implementation into tested, reviewable tasks. |
 | [Cluster metrics implementation plan](plans/2026-09-30-cluster-metrics.md) | Break the decision 0009 implementation into tasks. |
