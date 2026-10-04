@@ -4,7 +4,28 @@ Recover a stateful service after losing a region. This lab runs Gitea and Postgr
 
 The first target is recovery within a few hours. Faster recovery is a later experiment, based on the measured bottlenecks.
 
-**Status:** milestones 0 to 4 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups; a test restore took 43 seconds. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. Cold recovery in the second region (milestone 5) is complete: with both primary VMs stopped, a new cluster in Belgium restored the newest backup and passed the fixture and write checks through `git-dr.sindrg.com`. The first disaster drill (milestone 6) recovered the service through `git.sindrg.com` in 19 minutes with 25 minutes of data loss; the repeat has not run. See [plan.md](plan.md).
+**Status:** milestones 0 to 6 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups. Two disaster drills stopped the primary region, rebuilt the service in Belgium from code and one backup set, and moved `git.sindrg.com` to it. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. See [plan.md](plan.md).
+
+## Results
+
+Two drills on 2026-10-04 stopped both primary VMs and recovered the service in the second region.
+
+| Measure | Drill 1 | Drill 2 | Target |
+| --- | --- | --- | --- |
+| Recovery time: first failed external probe to sign-in, known commit and issue, and a new push through `git.sindrg.com` | 19 min 17 s | 17 min 36 s | At most 4 hours |
+| Data loss: last acknowledged write to the newest restored write | 25 min 28 s, 5 writes | 15 min 16 s, 3 writes | At most 2 hours |
+| Restored recovery point | 14:07 UTC backup | 16:07 UTC backup | |
+| Failed steps | One check rerun | None | |
+
+Every step is a typed command, about 19 per drill; nothing is automated end to end. The recovery environment existed for 42 and 28 minutes; its cost was not read from billing. The recovery time is not the restore time: the restore Job takes under 30 seconds, and a test restore on the primary took 43 seconds, while building the cluster takes most of the rest.
+
+| Evidence | Where |
+| --- | --- |
+| Drill results, stage timelines, probe times, failures, limits | [Disaster drill worklog](docs/worklogs/06-disaster-drill.md) |
+| The procedure that ran | [Regional recovery runbook](docs/runbooks/regional-recovery.md) |
+| First recovery with the primary stopped, without a cutover | [Cold recovery worklog](docs/worklogs/05-cold-recovery.md) |
+| How the measures are defined | [Decision 0002](docs/decisions/0002-recovery-contract.md#measurement) |
+| Backup and test restore | [Consistent backups worklog](docs/worklogs/04-consistent-backups.md) |
 
 ## Target architecture
 

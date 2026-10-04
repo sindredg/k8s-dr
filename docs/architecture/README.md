@@ -99,6 +99,6 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 | Cluster metrics, hardening, daily surface scan | Built and validated |
 | Recovery Terraform root, recovery Flux settings, shared sync definition, `CLUSTER` selection | Built and validated by the milestone 5 gate |
 | Per-cluster hostnames `git-primary` and `git-dr` | Built and validated by the milestone 5 gate |
-| External uptime probe | Built and applied from `infra/shared` ([decision 0011](../decisions/0011-external-uptime-probe.md)); measured the outage of drill 1 |
-| Disaster drill with measured recovery time and data loss | Drill 1 met both targets on 2026-10-04; the repeat has not run (milestone 6) |
+| External uptime probe | Built and applied from `infra/shared` ([decision 0011](../decisions/0011-external-uptime-probe.md)); measured the outages of both drills |
+| Disaster drill with measured recovery time and data loss | Two drills met both targets on 2026-10-04 (milestone 6) |
 | Failback to the primary | Not planned |

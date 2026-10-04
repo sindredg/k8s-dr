@@ -1,6 +1,6 @@
 # Disaster drill
 
-Status: Drill 1 ran on 2026-10-04 and met both targets. The repeat has not run. This file is the record of [milestone 6](../../plan.md#6-disaster-drill).
+Status: Complete. Two drills ran on 2026-10-04 and both met the targets; see the [comparison](#comparison). This file is the record of [milestone 6](../../plan.md#6-disaster-drill).
 
 ## Scope
 
@@ -202,4 +202,136 @@ Changes made to the runbook after this drill, before the repeat:
 
 ## Drill 2
 
-Not run. Use the same sections, then compare the two drills stage by stage.
+Date: 2026-10-04, with the runbook as changed after drill 1. The service recovered in Belgium, both targets were met, and no step failed. The drill then returned to the primary.
+
+### Result
+
+| Measure | Value | Target | Met |
+| --- | --- | --- | --- |
+| RTO: first failed probe to all checks passing through `git.sindrg.com` | 17 min 36 s (16:23:20 to 16:40:56 UTC) | At most 4 hours | Yes |
+| Observed data loss: last acknowledged write to the restored HEAD | 15 min 16 s | At most 2 hours | Yes |
+| Potential loss window: backup age at isolation | 15 min 12 s | Reported, no target | |
+| Acknowledged writes lost | 3 | Reported, no target | |
+| Manual actions | Every step is a typed command. Up to the end of the RTO: 19 commands, two of them waits, and one edit of `backup_clusters`. No rerun. | Reported, no target | |
+| Incremental cloud cost | Not measured. The recovery environment existed from 16:25 to 16:53 UTC, 28 minutes. | Reported, no target | |
+
+### Preflight
+
+`make preflight` was not repeated before drill 2. The 16:07 backup, the first after the return from drill 1, was the precondition that was checked: `primary/20261004T160702Z` had a manifest, and the restore verified it.
+
+### Recovery point
+
+| Item | Value |
+| --- | --- |
+| Isolation time (UTC) | `gcloud compute instances stop` ran from 16:22:14 to 16:24:36; both primary VMs `TERMINATED` |
+| First failed probe (UTC) | 16:23:20 |
+| Restored set | `primary/20261004T160702Z` |
+| Last acknowledged primary write | 16:21:03, commit `a941acb` |
+| Restored HEAD | 16:05:47, commit `8fb3c20` |
+
+`make write-loop` logged 14 acknowledged writes from 15:14:50 to 16:21:03 without a gap. Its first failed push was at 16:26:17.
+
+```text
+$ python3 scripts/drill_report.py rpo --restored-sha 8fb3c2046cdd815e7cd203a333bf090b4e701946 \
+    --isolated-at 2026-10-04T16:22:14Z --backup-set 20261004T160702Z
+Last acknowledged primary write: 2026-10-04T16:21:03Z a941acb94ab2a98e780cc6f816aa3d35801b858c
+Restored HEAD acknowledged:      2026-10-04T16:05:47Z 8fb3c2046cdd815e7cd203a333bf090b4e701946
+Observed data loss:              0h 15m 16s
+Acknowledged writes lost:        3
+  2026-10-04T16:10:52Z 63279203c13e4b134a711ec6cd6ce9a2a2cb92f6
+  2026-10-04T16:15:58Z 189a1a8786b9d5493e0f314eada117f8f20cc886
+  2026-10-04T16:21:03Z a941acb94ab2a98e780cc6f816aa3d35801b858c
+Potential loss window:           0h 15m 12s (backup age at isolation)
+```
+
+| Checker region | First failed check | Last failed check | First passing check after the cutover |
+| --- | --- | --- | --- |
+| `apac-singapore` | 16:23:50 | 16:40:40 | 16:40:50 |
+| `eur-belgium` | 16:23:20 | 16:41:10 | 16:41:20 |
+| `usa-virginia` | 16:23:30 | 16:40:20 | 16:40:30 |
+
+### Stage timeline
+
+| Stage | Start (UTC) | End (UTC) | Duration | Notes |
+| --- | --- | --- | --- | --- |
+| detection | 2026-10-04T16:22:14Z | 2026-10-04T16:24:48Z | 0h 02m 34s | 16:22:14 isolation: gcloud compute instances stop on both primary VMs |
+| provisioning | 2026-10-04T16:24:48Z | 2026-10-04T16:27:52Z | 0h 03m 04s | 16:27:52 20 resources, 2 backup grants, git-dr record |
+| bootstrap | 2026-10-04T16:27:54Z | 2026-10-04T16:36:29Z | 0h 08m 35s | 16:36:29 497 s, failed=0; the playbook includes the Flux install |
+| flux-reconcile | 2026-10-04T16:36:29Z | 2026-10-04T16:37:42Z | 0h 01m 13s | 16:37:42 validate-cluster and validate-services |
+| restore | 2026-10-04T16:38:03Z | 2026-10-04T16:39:13Z | 0h 01m 10s | 16:39:13 primary/20261004T160702Z, restore Job 27 s |
+| verification | 2026-10-04T16:39:13Z | 2026-10-04T16:39:53Z | 0h 00m 40s |  |
+| dns-cutover | 2026-10-04T16:39:53Z | 2026-10-04T16:40:47Z | 0h 00m 54s | 16:40:47 record set at 16:40:00 |
+| probe-recovery | 2026-10-04T16:40:47Z | 2026-10-04T16:40:57Z | 0h 00m 10s | 16:40:57 all checks through git.sindrg.com passed |
+
+The stages sum to 18 min 10 s between 16:22:14 and 16:40:47, with 23 seconds between stages. The RTO starts 66 seconds after the isolation began, at the first failed probe, and ends at 16:40:56, when the write check through `git.sindrg.com` passed.
+
+The commands are those of drill 1. Results that differ or that the comparison uses:
+
+| Stage | Result |
+| --- | --- |
+| Provisioning | `Plan: 20 to add`, applied; `Plan: 2 to add` in `infra/shared`, applied; `git-dr` record `set at 2026-10-04T16:27:47Z` |
+| Bootstrap | Control plane `ok=75 failed=0`, worker `ok=63 failed=0`; 16:27:57 to 16:36:14, 497 s |
+| Cluster and services | `ok=10 failed=0`, 44 s; `ok=13 failed=0`, 28 s |
+| No new recovery set | `gcloud storage ls gs://<bucket>/recovery/` listed only `recovery/20261004T150702Z/`, the set from drill 1 |
+| Restore | `restoring primary/20261004T160702Z; backup age at restore start 1882 seconds`, `digests match the manifest`, `restored primary/20261004T160702Z in 27 seconds`; `ok=15 failed=0`, 59 s |
+| Wait for the endpoint | `https://git-dr.sindrg.com/api/healthz` returned 200 at 16:39:43, 36 seconds after the restore command returned |
+| Fixtures and push on the recovery cluster | `failed=0` at 16:39:48 on the first run, newest commit `8fb3c20`; `Push accepted at 2026-10-04T16:39:53Z by https://git-dr.sindrg.com/` |
+| Cutover | `set at 2026-10-04T16:40:00Z`; resolvers returned the recovery address by 16:40:47 |
+| Checks through the public name | `failed=0` at 16:40:51; `Push accepted at 2026-10-04T16:40:56Z by https://git.sindrg.com/` |
+| Recovery backups | Merged `backup_suspend: "false"` at 16:42:44. CI passed on the first run. The recovery cluster was removed before its next hourly run, so this drill wrote no set. |
+| Fence the primary | `Apply complete! Resources: 0 added, 0 changed, 2 destroyed.` |
+
+The `suspend` check in runbook step 6 was not run in this drill either.
+
+### Failures and manual actions
+
+None. The wait added to step 8 ended after 36 seconds and the fixture check passed on its first run.
+
+### Return to the primary
+
+| Step | Result |
+| --- | --- |
+| Start the primary at 16:43:12 | `https://git-primary.sindrg.com/api/healthz` returned 200 at 16:45:51 |
+| Validate it | `make validate-cluster` `ok=10 failed=0`, 76 s; `make validate-services` `ok=13 failed=0`, 48 s; `make check-fixtures GIT_HOST=git-primary.sindrg.com` `failed=0`, newest commit `a941acb` |
+| Point `git` back | `set at 2026-10-04T16:48:09Z`; `make check-fixtures` `failed=0`; `Push accepted at 2026-10-04T16:49:29Z by https://git.sindrg.com/` |
+| Grants | `Apply complete! Resources: 2 added, 0 changed, 2 destroyed.` |
+| Delete `git-dr` | `deleted at 2026-10-04T16:50:00Z` |
+| Suspend recovery backups | Merged; `main` at `d5c9fba` |
+| Destroy the recovery root | `Apply complete! Resources: 0 added, 0 changed, 20 destroyed.` |
+| Nothing left, at 16:54 | Only the two primary VMs, both `RUNNING`; no recovery disk, address, or network; empty recovery state; `infra/shared` plans `No changes.` |
+
+The public name was served from Belgium from 16:40 to 16:48.
+
+### Runbook changes
+
+None after this drill.
+
+## Comparison
+
+| Measure | Drill 1 | Drill 2 |
+| --- | --- | --- |
+| RTO | 19 min 17 s | 17 min 36 s |
+| Observed data loss | 25 min 28 s, 5 writes | 15 min 16 s, 3 writes |
+| Backup age at isolation | 21 min 02 s | 15 min 12 s |
+| Failed steps | 1 rerun before the RTO stopped; 1 failed CI run after it | None |
+
+| Stage | Drill 1 | Drill 2 | Note |
+| --- | --- | --- | --- |
+| Detection (the stop command) | 2 min 44 s | 2 min 34 s | |
+| Provisioning | 3 min 26 s | 3 min 04 s | |
+| Bootstrap | 7 min 46 s | 8 min 35 s | The playbook took 442 s and 497 s. The largest stage in both drills. |
+| Flux reconcile (validation) | 51 s | 1 min 13 s | |
+| Restore | 1 min 08 s | 1 min 10 s | The restore Job took 28 s and 27 s. |
+| Verification | 1 min 39 s | 40 s | Drill 1 includes the failed fixture check and its rerun. |
+| DNS cutover | 1 min 02 s | 54 s | Bounded by the 60-second TTL. |
+
+The restore is repeatable: two builds from nothing, two different sets, the same commands, and both targets met with a wide margin. The data loss differs because it depends on when in the hourly interval the isolation falls: it can approach one hour plus the time since the last write. The bootstrap is about 45% of the recovery time.
+
+## Limits of these drills
+
+- The isolation stops the VMs. The drills do not cover a partial failure, a loss of the Google Cloud project, or a loss of Cloudflare.
+- The uptime check shares the project with both clusters, as [decision 0011](../decisions/0011-external-uptime-probe.md#known-limits) records.
+- The fixture repository is small. Restore time for a large instance is not measured.
+- Both drills ran on the same day with the same operator machine, already authenticated, with the keys in place. Time to notice the outage, decide, and find the credentials is not in the RTO.
+- The return to the primary discards the recovery copy. No failback was tested.
+- Cloud cost was not read from billing.
