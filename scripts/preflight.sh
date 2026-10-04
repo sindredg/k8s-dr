@@ -187,8 +187,9 @@ cloudflare() {
     curl -sS -m 30 -H @- "https://api.cloudflare.com/client/v4${path}" 2>/dev/null
 }
 
-# The recovery cluster issues its certificates with this token. The operator
-# changes DNS in the dashboard, which this script cannot check.
+# The recovery cluster issues its certificates with this token, and
+# scripts/dns_record.sh changes the drill's records with it. The dashboard is
+# the fallback, which this script cannot check.
 check_cloudflare() {
   local token verify status expires days zone record
   if [ ! -r "$FLUX_AGE_KEY_FILE" ]; then
@@ -230,7 +231,7 @@ check_cloudflare() {
   else
     report fail cloudflare-zone "git.${ZONE} is not DNS only with a 60-second TTL (ttl and proxied: ${record:-unreadable})"
   fi
-  report manual cloudflare-login "confirm that you can sign in to the Cloudflare dashboard for the cutover"
+  report manual cloudflare-login "confirm that you can sign in to the Cloudflare dashboard, the fallback for make dns-set"
 }
 
 printf 'Recovery preflight at %s\n\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"

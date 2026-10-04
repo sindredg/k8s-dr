@@ -1,6 +1,6 @@
 # 0008: Cold recovery
 
-Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03.
+Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03. Amended on 2026-10-04 with the [return to the primary after a drill](#amendment-return-to-the-primary-after-a-drill).
 
 Date: 2026-09-30
 
@@ -101,3 +101,21 @@ The recovery cluster keeps the prefix `recovery/` and the shared ping URL in bot
 | A second Healthchecks.io check for the recovery cluster | Separates the two heartbeats, but adds a credential that the recovery store must hold and a check that is silent most of the time. |
 
 The milestone 5 gate checks that a bootstrap and a restore leave the CronJob suspended and write no `recovery/` object. The milestone 6 drill exercises the change that enables it.
+
+## Amendment: return to the primary after a drill
+
+Date: 2026-10-04
+
+[Milestone 6](../../plan.md#6-disaster-drill) runs the drill twice. After the first drill the recovery cluster serves `git.sindrg.com`, backs up to `recovery/`, and the primary is stopped and fenced. The second drill needs the starting state again, and the project does not keep two regions running.
+
+A drill therefore ends by returning to the primary. The stopped primary still holds its data as of the isolation. The return starts it, points `git.sindrg.com` back, restores its backup grant, suspends recovery backups again in Git, and destroys the recovery environment. The [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill) has the steps.
+
+| Option | Trade-off |
+| --- | --- |
+| Return to the stopped primary and discard the recovery copy (selected) | A few commands and no data movement. Writes that the recovery cluster accepted are lost; in a drill these are only write checks. It is not a failback and proves nothing about one. |
+| Fail back: restore the newest `recovery/` set into a rebuilt primary | Keeps the recovery writes and exercises the reverse path. It is a second recovery with its own runbook, checks, and cutover, which the plan does not include. |
+| Keep the recovery cluster as the new primary and drill back to Finland | No return step. `infra/recovery` has no `prevent_destroy` and both roots would need to swap roles, which is a redesign. |
+
+After a real loss of the primary there is no return: the recovery cluster stays in service, and going back to Finland is a planned failback that this project does not build.
+
+Sets that the recovery cluster wrote stay under `recovery/` until the bucket's retention and lifecycle rules remove them. The next restore still reads `primary/`.

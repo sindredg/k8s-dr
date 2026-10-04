@@ -1,6 +1,6 @@
 # 0002: Recovery contract and target design
 
-Status: Accepted. The milestone 0 gate is met. Milestones 1 and 2 validated the primary infrastructure and cluster; recovery validation is pending. Amended on 2026-09-29: [decision 0007](0007-consistent-backups.md) replaces restic with age-encrypted objects.
+Status: Accepted. The milestone 0 gate is met. Milestones 1 and 2 validated the primary infrastructure and cluster; recovery validation is pending. Amended on 2026-09-29: [decision 0007](0007-consistent-backups.md) replaces restic with age-encrypted objects. Amended on 2026-10-04: the drill changes DNS records [through the Cloudflare API](#amendment-change-dns-records-through-the-cloudflare-api).
 
 Date: 2026-09-22
 
@@ -92,3 +92,20 @@ The drill therefore keeps a log on the operator machine. `make write-loop` pushe
 The drill also records the UTC start and end of each stage (detection, provisioning, bootstrap, Flux reconcile, restore, verification, DNS cutover, probe recovery) with the failures, retries, and manual actions in each. The worklog explains any gap between the stage durations and the RTO that the external probe measures.
 
 `scripts/drill_report.py` computes both from the local logs. The trade-off is a second record beside the probe: the stage timeline depends on the operator recording each stage, so the probe remains the source for the RTO.
+
+## Amendment: change DNS records through the Cloudflare API
+
+Date: 2026-10-04
+
+The table above selects a manual record change in the Cloudflare dashboard and defers automation until a drill shows the step is a meaningful delay. The milestone 5 gate showed a different problem: a record made by hand got TTL `Auto` instead of 60 seconds, and a dashboard change leaves no command or timestamp for the worklog.
+
+`make dns-set` and `make dns-delete` now change the two records a drill touches, `git-dr` and `git`, through the Cloudflare API. `scripts/dns_record.sh` always writes a DNS-only record with a 60-second TTL, prints the old and new record and the UTC time, refuses any other name, and refuses to delete `git`.
+
+| Option | Trade-off |
+| --- | --- |
+| A script that uses the existing token (selected) | Repeatable, timed, and the same on every drill. The token that cert-manager uses for DNS-01 already has DNS edit on the zone, so no new credential exists. The operator machine now uses that token to move the public name, so a wrong address in the command takes the service down until it is corrected. |
+| The dashboard | No script. Needs a signed-in person at each of the four record changes of a drill, and repeats the TTL mistake. It stays the fallback if the API or the token fails. |
+| A second token for the operator | Separates the operator's use from cert-manager's. One more credential to store, rotate, and restore; the scope would be the same. |
+| Cloudflare records in Terraform | Declarative, but adds a provider and a credential to a root, and a cutover would be a `terraform apply` during the outage. |
+
+The token expires on 2026-11-01. `make preflight` fails within a week of the expiry.
