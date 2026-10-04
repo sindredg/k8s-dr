@@ -1,6 +1,6 @@
 # 0012: Back up every 15 minutes
 
-Status: Proposed on 2026-10-04. The schedule is changed; the drill that measures it has not run.
+Status: Accepted on 2026-10-04. A third drill measured it; see the [worklog](../worklogs/07-faster-recovery.md). The schedule stays.
 
 Date: 2026-10-04
 
@@ -41,4 +41,4 @@ The expected data loss is then at most 15 minutes plus the time since the last w
 
 - `make preflight` still accepts a newest set up to two hours old.
 - The write loop of a drill fails a push when it coincides with a capture. The loop logs the failure and continues.
-- If the repeat drill shows that the captures cost more availability than the shorter interval is worth, the change is one line to revert.
+- The repeat drill restored a 15-minute set with a data loss of 10 minutes and showed one failed uptime check in one region at each capture. The change stays; it is one line to revert.

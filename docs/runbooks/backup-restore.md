@@ -1,6 +1,6 @@
 # Backup and restore: operator procedure
 
-Check the hourly backups and restore a backup set with the restore Job. [Decision 0007](../decisions/0007-consistent-backups.md) records the design. Record observed results in the [milestone 4 worklog](../worklogs/04-consistent-backups.md).
+Check the scheduled backups and restore a backup set with the restore Job. [Decision 0007](../decisions/0007-consistent-backups.md) records the design. Record observed results in the [milestone 4 worklog](../worklogs/04-consistent-backups.md).
 
 ## Prerequisites
 

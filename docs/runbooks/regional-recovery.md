@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -151,7 +151,7 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
    Expected: the wait ends within the 60-second TTL. Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
 
-   1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml` and in the expected settings in `tests/test_services.py`, which pins the value. Do not use `kubectl patch`; Flux reverts it. The next hourly run writes the first `recovery/` set.
+   1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml` and in the expected settings in `tests/test_services.py`, which pins the value. Do not use `kubectl patch`; Flux reverts it. The next scheduled run writes the first `recovery/` set.
    2. Fence the primary: remove `primary` from `backup_clusters` in `infra/shared/terraform.tfvars` and apply `infra/shared`, so a primary that returns cannot write backups.
 
 10. Compute the results and record them in the [drill worklog](../worklogs/06-disaster-drill.md).
@@ -200,7 +200,7 @@ A drill ends by returning to the stopped primary, which still holds its data as 
    terraform -chdir=infra/shared apply shared-return.tfplan
    ```
 
-   Expected: `Plan: 2 to add, 0 to change, 2 to destroy`: the two primary grants return and the two recovery grants go. Confirm that the next hourly backup on the primary completes.
+   Expected: `Plan: 2 to add, 0 to change, 2 to destroy`: the two primary grants return and the two recovery grants go. Confirm that the next backup on the primary completes.
 
 5. Delete the `git-dr` record and destroy the recovery root, as in steps 2 and 3 of the next section.
 

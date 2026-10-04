@@ -2,26 +2,27 @@
 
 Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
 
-The first target is recovery within a few hours. Faster recovery is a later experiment, based on the measured bottlenecks.
+The first target was recovery within a few hours. The measured recovery takes under 20 minutes.
 
-**Status:** milestones 0 to 6 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups. Two disaster drills stopped the primary region, rebuilt the service in Belgium from code and one backup set, and moved `git.sindrg.com` to it. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. See [plan.md](plan.md).
+**Status:** all milestones are complete. The primary cluster serves Gitea and takes encrypted offsite backups every 15 minutes. Three disaster drills stopped the primary region, rebuilt the service in Belgium from code and one backup set, and moved `git.sindrg.com` to it. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. See [plan.md](plan.md).
 
 ## Results
 
-Two drills on 2026-10-04 stopped both primary VMs and recovered the service in the second region.
+Three drills on 2026-10-04 stopped both primary VMs and recovered the service in the second region. Drills 1 and 2 ran with hourly backups. Drill 3 ran after the backups moved to every 15 minutes.
 
-| Measure | Drill 1 | Drill 2 | Target |
-| --- | --- | --- | --- |
-| Recovery time: first failed external probe to sign-in, known commit and issue, and a new push through `git.sindrg.com` | 19 min 17 s | 17 min 36 s | At most 4 hours |
-| Data loss: last acknowledged write to the newest restored write | 25 min 28 s, 5 writes | 15 min 16 s, 3 writes | At most 2 hours |
-| Restored recovery point | 14:07 UTC backup | 16:07 UTC backup | |
-| Failed steps | One check rerun | None | |
+| Measure | Drill 1 | Drill 2 | Drill 3 | Target |
+| --- | --- | --- | --- | --- |
+| Recovery time: first failed external probe to sign-in, known commit and issue, and a new push through `git.sindrg.com` | 19 min 17 s | 17 min 36 s | 16 min 46 s | At most 4 hours |
+| Data loss: last acknowledged write to the newest restored write | 25 min 28 s | 15 min 16 s | 10 min 10 s | At most 2 hours |
+| Largest possible backup age | 60 min | 60 min | 15 min | |
+| Failed steps | One check rerun | None | None | |
 
-Every step is a typed command, about 19 per drill; nothing is automated end to end. The recovery environment existed for 42 and 28 minutes; its cost was not read from billing. The recovery time is not the restore time: the restore Job takes under 30 seconds, and a test restore on the primary took 43 seconds, while building the cluster takes most of the rest.
+Every step is a typed command, about 19 per drill; nothing is automated end to end. The recovery environment existed for 42, 28, and 23 minutes; its cost was not read from billing. The recovery time is not the restore time: the restore Job takes under 30 seconds, and a test restore on the primary took 43 seconds, while building the cluster takes most of the rest. Each backup briefly scales the service to zero, which now happens four times an hour.
 
 | Evidence | Where |
 | --- | --- |
 | Drill results, stage timelines, probe times, failures, limits | [Disaster drill worklog](docs/worklogs/06-disaster-drill.md) |
+| The 15-minute schedule, drill 3, and what it costs | [Faster recovery worklog](docs/worklogs/07-faster-recovery.md) |
 | The procedure that ran | [Regional recovery runbook](docs/runbooks/regional-recovery.md) |
 | First recovery with the primary stopped, without a cutover | [Cold recovery worklog](docs/worklogs/05-cold-recovery.md) |
 | How the measures are defined | [Decision 0002](docs/decisions/0002-recovery-contract.md#measurement) |
@@ -53,7 +54,7 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | Traefik and cert-manager | Route HTTPS through the Gateway API with Let's Encrypt certificates |
 | SOPS and age | Keep secrets encrypted in the public repository; encrypt backups to keys the cluster does not hold |
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
-| Offsite object storage | Hourly encrypted application backups, with a Healthchecks.io heartbeat that alerts when they stop |
+| Offsite object storage | Encrypted application backups every 15 minutes, with a Healthchecks.io heartbeat that alerts when they stop |
 | Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
 | GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, and a daily scan of the public surface |
 | External health probe | Measure outage and restored service from outside the cluster |

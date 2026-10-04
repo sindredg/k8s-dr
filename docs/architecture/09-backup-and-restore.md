@@ -1,12 +1,12 @@
 # 9. Backup and restore
 
-Status: built and validated on the primary cluster, including a test restore. The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) restored a set into a recovery cluster.
+Status: built and validated on the primary cluster, including a test restore. Three [drills](../worklogs/07-faster-recovery.md#comparison) restored a set into a recovery cluster.
 
-Every hour a CronJob captures the database and the Gitea volume as one consistent set, encrypts it, and uploads it to a bucket in another region. A restore Job reverses it. This is the only path by which data leaves the primary region.
+Every 15 minutes a CronJob captures the database and the Gitea volume as one consistent set, encrypts it, and uploads it to a bucket in another region. A restore Job reverses it. This is the only path by which data leaves the primary region.
 
 ## Backup
 
-The CronJob `gitea-backup` runs at minute 7 of every hour on the worker, with the Gitea volume mounted read-only.
+The CronJob `gitea-backup` runs at minutes 7, 22, 37, and 52 of every hour on the worker ([decision 0012](../decisions/0012-backup-every-15-minutes.md)), with the Gitea volume mounted read-only.
 
 ```mermaid
 sequenceDiagram
@@ -29,7 +29,7 @@ sequenceDiagram
 
 Stopping Gitea for the capture is what makes the set consistent: the database and the files are taken while nothing writes. Gitea is back before the upload starts, so the pause is seconds, not the upload time.
 
-If any step fails, the script scales Gitea back up and pings the failure endpoint. A retry is not attempted; the next hourly run is the retry.
+If any step fails, the script scales Gitea back up and pings the failure endpoint. A retry is not attempted; the next scheduled run is the retry.
 
 ## A backup set
 
@@ -64,7 +64,7 @@ After a failover, the operator removes `primary` from `backup_clusters` in `infr
 
 ## Alerting
 
-Healthchecks.io expects a success ping every hour with one hour of grace. It alerts when pings stop or a failure ping arrives, which is when no backup has completed inside the two-hour data-loss target.
+Healthchecks.io expects a success ping every hour with one hour of grace. It alerts when pings stop or a failure ping arrives, which is when no backup has completed inside the two-hour data-loss target. The period did not change with the 15-minute schedule.
 
 ## Restore
 
@@ -95,8 +95,8 @@ The namespace has no default. `gitea` replaces a live service; `gitea-restore` i
 - The backup bucket is in the same project as the cluster.
 - The retention policy is unlocked.
 - Test restores are run by hand, not on a schedule.
-- Gitea is unavailable for a few seconds every hour.
+- Gitea is unavailable for a short time at every backup, four times an hour. The uptime check reports one failed check in one or two regions per backup.
 
-A recovery cluster starts its own hourly backups as soon as Flux deploys the CronJob, before any data is restored. Those early sets hold an empty service; they land under `recovery/` and do not affect a restore from `primary/`.
+A recovery cluster starts with its backups suspended, so a bootstrap writes no set before the restore is verified. A change in Git enables them after the cutover, and its sets land under `recovery/`. See [decision 0008](../decisions/0008-cold-recovery.md#amendment-recovery-backups-stay-suspended-until-the-cutover).
 
 See [decision 0007](../decisions/0007-consistent-backups.md) and the [backup and restore runbook](../runbooks/backup-restore.md).

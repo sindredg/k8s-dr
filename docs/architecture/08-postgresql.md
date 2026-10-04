@@ -43,7 +43,7 @@ The image reads the password only when it initializes an empty data directory. C
 
 ```mermaid
 flowchart LR
-    live[("Live database")] -- "pg_dump, hourly" --> dump["Encrypted dump<br/>in the backup bucket"]
+    live[("Live database")] -- "pg_dump, every 15 min" --> dump["Encrypted dump<br/>in the backup bucket"]
     dump -- "pg_restore" --> restored[("Restored database")]
 ```
 
@@ -52,7 +52,7 @@ flowchart LR
 | The volume is on a dedicated disk | Losing the pod, or rebuilding the worker VM |
 | Flux does not own the volume claim, and the namespace is never pruned | A manifest removed from Git deleting the data |
 | The disk has `prevent_destroy` in Terraform | A `terraform destroy` deleting the data |
-| The hourly `pg_dump` in the [backup set](09-backup-and-restore.md) | Losing the disk, the zone, or the region |
+| The `pg_dump` every 15 minutes in the [backup set](09-backup-and-restore.md) | Losing the disk, the zone, or the region |
 
 The dump is taken while Gitea is scaled to zero, so it matches the file archive taken at the same moment. The backup tool image is built from the same PostgreSQL image as the server, so `pg_dump` and `pg_restore` always match the server version.
 
@@ -68,7 +68,7 @@ A restore drops and recreates the `gitea` database, then loads the dump in a sin
 ## Limits
 
 - One instance and no replica. A pod restart is an outage for Gitea.
-- No point-in-time recovery. The hourly dump is the only recovery point, so up to an hour of writes can be lost. The target allows two.
+- No point-in-time recovery. The dump every 15 minutes is the only recovery point, so up to 15 minutes of writes can be lost. The target allows two hours.
 - The volume is node-local and cannot move to another node.
 - No connection pooling, no metrics exporter, and no automatic tuning. The load is one small Gitea.
 
