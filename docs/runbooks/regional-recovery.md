@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). The repeat has not run. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 

@@ -10,7 +10,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | 3. Service deployment | Gitea survives pod restarts | Complete |
 | 4. Consistent backups | Offsite data restores successfully | Complete |
 | 5. Cold recovery | Independent service in second region | Complete |
-| 6. Disaster drill | Measured RTO and RPO | In progress |
+| 6. Disaster drill | Measured RTO and RPO | Complete |
 | 7. Faster recovery | Optional improvement backed by measurements | Pending |
 
 ## 0. Recovery contract
@@ -100,13 +100,13 @@ Close the findings of a security review of the running service. See [decision 00
 
 ## 6. Disaster drill
 
-- [ ] Start an external health probe and record the last successful write.
-- [ ] Simulate primary-region loss and execute the recovery runbook.
-- [ ] Verify login, known commit and issue, and a new push through the recovery endpoint.
-- [ ] Record actual RTO, RPO, manual actions, failures, and cloud cost.
-- [ ] Fix the runbook and repeat the drill once.
+- [x] Start an external health probe and record the last successful write.
+- [x] Simulate primary-region loss and execute the recovery runbook.
+- [x] Verify login, known commit and issue, and a new push through the recovery endpoint.
+- [x] Record actual RTO, RPO, manual actions, failures, and cloud cost.
+- [x] Fix the runbook and repeat the drill once.
 
-**Gate:** Evidence shows a successful repeatable restore and whether the targets were met.
+**Gate:** Evidence shows a successful repeatable restore and whether the targets were met. Passed on 2026-10-04: two drills met both targets; see the [worklog](docs/worklogs/06-disaster-drill.md#comparison). Cloud cost is recorded as the time the recovery environment existed, not as a billed amount.
 
 ## 7. Faster recovery (optional)
 
