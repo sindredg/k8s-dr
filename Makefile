@@ -37,6 +37,10 @@ INVENTORY := ansible/inventory/generated/$(CLUSTER)/hosts.json
 # Local drill records, ignored by Git: the write log and the stage timeline.
 # See scripts/drill_report.py.
 DRILL_DIR ?= .drill
+# DNS record for dns-show, dns-set, and dns-delete: git or git-dr, and the
+# address to set. See scripts/dns_record.sh.
+DNS_NAME ?=
+DNS_ADDRESS ?=
 # File that write-check appends each acknowledged write to. Empty logs nothing;
 # write-loop sets it.
 WRITE_LOG ?=
@@ -66,7 +70,8 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
-	restore-test-env-delete restore-test-forward check manifests pins surface preflight
+	restore-test-env-delete restore-test-forward check manifests pins surface preflight \
+	dns-show dns-set dns-delete
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -156,3 +161,12 @@ preflight: ## Check every recovery dependency from this machine (read-only)
 
 surface: ## Probe the public endpoint from outside (read-only)
 	scripts/check-public-surface.sh $(GIT_HOST)
+
+dns-show: age-key ## Show the Cloudflare A record of DNS_NAME (read-only)
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" scripts/dns_record.sh show $(DNS_NAME)
+
+dns-set: age-key ## Point the A record of DNS_NAME at DNS_ADDRESS, DNS only, TTL 60
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" scripts/dns_record.sh set $(DNS_NAME) $(DNS_ADDRESS)
+
+dns-delete: age-key ## Delete the A record of DNS_NAME (git-dr only)
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" scripts/dns_record.sh delete $(DNS_NAME)

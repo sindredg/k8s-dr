@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Steps 2 to 8 passed the [milestone 5](../../plan.md#5-cold-recovery) gate on 2026-10-03; see the [worklog](../worklogs/05-cold-recovery.md#validation). Steps 1, 9, and 10 belong to the [milestone 6](../../plan.md#6-disaster-drill) drill and have not run. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Status: Steps 2 to 8 passed the [milestone 5](../../plan.md#5-cold-recovery) gate on 2026-10-03; see the [worklog](../worklogs/05-cold-recovery.md#validation). Steps 1, 9, and 10 and the [return to the primary](#return-to-the-primary-after-a-drill) belong to the [milestone 6](../../plan.md#6-disaster-drill) drill and have not run. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -85,14 +85,15 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
    Expected: `Plan: 2 to add, 0 to change, 0 to destroy`: one object creator grant limited to `recovery/` and one object viewer grant. If the uptime check is not applied yet, the plan also adds it.
 
-5. Create the `git-dr` DNS record for the recovery address, as in the [service deployment runbook](service-deployment.md#public-endpoint). Leave `git.sindrg.com` unchanged.
+5. Create the `git-dr` DNS record for the recovery address. Leave `git.sindrg.com` unchanged. The command writes a DNS-only record with a 60-second TTL through the Cloudflare API; the dashboard is the fallback. See [decision 0002](../decisions/0002-recovery-contract.md#amendment-change-dns-records-through-the-cloudflare-api).
 
    ```bash
-   terraform -chdir=infra/recovery output -raw public_web_address; echo
+   RECOVERY_ADDRESS="$(terraform -chdir=infra/recovery output -raw public_web_address)"
+   make dns-set DNS_NAME=git-dr DNS_ADDRESS="$RECOVERY_ADDRESS"
    dig +short git-dr.sindrg.com @1.1.1.1
    ```
 
-   Expected: both print the same address.
+   Expected: the command prints the new record, and `dig` prints the recovery address.
 
 6. Build the cluster and let Flux deploy the service.
 
@@ -140,7 +141,14 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
    Expected: `failed=0`. Together these sign in, find the known commit and issue, and push a new commit. Investigate any failure before proceeding. Repeat the two commands from step 6 and expect the same results: the restore must not have enabled backups.
 
-9. Cut over. Change the Cloudflare DNS target for `git.sindrg.com` to the recovery address. Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
+9. Cut over. Point `git.sindrg.com` at the recovery address.
+
+   ```bash
+   make dns-set DNS_NAME=git DNS_ADDRESS="$RECOVERY_ADDRESS"
+   dig +short git.sindrg.com @1.1.1.1
+   ```
+
+   Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
 
    1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml`. Do not use `kubectl patch`; Flux reverts it.
    2. Fence the primary: remove `primary` from `backup_clusters` in `infra/shared/terraform.tfvars` and apply `infra/shared`, so a primary that returns cannot write backups.
@@ -158,12 +166,53 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
     - The potential loss window is the backup age at isolation. Report it separately.
     - Explain any gap between the sum of the stage durations and the externally measured RTO. Record failures, manual steps, and cost.
 
+## Return to the primary after a drill
+
+A drill ends by returning to the stopped primary, which still holds its data as of the isolation. Writes that the recovery cluster accepted are discarded. This is not a failback, and it does not apply after a real loss. See [decision 0008](../decisions/0008-cold-recovery.md#amendment-return-to-the-primary-after-a-drill).
+
+1. Start the primary VMs and wait for the service. Validate it through its own name while `git.sindrg.com` still points at the recovery cluster.
+
+   ```bash
+   gcloud compute instances start <primary control plane> <primary worker> --zone <primary zone>
+   curl -s -o /dev/null -w '%{http_code}\n' https://git-primary.sindrg.com/api/healthz
+   make validate-cluster
+   make validate-services
+   make check-fixtures GIT_HOST=git-primary.sindrg.com
+   ```
+
+   Expected: `200`, about three minutes after the start, then `failed=0` three times. The newest commit is the last write before the isolation.
+
+2. Point `git.sindrg.com` back at the primary address and check through the public name.
+
+   ```bash
+   make dns-set DNS_NAME=git DNS_ADDRESS="$(terraform -chdir=infra/primary output -raw public_web_address)"
+   make check-fixtures
+   make write-check
+   ```
+
+3. Suspend recovery backups again: merge a change that sets `backup_suspend: "true"` in `deploy/clusters/recovery/cluster-settings.yaml`. The next recovery bootstrap must not write a set.
+
+4. Restore the primary's backup grant and remove the recovery grants in one apply: put `primary` back in `backup_clusters` and remove `recovery`, in `infra/shared/terraform.tfvars`.
+
+   ```bash
+   terraform -chdir=infra/shared plan -out=shared-return.tfplan
+   terraform -chdir=infra/shared apply shared-return.tfplan
+   ```
+
+   Expected: `Plan: 2 to add, 0 to change, 2 to destroy`: the two primary grants return and the two recovery grants go. Confirm that the next hourly backup on the primary completes.
+
+5. Delete the `git-dr` record and destroy the recovery root, as in steps 2 and 3 of the next section.
+
+   ```bash
+   make dns-delete DNS_NAME=git-dr
+   ```
+
 ## Remove the recovery environment
 
-After a gate or a drill that returns to the primary, remove the recovery environment. The order matters: a grant for a deleted service account makes later `infra/shared` plans fail.
+After a gate that left the primary in service, remove the recovery environment. The order matters: a grant for a deleted service account makes later `infra/shared` plans fail.
 
 1. Remove the `recovery` line from `backup_clusters` in `infra/shared/terraform.tfvars`, then plan and apply `infra/shared`. Expected: `2 to destroy`.
-2. Delete the `git-dr` DNS record in Cloudflare, so the name does not point at a released address.
+2. Delete the `git-dr` DNS record with `make dns-delete DNS_NAME=git-dr`, so the name does not point at a released address.
 3. Destroy the recovery root.
 
    ```bash
