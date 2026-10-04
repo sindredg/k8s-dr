@@ -1,6 +1,6 @@
 # 0011: External uptime probe
 
-Status: Accepted on 2026-10-03. The check is applied, and the command under [Reading the results](#reading-the-results) returned passing checks from all three regions on 2026-10-04.
+Status: Accepted on 2026-10-03. The check is applied, and it measured the outage of [drill 1](../worklogs/06-disaster-drill.md#drill-1) on 2026-10-04.
 
 Date: 2026-10-03
 
@@ -59,7 +59,7 @@ The command ran on 2026-10-04 with a ten-minute interval and the service up. Eve
 2026-10-04T08:31:10Z usa-virginia true
 ```
 
-Each region reports a point every 10 seconds, although `gcloud monitoring uptime describe` shows `period: 60s`. Hypothesis, not confirmed: the metric repeats the latest result between checks. Until a drill shows otherwise, treat the first `false` line as accurate to the 60-second period, not to 10 seconds. The command has not been run across an outage.
+Each region reports a point every 10 seconds, although `gcloud monitoring uptime describe` shows `period: 60s`. Hypothesis, not confirmed: the metric repeats the latest result between checks. In drill 1 the three regions reported their first `false` at 14:28:40, 14:29:20, and 14:29:30 for one isolation, a spread of 50 seconds, which fits one check a minute per region at different offsets. Treat the first `false` line as accurate to the 60-second period, not to 10 seconds.
 
 ## Consequences
 

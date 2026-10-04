@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Steps 2 to 8 passed the [milestone 5](../../plan.md#5-cold-recovery) gate on 2026-10-03; see the [worklog](../worklogs/05-cold-recovery.md#validation). Steps 1, 9, and 10 and the [return to the primary](#return-to-the-primary-after-a-drill) belong to the [milestone 6](../../plan.md#6-disaster-drill) drill and have not run. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). The repeat has not run. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -48,7 +48,7 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
    python3 scripts/drill_report.py stage provisioning end
    ```
 
-   The stages are `detection`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `dns-cutover`, and `probe-recovery`. Stop the write loop once its pushes fail.
+   The stages are `detection`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `dns-cutover`, and `probe-recovery`. Check `.drill/writes.tsv` before the isolation: the newest line must be less than `WRITE_INTERVAL` old. If the loop stopped, start it again and isolate only after a new write. Stop the write loop once its pushes fail.
 
 2. Select the newest backup set that has a manifest, and record its name. The name is its recovery-point timestamp in UTC. Exclude sets without a manifest.
 
@@ -130,10 +130,11 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 8. Test the recovery endpoint before changing public routing. The recovery cluster already serves `git.sindrg.com` with its own certificate; `git-dr.sindrg.com` reaches it directly. See [decision 0008](../decisions/0008-cold-recovery.md#serve-the-public-host-and-a-per-cluster-host-from-every-cluster).
 
    ```bash
+   until [ "$(curl -s -m 5 -o /dev/null -w '%{http_code}' https://git-dr.sindrg.com/api/healthz)" = 200 ]; do sleep 5; done
    make check-fixtures GIT_HOST=git-dr.sindrg.com
    ```
 
-   Expected: the recap ends with `failed=0`. Record the newest commit that it reports before anything writes to the recovery copy: it is the restored HEAD, and the data-loss report needs it. Then push a new commit:
+   Expected: the wait ends within a minute of the restore, and the recap ends with `failed=0`. In drill 1 the check failed when it ran ten seconds after the restore, before the endpoint answered. Record the newest commit that it reports before anything writes to the recovery copy: it is the restored HEAD, and the data-loss report needs it. Then push a new commit:
 
    ```bash
    make write-check GIT_HOST=git-dr.sindrg.com
@@ -145,12 +146,12 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
    ```bash
    make dns-set DNS_NAME=git DNS_ADDRESS="$RECOVERY_ADDRESS"
-   dig +short git.sindrg.com @1.1.1.1
+   until [ "$(dig +short git.sindrg.com @1.1.1.1)" = "$RECOVERY_ADDRESS" ]; do sleep 5; done
    ```
 
-   Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
+   Expected: the wait ends within the 60-second TTL. Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
 
-   1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml`. Do not use `kubectl patch`; Flux reverts it.
+   1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml` and in the expected settings in `tests/test_services.py`, which pins the value. Do not use `kubectl patch`; Flux reverts it. The next hourly run writes the first `recovery/` set.
    2. Fence the primary: remove `primary` from `backup_clusters` in `infra/shared/terraform.tfvars` and apply `infra/shared`, so a primary that returns cannot write backups.
 
 10. Compute the results and record them in the [drill worklog](../worklogs/06-disaster-drill.md).
@@ -180,7 +181,7 @@ A drill ends by returning to the stopped primary, which still holds its data as 
    make check-fixtures GIT_HOST=git-primary.sindrg.com
    ```
 
-   Expected: `200`, about three minutes after the start, then `failed=0` three times. The newest commit is the last write before the isolation.
+   Expected: `200`, about three minutes after the start, then `failed=0` three times. `make validate-cluster` waits for the API server and took 147 seconds in drill 1. The newest commit is the last write before the isolation.
 
 2. Point `git.sindrg.com` back at the primary address and check through the public name.
 
@@ -190,7 +191,7 @@ A drill ends by returning to the stopped primary, which still holds its data as 
    make write-check
    ```
 
-3. Suspend recovery backups again: merge a change that sets `backup_suspend: "true"` in `deploy/clusters/recovery/cluster-settings.yaml`. The next recovery bootstrap must not write a set.
+3. Suspend recovery backups again: merge a change that sets `backup_suspend: "true"` in `deploy/clusters/recovery/cluster-settings.yaml` and in `tests/test_services.py`. The next recovery bootstrap must not write a set.
 
 4. Restore the primary's backup grant and remove the recovery grants in one apply: put `primary` back in `backup_clusters` and remove `recovery`, in `infra/shared/terraform.tfvars`.
 

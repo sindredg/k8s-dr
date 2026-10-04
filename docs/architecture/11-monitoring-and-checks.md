@@ -1,6 +1,6 @@
 # 11. Monitoring and checks
 
-Status: built. The external uptime probe of [decision 0011](../decisions/0011-external-uptime-probe.md) is applied from `infra/shared` and passing; its results have not been read across an outage.
+Status: built. The external uptime probe of [decision 0011](../decisions/0011-external-uptime-probe.md) is applied from `infra/shared` and measured the outage of drill 1.
 
 What watches the system, from inside and from outside, and what does not.
 
