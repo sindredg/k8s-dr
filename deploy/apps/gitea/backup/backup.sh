@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hourly consistent backup of PostgreSQL and the Gitea volume. Scales Gitea
+# Scheduled consistent backup of PostgreSQL and the Gitea volume. Scales Gitea
 # to zero, streams an encrypted pg_dump and volume archive to local staging,
 # scales Gitea back up, then uploads the objects and a manifest written last.
 # A set without a manifest is incomplete and restore ignores it. See

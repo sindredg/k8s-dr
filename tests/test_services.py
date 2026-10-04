@@ -246,7 +246,7 @@ class BackupTests(unittest.TestCase):
         self.script = (APPS / "gitea/backup/backup.sh").read_text()
 
     def test_runs_hourly_one_at_a_time_without_retries(self):
-        self.assertEqual(self.cronjob["schedule"], "7 * * * *")
+        self.assertEqual(self.cronjob["schedule"], "7,22,37,52 * * * *")
         self.assertEqual(self.cronjob["concurrencyPolicy"], "Forbid")
         self.assertEqual(self.cronjob["jobTemplate"]["spec"]["backoffLimit"], 0)
 
