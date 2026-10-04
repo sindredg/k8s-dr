@@ -57,7 +57,7 @@ class ClusterSettingsTests(unittest.TestCase):
                 "git_cluster_host": "git-dr.sindrg.com",
                 "git_issuer": "letsencrypt-production",
                 "backup_cluster": "recovery",
-                "backup_suspend": "true",
+                "backup_suspend": "false",
                 "cluster_name": "recovery",
             },
         )
