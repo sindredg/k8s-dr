@@ -52,7 +52,7 @@ Date: 2026-09-25.
 - Move the worker data disk from the module to the calling root. The module attaches a disk ID it receives. The primary root keeps `prevent_destroy`; a recovery root can omit it.
 - Rename the primary outputs to `zone` and `subnet_cidr`. Every regional root exposes the same output contract, and a unit test checks it.
 - Track the tested image self-link as the module's `boot_image` default. Images are global, so both regions use the same one.
-- Move existing resources with `moved`, `removed`, and `import` blocks instead of recreating them. See the [migration procedure](../runbooks/terraform-shared-root-migration.md).
+- Move existing resources with `moved`, `removed`, and `import` blocks instead of recreating them. The [preparation worklog](../worklogs/03-service-deployment.md#preparation) records the migration.
 
 **Trade-offs:**
 
