@@ -180,7 +180,7 @@ The first run of the [return steps](../runbooks/regional-recovery.md#return-to-t
 | --- | --- | --- |
 | Start the primary | `gcloud compute instances start` at 14:56 | `https://git-primary.sindrg.com/api/healthz` returned 200 at 14:59:26 |
 | Validate it | `make validate-cluster`; `make validate-services`; `make check-fixtures GIT_HOST=git-primary.sindrg.com` | `ok=10 failed=0`, 147 s; `ok=13 failed=0`, 26 s; `failed=0`, newest commit `09f75c3`, the last write before the isolation |
-| Fence held | `gcloud storage ls gs://<bucket>/primary/` after the 15:07 run | No `primary/20261004T15*` set while the primary ran without its grants. The Job itself was not read. |
+| Fence held | `gcloud storage ls gs://<bucket>/primary/` after the 15:07 run | No `primary/20261004T15*` set while the primary ran without its grants. The Job is `Failed` in a later `kubectl get jobs`, and it sent a failure ping; see [Console evidence](#console-evidence). |
 | Point `git` back | `make dns-set DNS_NAME=git DNS_ADDRESS=<primary address>` | `set at 2026-10-04T15:07:37Z` |
 | Check the public name | `make check-fixtures`; `make write-check` | `failed=0`; `Push accepted at 2026-10-04T15:09:13Z by https://git.sindrg.com/` |
 | Grants | `terraform -chdir=infra/shared apply shared-return.tfplan` | `Apply complete! Resources: 2 added, 0 changed, 2 destroyed.` |
@@ -326,6 +326,37 @@ None after this drill.
 | DNS cutover | 1 min 02 s | 54 s | Bounded by the 60-second TTL. |
 
 The restore is repeatable: two builds from nothing, two different sets, the same commands, and both targets met with a wide margin. The data loss differs because it depends on when in the hourly interval the isolation falls: it can approach one hour plus the time since the last write. The bootstrap is about 45% of the recovery time.
+
+## Console evidence
+
+Screenshots taken after the drills. The charts use UTC+2, so 4:30 PM is 14:30 UTC.
+
+The uptime check `git-healthz` over the afternoon. The three wide gaps are drill 1, drill 2, and [drill 3](07-faster-recovery.md#drill-3). The narrow dips are backups:
+
+![Passed checks of the uptime check, with three outages of about 20 minutes each](../images/drills-uptime-passed-checks.png)
+
+The same period as latency. A failed check is drawn at the 10-second timeout:
+
+![Uptime check latency, at the timeout during the three outages](../images/drills-uptime-latency.png)
+
+The configuration of the check:
+
+![Uptime check configuration: HTTPS, git.sindrg.com, /api/healthz, every 60 seconds, three regions](../images/drills-uptime-check-configuration.png)
+
+The Healthchecks.io log around the fence of drill 1. At 15:07 UTC the fenced primary reported `backup primary/20261004T150702Z failed` and the check went down. In the same minute the recovery cluster reported `backup recovery/20261004T150702Z complete` and the check came back up:
+
+![Healthchecks.io log: a failure ping from the primary, the check down and up again, and a success ping from the recovery cluster](../images/drills-healthchecks-fence.png)
+
+The log shows two things about the heartbeat:
+
+- The check changed status only at 15:07 UTC. The outages of drills 1 and 2 were shorter than its one-hour period plus one hour of grace, so stopping the primary raised no alert. The log ends before drill 3.
+- Both clusters ping one check, so a success from the recovery cluster cleared the failure of the primary within the minute. [Decision 0008](../decisions/0008-cold-recovery.md#amendment-recovery-backups-stay-suspended-until-the-cutover) records that the check cannot tell the clusters apart.
+
+The fixture repository on the primary after the drills, and the oldest page of its commit list, which starts with the fixture commit and holds the first writes of the drill 1 loop:
+
+![Gitea: the recovery-fixture repository with 61 commits and one issue](../images/drills-gitea-fixture-repository.png)
+
+![Gitea: the commit list with one write check every five minutes](../images/drills-gitea-write-checks.png)
 
 ## Limits of these drills
 
