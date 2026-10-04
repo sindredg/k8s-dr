@@ -106,6 +106,10 @@ Return to the primary: started at 17:49:44, `https://git-primary.sindrg.com/api/
 | Sets retained for 14 days | About 336 | About 1,350, about 0.6 GB at 475 KB a set | `gcloud storage du` on one set |
 | Cloud cost | | Not read from billing. Storage of 0.6 GB is the only added resource. | |
 
+The uptime check over the whole day, in UTC+2. Each narrow dip is one backup: hourly until 7 PM, then every 15 minutes. The three wide gaps are the drills:
+
+![Passed checks over the day: one dip an hour, then four an hour after the schedule change](../images/drills-uptime-backup-pauses.png)
+
 The pause is longer than `pause_seconds`: that field measures the capture, and the service is unavailable until the new Gitea pod is ready. A checker that probes during that time reports one failed check. The data shows one to two regions affected per capture, so the availability cost is now up to four short outages an hour instead of one.
 
 ## Decision
@@ -117,4 +121,3 @@ Keep the 15-minute schedule. It cuts the worst-case data loss to a quarter for a
 - One drill with the new schedule. The bound follows from the schedule; the drill confirms that a 15-minute set restores and that nothing else changed.
 - The Healthchecks.io check still expects a ping every hour with one hour of grace, so a stalled backup is reported within two hours, not within 15 minutes.
 - The capture outage was measured with the uptime check at four captures, not over a longer period.
-- The 15:07 run on the fenced primary during drill 1 is `Failed` in `kubectl get jobs`, which confirms the fence that the drill 1 record could only infer from the bucket.

@@ -19,6 +19,10 @@ Three drills on 2026-10-04 stopped both primary VMs and recovered the service in
 
 Every step is a typed command, about 19 per drill; nothing is automated end to end. The recovery environment existed for 42, 28, and 23 minutes; its cost was not read from billing. The recovery time is not the restore time: the restore Job takes under 30 seconds, and a test restore on the primary took 43 seconds, while building the cluster takes most of the rest. Each backup briefly scales the service to zero, which now happens four times an hour.
 
+The external uptime check during the three drills, in UTC+2. The wide gaps are the outages; the narrow dips are backups:
+
+![Passed checks of the uptime check, with three outages of about 20 minutes each](docs/images/drills-uptime-passed-checks.png)
+
 | Evidence | Where |
 | --- | --- |
 | Drill results, stage timelines, probe times, failures, limits | [Disaster drill worklog](docs/worklogs/06-disaster-drill.md) |

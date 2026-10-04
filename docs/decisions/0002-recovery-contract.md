@@ -1,6 +1,6 @@
 # 0002: Recovery contract and target design
 
-Status: Accepted. The milestone 0 gate is met. Milestones 1 and 2 validated the primary infrastructure and cluster; recovery validation is pending. Amended on 2026-09-29: [decision 0007](0007-consistent-backups.md) replaces restic with age-encrypted objects. Amended on 2026-10-04: the drill changes DNS records [through the Cloudflare API](#amendment-change-dns-records-through-the-cloudflare-api).
+Status: Accepted. The milestone 0 gate is met. Milestones 1 and 2 validated the primary infrastructure and cluster, and three drills on 2026-10-04 validated the recovery. Amended on 2026-09-29: [decision 0007](0007-consistent-backups.md) replaces restic with age-encrypted objects. Amended on 2026-10-04: the drill changes DNS records [through the Cloudflare API](#amendment-change-dns-records-through-the-cloudflare-api).
 
 Date: 2026-09-22
 
