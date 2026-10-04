@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root; an existing deployment moves to it once with the [shared-root migration](terraform-shared-root-migration.md). Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 

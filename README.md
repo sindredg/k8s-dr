@@ -2,9 +2,9 @@
 
 Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
 
-The first target was recovery within a few hours. The measured recovery takes under 20 minutes.
+Three drills stopped the primary region and recovered the service in a second region in under 20 minutes, against a target of four hours.
 
-**Status:** all milestones are complete. The primary cluster serves Gitea and takes encrypted offsite backups every 15 minutes. Three disaster drills stopped the primary region, rebuilt the service in Belgium from code and one backup set, and moved `git.sindrg.com` to it. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. See [plan.md](plan.md).
+**Status:** complete. Every milestone in [plan.md](plan.md) passed its gate. A primary cluster in Finland ran Gitea and took encrypted offsite backups every 15 minutes. Three disaster drills stopped it, rebuilt the service in Belgium from code and one backup set, and moved `git.sindrg.com` there. Cluster metrics went to Grafana Cloud, and a security review of the running service was closed with a daily scan of its public surface.
 
 ## Results
 
@@ -17,7 +17,7 @@ Three drills on 2026-10-04 stopped both primary VMs and recovered the service in
 | Largest possible backup age | 60 min | 60 min | 15 min | |
 | Failed steps | One check rerun | None | None | |
 
-Every step is a typed command, about 19 per drill; nothing is automated end to end. The recovery environment existed for 42, 28, and 23 minutes; its cost was not read from billing. The recovery time is not the restore time: the restore Job takes under 30 seconds, and a test restore on the primary took 43 seconds, while building the cluster takes most of the rest. Each backup briefly scales the service to zero, which now happens four times an hour.
+The recovery is automated in stages, with an operator between them. Six commands do the work: two Terraform applies, one Ansible playbook that builds the cluster and installs Flux, one restore, and two DNS changes. Flux deploys the service from Git without a command. The other 13 commands of a drill are the simulated failure, plans, checks, and waits that the operator reads before going on. No single command runs the whole recovery. The recovery environment existed for 42, 28, and 23 minutes; its cost was not read from billing. The recovery time is not the restore time: the restore Job takes under 30 seconds, and a test restore on the primary took 43 seconds, while building the cluster takes most of the rest. Each backup briefly scales the service to zero, which now happens four times an hour.
 
 The external uptime check during the three drills, in UTC+2. The wide gaps are the outages; the narrow dips are backups:
 
@@ -32,7 +32,7 @@ The external uptime check during the three drills, in UTC+2. The wide gaps are t
 | How the measures are defined | [Decision 0002](docs/decisions/0002-recovery-contract.md#measurement) |
 | Backup and test restore | [Consistent backups worklog](docs/worklogs/04-consistent-backups.md) |
 
-## Target architecture
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -73,7 +73,16 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 
 The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds.
 
-See [plan.md](plan.md) for milestones and validation gates, the [architecture pages](docs/architecture/README.md) for how each part works, and [docs](docs/README.md) for worklogs, decisions, troubleshooting, and the recovery runbook. Run `make` from the repository root to list the operator commands; the [bootstrap runbook](docs/runbooks/kubernetes-bootstrap.md) shows when to use each one. The project does not depend on Gitea to store its own recovery configuration.
+## Documentation
+
+| To find | Read |
+| --- | --- |
+| How each part works, with diagrams | [Architecture pages](docs/architecture/README.md) |
+| Why it is built this way | [Decision records](docs/decisions/) |
+| What was done and the evidence for each gate | [Worklogs](docs/worklogs/) and [plan.md](plan.md) |
+| How to operate it | [Runbooks](docs/runbooks/); run `make` to list the operator commands |
+| How to build it yourself | [Reproduce the project](docs/reproduce.md) |
+| Everything else | [Documentation index](docs/README.md) |
 
 ## License
 

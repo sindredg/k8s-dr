@@ -1,6 +1,6 @@
 # Billing budget apply errors
 
-Status: Historical incident. The operator chose to remove the budget from Terraform; the revised configuration is not yet validated.
+Status: Historical. Resolved on 2026-09-23 by removing the budget from Terraform; see [decision 0004](../decisions/0004-remove-budget-alert.md).
 
 ## Symptom
 
@@ -26,4 +26,4 @@ The current configuration removes the budget resource, its required inputs, and 
 
 ## Verification
 
-No successful budget creation, no-change plan, or milestone gate result is recorded. The operator should run a fresh plan with the revised configuration. Expect no infrastructure changes if the earlier resource creations are in state; if a budget was created later, expect its deletion. Stop and report any proposed VM, disk, network, or bucket replacement before applying. Do not share state or raw plan files.
+A `terraform plan` of the primary root without the budget resource reported no changes on 2026-09-23. [Decision 0004](../decisions/0004-remove-budget-alert.md) and the [milestone 1 worklog](../worklogs/01-primary-infrastructure.md) record it.

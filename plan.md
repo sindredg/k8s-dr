@@ -1,6 +1,6 @@
 # Project plan
 
-Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mark its steps complete only after the validation gate passes. Record evidence in the repo as each milestone finishes.
+Every milestone is complete. A step was ticked only after its validation gate passed, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |

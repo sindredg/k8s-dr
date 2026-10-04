@@ -55,7 +55,7 @@ Date: 2026-10-04. The service recovered in Belgium and both targets were met. Th
 | Observed data loss: last acknowledged write to the restored HEAD | 25 min 28 s | At most 2 hours | Yes |
 | Potential loss window: backup age at isolation | 21 min 02 s | Reported, no target | |
 | Acknowledged writes lost | 5 | Reported, no target | |
-| Manual actions | Every step is a typed command. Up to the end of the RTO: 18 commands, one of them a rerun, and one edit of `backup_clusters`. After it: one merged change, a second edit, and one apply. | Reported, no target | |
+| Manual actions | Each stage is automated and started by a command; no single command runs the whole recovery. Up to the end of the RTO: 18 commands, one of them a rerun, and one edit of `backup_clusters`. After it: one merged change, a second edit, and one apply. | Reported, no target | |
 | Incremental cloud cost | Not measured. The recovery environment, with the same resources as the primary, existed from 14:31 to 15:13 UTC, 42 minutes. | Reported, no target | |
 
 The observed loss is larger than the backup age at isolation. The 14:07 backup captured its recovery point before the write that was acknowledged at 14:07:39, so the restored HEAD is the 14:02:34 write.
@@ -212,7 +212,7 @@ Date: 2026-10-04, with the runbook as changed after drill 1. The service recover
 | Observed data loss: last acknowledged write to the restored HEAD | 15 min 16 s | At most 2 hours | Yes |
 | Potential loss window: backup age at isolation | 15 min 12 s | Reported, no target | |
 | Acknowledged writes lost | 3 | Reported, no target | |
-| Manual actions | Every step is a typed command. Up to the end of the RTO: 19 commands, two of them waits, and one edit of `backup_clusters`. No rerun. | Reported, no target | |
+| Manual actions | Each stage is automated and started by a command; no single command runs the whole recovery. Up to the end of the RTO: 19 commands, two of them waits, and one edit of `backup_clusters`. No rerun. | Reported, no target | |
 | Incremental cloud cost | Not measured. The recovery environment existed from 16:25 to 16:53 UTC, 28 minutes. | Reported, no target | |
 
 ### Preflight
