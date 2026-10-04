@@ -1,6 +1,6 @@
 # 9. Backup and restore
 
-Status: built and validated on the primary cluster, including a test restore. Restoring into a recovery cluster is milestone 5.
+Status: built and validated on the primary cluster, including a test restore. The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) restored a set into a recovery cluster.
 
 Every hour a CronJob captures the database and the Gitea volume as one consistent set, encrypts it, and uploads it to a bucket in another region. A restore Job reverses it. This is the only path by which data leaves the primary region.
 

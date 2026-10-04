@@ -9,7 +9,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | 2. Kubernetes bootstrap | Repeatable kubeadm cluster | Complete |
 | 3. Service deployment | Gitea survives pod restarts | Complete |
 | 4. Consistent backups | Offsite data restores successfully | Complete |
-| 5. Cold recovery | Independent service in second region | In progress |
+| 5. Cold recovery | Independent service in second region | Complete |
 | 6. Disaster drill | Measured RTO and RPO | Pending |
 | 7. Faster recovery | Optional improvement backed by measurements | Pending |
 
@@ -91,12 +91,12 @@ Close the findings of a security review of the running service. See [decision 00
 
 ## 5. Cold recovery
 
-- [ ] Provision recovery-region VMs from Terraform with no primary-region dependency.
-- [ ] Bootstrap Kubernetes with Ansible and kubeadm; reconnect Flux to GitHub.
-- [ ] Restore Gitea and PostgreSQL from one verified recovery point.
-- [ ] Route test traffic to the recovered service.
+- [x] Provision recovery-region VMs from Terraform with no primary-region dependency.
+- [x] Bootstrap Kubernetes with Ansible and kubeadm; reconnect Flux to GitHub.
+- [x] Restore Gitea and PostgreSQL from one verified recovery point.
+- [x] Route test traffic to the recovered service.
 
-**Gate:** The recovered service passes the same checks while the primary service is isolated.
+**Gate:** The recovered service passes the same checks while the primary service is isolated. Passed on 2026-10-03; see the [worklog](docs/worklogs/05-cold-recovery.md#validation).
 
 ## 6. Disaster drill
 

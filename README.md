@@ -4,7 +4,7 @@ Recover a stateful service after losing a region. This lab runs Gitea and Postgr
 
 The first target is recovery within a few hours. Faster recovery is a later experiment, based on the measured bottlenecks.
 
-**Status:** milestones 0 to 4 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups; a test restore took 43 seconds. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. Cold recovery in the second region (milestone 5) is in progress: designed, not built. See [plan.md](plan.md).
+**Status:** milestones 0 to 4 are complete. The primary cluster serves Gitea and takes hourly, encrypted offsite backups; a test restore took 43 seconds. Cluster metrics go to Grafana Cloud, and a security review of the running service is closed with a daily scan of its public surface. Cold recovery in the second region (milestone 5) is complete: with both primary VMs stopped, a new cluster in Belgium restored the newest backup and passed the fixture and write checks through `git-dr.sindrg.com`. The disaster drill that measures recovery time and data loss (milestone 6) has not run. See [plan.md](plan.md).
 
 ## Target architecture
 
@@ -35,7 +35,7 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | Offsite object storage | Hourly encrypted application backups, with a Healthchecks.io heartbeat that alerts when they stop |
 | Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
 | GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, and a daily scan of the public surface |
-| External health probe | Measure outage and restored service (planned before the drill) |
+| External health probe | Measure outage and restored service from outside the cluster |
 
 ## Recovery test
 

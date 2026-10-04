@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Draft. Steps 2 to 8 carry the commands for the [milestone 5](../../plan.md#5-cold-recovery) gate and have not been run end to end. Steps 1, 9, and 10 belong to the [milestone 6](../../plan.md#6-disaster-drill) drill. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Status: Steps 2 to 8 passed the [milestone 5](../../plan.md#5-cold-recovery) gate on 2026-10-03; see the [worklog](../worklogs/05-cold-recovery.md#validation). Steps 1, 9, and 10 belong to the [milestone 6](../../plan.md#6-disaster-drill) drill and have not run. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 

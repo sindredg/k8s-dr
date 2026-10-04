@@ -1,6 +1,6 @@
 # 11. Monitoring and checks
 
-Status: built, except the external uptime probe. [Decision 0011](../decisions/0011-external-uptime-probe.md) proposes a Cloud Monitoring uptime check; it is written in `infra/shared` and not applied.
+Status: built. The external uptime probe of [decision 0011](../decisions/0011-external-uptime-probe.md) is applied from `infra/shared` and passing; its results have not been read across an outage.
 
 What watches the system, from inside and from outside, and what does not.
 
@@ -51,7 +51,7 @@ Only metrics are collected. Logs, traces, and the chart's own telemetry are off.
 
 ## Uptime probe
 
-An external probe requests the public endpoint every minute. Its first failed check starts the recovery clock and its first success after cutover helps stop it, so it must run outside both regions. It uses `/api/healthz`, which stays open without sign-in. The proposed probe is a Cloud Monitoring uptime check with checkers in three regions; it shares the Google Cloud project with both clusters, which [decision 0011](../decisions/0011-external-uptime-probe.md#known-limits) records as a limit.
+An external probe requests the public endpoint every minute. Its first failed check starts the recovery clock and its first success after cutover helps stop it, so it must run outside both regions. It uses `/api/healthz`, which stays open without sign-in. The probe is a Cloud Monitoring uptime check with checkers in three regions; it shares the Google Cloud project with both clusters, which [decision 0011](../decisions/0011-external-uptime-probe.md#known-limits) records as a limit.
 
 ## Public surface scan
 

@@ -97,8 +97,8 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 | --- | --- |
 | Primary infrastructure, cluster, service, backups, test restore | Built and validated (milestones 1 to 4) |
 | Cluster metrics, hardening, daily surface scan | Built and validated |
-| Recovery Terraform root, recovery Flux settings, shared sync definition, `CLUSTER` selection | Written; not applied or validated on a recovery cluster (milestone 5) |
-| Per-cluster hostnames `git-primary` and `git-dr` | Written; not validated on a cluster (milestone 5) |
-| External uptime probe | Proposed in [decision 0011](../decisions/0011-external-uptime-probe.md); written in `infra/shared`, not applied |
+| Recovery Terraform root, recovery Flux settings, shared sync definition, `CLUSTER` selection | Built and validated by the milestone 5 gate |
+| Per-cluster hostnames `git-primary` and `git-dr` | Built and validated by the milestone 5 gate |
+| External uptime probe | Built and applied from `infra/shared` ([decision 0011](../decisions/0011-external-uptime-probe.md)); not yet read across an outage |
 | Disaster drill with measured recovery time and data loss | Not run (milestone 6) |
 | Failback to the primary | Not planned |

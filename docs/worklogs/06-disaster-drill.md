@@ -13,7 +13,7 @@ Simulate the loss of the primary region, execute the [regional recovery runbook]
 - `.drill/` is ignored by Git and stays on the operator machine.
 - `make preflight` checks every recovery dependency from the operator machine without changing anything, and tells a missing prerequisite from a failed check. See the [regional recovery runbook](../runbooks/regional-recovery.md#preconditions).
 
-- [Decision 0011](../decisions/0011-external-uptime-probe.md) proposes the external probe: a Cloud Monitoring uptime check on `https://git.sindrg.com/api/healthz` every 60 seconds, in `infra/shared`. `terraform -chdir=infra/shared plan -lock=false` reports `Plan: 1 to add, 0 to change, 0 to destroy.` It is not applied, and the command that reads its results has not been run.
+- [Decision 0011](../decisions/0011-external-uptime-probe.md) defines the external probe: a Cloud Monitoring uptime check on `https://git.sindrg.com/api/healthz` every 60 seconds, in `infra/shared`. It was applied on 2026-10-03 and added one resource. On 2026-10-04, `terraform -chdir=infra/shared plan -lock=false` reports `No changes. Your infrastructure matches the configuration.`, and the [command that reads its results](../decisions/0011-external-uptime-probe.md#reading-the-results) returned only `true` lines from `apac-singapore`, `eur-belgium`, and `usa-virginia` for 08:31 to 08:40 UTC. The series has a point every 10 seconds per region; the decision records what that means for the measurement.
 
 First run of the preflight, with the recovery root planned but not applied:
 
