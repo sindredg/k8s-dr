@@ -73,7 +73,7 @@ Both go through the public endpoint the way a user would. The write check's time
 
 ## Limits
 
-- One replica. A restart or an hourly backup is a short outage.
+- One replica. A restart or a backup, every 15 minutes, is a short outage.
 - Sign-in is a password. There is no second factor and no rate limit.
 - A backup records the Gitea version. Restoring into a different version relies on Gitea's migration on start.
 

@@ -48,7 +48,7 @@ flowchart TB
     make -. "SSH through IAP" .-> recovery
     repo -- "Flux pulls main" --> primary
     repo -. "Flux pulls main" .-> recovery
-    primary -- "hourly encrypted backup" --> backups
+    primary -- "encrypted backup every 15 min" --> backups
     backups -. "restore" .-> recovery
     primary -- "metrics" --> grafana
     primary -- "heartbeat" --> hc
@@ -86,7 +86,7 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 | [6. Traffic and certificates](06-traffic-and-certificates.md) | DNS, the load balancer, Traefik, the Gateway API, and cert-manager |
 | [7. Gitea](07-gitea.md) | The application: deployment, configuration, data, and fixtures |
 | [8. PostgreSQL](08-postgresql.md) | The database: deployment, credentials, data, and how it is backed up |
-| [9. Backup and restore](09-backup-and-restore.md) | The hourly backup, the bucket, and the restore Job |
+| [9. Backup and restore](09-backup-and-restore.md) | The scheduled backup, the bucket, and the restore Job |
 | [10. Regional recovery](10-regional-recovery.md) | How the service moves to Belgium, and how the move is measured |
 | [11. Monitoring and checks](11-monitoring-and-checks.md) | Metrics, the backup heartbeat, the uptime probe, the surface scan, and CI |
 | [12. Access and secrets](12-access-and-secrets.md) | Identities, keys, where each secret lives, and what a compromise reaches |
@@ -100,5 +100,5 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 | Recovery Terraform root, recovery Flux settings, shared sync definition, `CLUSTER` selection | Built and validated by the milestone 5 gate |
 | Per-cluster hostnames `git-primary` and `git-dr` | Built and validated by the milestone 5 gate |
 | External uptime probe | Built and applied from `infra/shared` ([decision 0011](../decisions/0011-external-uptime-probe.md)); measured the outages of both drills |
-| Disaster drill with measured recovery time and data loss | Two drills met both targets on 2026-10-04 (milestone 6) |
+| Disaster drill with measured recovery time and data loss | Three drills met both targets on 2026-10-04 (milestones 6 and 7) |
 | Failback to the primary | Not planned |

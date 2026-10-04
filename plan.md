@@ -11,7 +11,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | 4. Consistent backups | Offsite data restores successfully | Complete |
 | 5. Cold recovery | Independent service in second region | Complete |
 | 6. Disaster drill | Measured RTO and RPO | Complete |
-| 7. Faster recovery | Optional improvement backed by measurements | In progress |
+| 7. Faster recovery | Optional improvement backed by measurements | Complete |
 
 ## 0. Recovery contract
 
@@ -110,8 +110,8 @@ Close the findings of a security review of the running service. See [decision 00
 
 ## 7. Faster recovery (optional)
 
-- [ ] Identify the largest measured delays and data-loss window from milestone 6.
-- [ ] Choose one improvement, such as a warm standby or more frequent backups.
-- [ ] Repeat the same drill and compare recovery time, data loss, and cost.
+- [x] Identify the largest measured delays and data-loss window from milestone 6.
+- [x] Choose one improvement, such as a warm standby or more frequent backups.
+- [x] Repeat the same drill and compare recovery time, data loss, and cost.
 
-**Gate:** The improvement has measured benefits and a documented cost trade-off.
+**Gate:** The improvement has measured benefits and a documented cost trade-off. Passed on 2026-10-04: backups every 15 minutes; see [decision 0012](docs/decisions/0012-backup-every-15-minutes.md) and the [worklog](docs/worklogs/07-faster-recovery.md).

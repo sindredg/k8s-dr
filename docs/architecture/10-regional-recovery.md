@@ -1,6 +1,6 @@
 # 10. Regional recovery
 
-Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) built a recovery cluster and restored into it with the primary stopped. Two [drills](../worklogs/06-disaster-drill.md#comparison) cut `git.sindrg.com` over and measured recovery times of 19 and 18 minutes and data losses of 25 and 15 minutes.
+Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) built a recovery cluster and restored into it with the primary stopped. Three [drills](../worklogs/07-faster-recovery.md#comparison) cut `git.sindrg.com` over and measured recovery times of 17 to 19 minutes and data losses of 10 to 25 minutes.
 
 This is what the project exists to prove: after losing the primary region, the service comes back in another region from code and one backup, inside a measured time and with a measured data loss.
 
@@ -11,7 +11,7 @@ This is what the project exists to prove: after losing the primary region, the s
 | Recovery time | At most 4 hours | The uptime probe's first failed check | Sign-in, the known commit and issue, and a new push all work through `git.sindrg.com` |
 | Data loss | At most 2 hours | The last acknowledged write before the failure | The newest write present after the restore |
 
-Backups run hourly, so the expected data loss is under an hour.
+Backups run every 15 minutes, so the expected data loss is under 15 minutes plus the time since the last write.
 
 ## Cold recovery
 
@@ -22,7 +22,7 @@ flowchart LR
     subgraph before["Normal operation"]
         direction TB
         u1(["Users"]) --> p1["Primary, Finland"]
-        p1 -- "hourly" --> b1[("Backups, Belgium")]
+        p1 -- "every 15 min" --> b1[("Backups, Belgium")]
         r1["Recovery: nothing running"]
     end
 
@@ -30,7 +30,7 @@ flowchart LR
         direction TB
         u2(["Users"]) --> r2["Recovery, Belgium"]
         b2[("Backups, Belgium")] -- "restore" --> r2
-        r2 -- "hourly" --> b2
+        r2 -- "every 15 min" --> b2
         p2["Primary: down, fenced"]
     end
 
