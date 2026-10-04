@@ -51,7 +51,8 @@ metadata:
 spec:
   # Flux substitutes a bare true or false from the cluster settings.
   suspend: ${backup_suspend}
-  schedule: "7 * * * *"
+  # Every 15 minutes. See decision 0012.
+  schedule: "7,22,37,52 * * * *"
   timeZone: Etc/UTC
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 600
@@ -59,7 +60,7 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
-      # A retry would start a new set; the next hourly run is the retry.
+      # A retry would start a new set; the next scheduled run is the retry.
       backoffLimit: 0
       activeDeadlineSeconds: 1800
       ttlSecondsAfterFinished: 86400
