@@ -89,7 +89,9 @@ class RepositoryRenderTests(unittest.TestCase):
                     },
                 )
                 cronjob = next(d for d in renders["gitea"].documents if d["kind"] == "CronJob")
-                self.assertIs(cronjob["spec"]["suspend"], cluster == "recovery")
+                # The settings test pins each cluster's value; this checks that it renders.
+                settings = Path("deploy/clusters", cluster, "cluster-settings.yaml").read_text()
+                self.assertIs(cronjob["spec"]["suspend"], 'backup_suspend: "true"' in settings)
                 self.assertNotIn("${", str(renders["certificates"].documents))
 
 
