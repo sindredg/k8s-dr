@@ -1,6 +1,6 @@
 # 10. Regional recovery
 
-Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) built a recovery cluster and restored into it with the primary stopped. No DNS cutover or measured drill has run.
+Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) built a recovery cluster and restored into it with the primary stopped. [Drill 1](../worklogs/06-disaster-drill.md#drill-1) cut `git.sindrg.com` over and measured a recovery time of 19 minutes and a data loss of 25 minutes. The repeat has not run.
 
 This is what the project exists to prove: after losing the primary region, the service comes back in another region from code and one backup, inside a measured time and with a measured data loss.
 
@@ -48,7 +48,7 @@ flowchart LR
 | DNS control | Cloudflare |
 | Pinned packages, charts, and images | Public repositories, checked weekly by the pin check |
 
-Nothing on the list is in Finland. This is checked by design, not yet by a drill.
+Nothing on the list is in Finland. Drill 1 recovered with both primary VMs stopped and used nothing else there.
 
 ## The procedure
 

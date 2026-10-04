@@ -10,7 +10,7 @@ Update each milestone's `Status` to `Pending`, `In progress`, or `Complete`. Mar
 | 3. Service deployment | Gitea survives pod restarts | Complete |
 | 4. Consistent backups | Offsite data restores successfully | Complete |
 | 5. Cold recovery | Independent service in second region | Complete |
-| 6. Disaster drill | Measured RTO and RPO | Pending |
+| 6. Disaster drill | Measured RTO and RPO | In progress |
 | 7. Faster recovery | Optional improvement backed by measurements | Pending |
 
 ## 0. Recovery contract
