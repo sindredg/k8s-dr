@@ -73,7 +73,7 @@ Each check has three outcomes: pass, fail, or inconclusive. A probe that could n
 | Docs | Pull requests and `main` | Trailing whitespace, final newlines, broken local links |
 | Pins | Pull requests, `main`, weekly | Every pinned package, chart, manifest, and image digest still resolves |
 | Public surface | Daily, and pull requests that change it | The scan above |
-| Backup image | Changes to `images/backup` | Builds the tool image and publishes it from `main` |
+| Backup image | Changes to `backup-image` | Builds the tool image and publishes it from `main` |
 
 The unit tests in `tests/` read the manifests, the Terraform module, and the Ansible roles and assert the properties that matter: allowed network flows, pinned versions, the Flux dependency order, and the backup Job's settings. Actions are pinned by commit SHA.
 
