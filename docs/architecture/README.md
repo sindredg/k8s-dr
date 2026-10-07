@@ -2,7 +2,7 @@
 
 How the parts of this project work and how they connect. Each page covers one part: what it does, what it owns, how it is run, and where its limits are.
 
-The pages describe the final design: a primary cluster in Finland, and a recovery cluster in Belgium that is built from the same code only when it is needed. Not all of it exists yet. Each page states its status under the title, and [the table below](#what-is-built) lists what is still to come. For why a design was chosen, follow the links to the [decision records](../README.md).
+The pages describe the final design: a primary cluster in Finland, and a recovery cluster in Belgium that is built from the same code only when it is needed. All of it is built, and three drills exercised the recovery path. For why a design was chosen, follow the links to the [decision records](../README.md).
 
 ## The whole system
 
@@ -72,7 +72,7 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 | Calico, Gateway API CRDs, Traefik, Local Path Provisioner, the Flux install | Ansible, with Helm for Traefik | `ansible/roles/cluster_addons`, `ansible/roles/flux` | `make bootstrap` |
 | cert-manager, certificates, PostgreSQL, Gitea, backups, monitoring, network policies | Flux, with Helm for the charts | `deploy/` | Merge to `main`; Flux applies it within about a minute |
 | Application data | The restore Job | The backup bucket | `make restore` |
-| DNS records for `sindrg.com` | By hand | Cloudflare dashboard | Manual edit, recorded in a worklog |
+| DNS records for `sindrg.com` | The operator | Cloudflare | `make dns-set` and `make dns-delete`, through the Cloudflare API |
 
 ## Pages
 
@@ -90,15 +90,3 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 | [10. Regional recovery](10-regional-recovery.md) | How the service moves to Belgium, and how the move is measured |
 | [11. Monitoring and checks](11-monitoring-and-checks.md) | Metrics, the backup heartbeat, the uptime probe, the surface scan, and CI |
 | [12. Access and secrets](12-access-and-secrets.md) | Identities, keys, where each secret lives, and what a compromise reaches |
-
-## What is built
-
-| Part | Status |
-| --- | --- |
-| Primary infrastructure, cluster, service, backups, test restore | Built and validated (milestones 1 to 4) |
-| Cluster metrics, hardening, daily surface scan | Built and validated |
-| Recovery Terraform root, recovery Flux settings, shared sync definition, `CLUSTER` selection | Built and validated by the milestone 5 gate |
-| Per-cluster hostnames `git-primary` and `git-dr` | Built and validated by the milestone 5 gate |
-| External uptime probe | Built and applied from `infra/shared` ([decision 0011](../decisions/0011-external-uptime-probe.md)); measured the outages of all three drills |
-| Disaster drill with measured recovery time and data loss | Three drills met both targets on 2026-10-04 (milestones 6 and 7) |
-| Failback to the primary | Not planned |

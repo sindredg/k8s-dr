@@ -1,7 +1,5 @@
 # 8. PostgreSQL
 
-Status: built on the primary cluster.
-
 One PostgreSQL 18 instance holds all of Gitea's relational data. It is a plain StatefulSet from the official image, not a chart and not an operator.
 
 ## What runs

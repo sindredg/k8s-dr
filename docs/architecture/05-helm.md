@@ -1,7 +1,5 @@
 # 5. Helm
 
-Status: built on the primary cluster.
-
 Helm packages a set of Kubernetes manifests as a chart with adjustable values. This project uses it only where an upstream project ships a chart worth reusing. It is run in two different ways, by two different owners.
 
 ## Two ways Helm runs

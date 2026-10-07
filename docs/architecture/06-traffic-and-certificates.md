@@ -1,7 +1,5 @@
 # 6. Traffic and certificates
 
-Status: built and validated on both clusters. The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) served `git-primary.sindrg.com` from the primary and `git-dr.sindrg.com` from a recovery cluster ([decision 0008](../decisions/0008-cold-recovery.md)).
-
 How a request reaches Gitea, and how the certificate that protects it is issued.
 
 ## The request path
@@ -95,12 +93,12 @@ cert-manager proves control of a name with a DNS-01 challenge. Issuance needs no
 
 ## DNS records
 
-Records are created by hand in Cloudflare, DNS only, with a 60-second TTL. A cutover is one edit: point `git.sindrg.com` at the recovery cluster's static address.
+`make dns-set` writes records through the Cloudflare API, DNS only, with a 60-second TTL. A cutover is one command: point `git.sindrg.com` at the recovery cluster's static address.
 
 ## Limits
 
 - One Traefik pod on one node. Replacing it is a short outage.
-- The DNS cutover is manual.
+- The DNS cutover is a command the operator runs, not an automatic failover.
 - No rate limit or web application firewall, and no `Strict-Transport-Security` header yet.
 - The Cloudflare token in the cluster can edit the whole zone.
 
