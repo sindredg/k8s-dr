@@ -5,10 +5,10 @@ name: Backup image
 # it, and publishes it from main. Manifests pin the published digest.
 "on":
   pull_request:
-    paths: ["images/backup/**", ".github/workflows/backup-image.yml"]
+    paths: ["backup-image/**", ".github/workflows/backup-image.yml"]
   push:
     branches: [main]
-    paths: ["images/backup/**", ".github/workflows/backup-image.yml"]
+    paths: ["backup-image/**", ".github/workflows/backup-image.yml"]
   workflow_dispatch:
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
       - id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
-          context: images/backup
+          context: backup-image
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           provenance: false

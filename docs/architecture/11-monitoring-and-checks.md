@@ -1,7 +1,5 @@
 # 11. Monitoring and checks
 
-Status: built. The external uptime probe of [decision 0011](../decisions/0011-external-uptime-probe.md) is applied from `infra/shared` and measured the outages of all three drills.
-
 What watches the system, from inside and from outside, and what does not.
 
 ## Overview
@@ -75,7 +73,7 @@ Each check has three outcomes: pass, fail, or inconclusive. A probe that could n
 | Docs | Pull requests and `main` | Trailing whitespace, final newlines, broken local links |
 | Pins | Pull requests, `main`, weekly | Every pinned package, chart, manifest, and image digest still resolves |
 | Public surface | Daily, and pull requests that change it | The scan above |
-| Backup image | Changes to `images/backup` | Builds the tool image and publishes it from `main` |
+| Backup image | Changes to `backup-image` | Builds the tool image and publishes it from `main` |
 
 The unit tests in `tests/` read the manifests, the Terraform module, and the Ansible roles and assert the properties that matter: allowed network flows, pinned versions, the Flux dependency order, and the backup Job's settings. Actions are pinned by commit SHA.
 

@@ -1,7 +1,5 @@
 # 10. Regional recovery
 
-Status: designed in [decision 0002](../decisions/0002-recovery-contract.md) and [decision 0008](../decisions/0008-cold-recovery.md). The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) built a recovery cluster and restored into it with the primary stopped. Three [drills](../worklogs/07-faster-recovery.md#comparison) cut `git.sindrg.com` over and measured recovery times of 17 to 19 minutes and data losses of 10 to 25 minutes.
-
 This is what the project exists to prove: after losing the primary region, the service comes back in another region from code and one backup, inside a measured time and with a measured data loss.
 
 ## Targets
@@ -103,19 +101,19 @@ The recovery cluster is tested through `git-dr.sindrg.com` before any user reach
 
 A drill simulates the failure by stopping both primary VMs. Stopping keeps the disks, so the primary resumes unchanged afterwards, and it matches the real failure: nothing in the region answers.
 
-Two gates use it:
+The gates that used it:
 
 | Milestone | What it proves |
 | --- | --- |
 | 5. Cold recovery | The recovered service passes the fixture checks through `git-dr.sindrg.com` while the primary is stopped. Public DNS is not changed. |
-| 6. Disaster drill | The full procedure with the cutover, timed, with recovery time and data loss recorded. Run twice. |
+| 6 and 7. Disaster drills | The full procedure with the cutover, timed, with recovery time and data loss recorded. Run three times; see the [comparison](../worklogs/07-faster-recovery.md#comparison). |
 
 After a drill, `terraform destroy` removes the recovery environment and the primary is started again.
 
 ## Limits
 
-- Recovery time is dominated by building a cluster from nothing. A faster design costs more to keep running. The optional milestone 7 picks an improvement from what the drill measures.
-- The cutover is a manual DNS edit, and clients may cache the old address for the TTL.
+- Recovery time is dominated by building a cluster from nothing. A faster design, such as a warm standby, costs more to keep running. Milestone 7 shortened the data loss instead ([decision 0012](../decisions/0012-backup-every-15-minutes.md)).
+- The cutover is a DNS command the operator runs, and clients may cache the old address for the TTL.
 - There is no failback procedure. Returning to Finland would be a second recovery in the other direction.
 - The buckets, the state, and both clusters are in one Google Cloud project. Losing the project or the account is not covered.
 - Recovery depends on public package, chart, and image repositories being reachable.

@@ -1,7 +1,5 @@
 # 3. Kubernetes cluster
 
-Status: built on the primary cluster. A recovery cluster is the same cluster built from the same code.
-
 A kubeadm cluster with one control-plane node and one worker. This page covers what runs on the nodes before any application: the runtime, pod networking, network policies, and storage. The ingress proxy has [its own page](06-traffic-and-certificates.md).
 
 ## Nodes

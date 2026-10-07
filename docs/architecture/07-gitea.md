@@ -1,7 +1,5 @@
 # 7. Gitea
 
-Status: built on the primary cluster.
-
 Gitea is the application. It was chosen because it holds state in two places at once, a database and a file volume, and a recovery must bring both back from the same moment.
 
 ## What runs

@@ -1,7 +1,5 @@
 # 2. Ansible
 
-Status: built for both clusters. `CLUSTER` selects the cluster ([decision 0008](../decisions/0008-cold-recovery.md)); the [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) bootstrapped and validated a recovery cluster with the same playbooks.
-
 Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, and runs the operator's routine checks. The same playbook builds the primary and the recovery cluster. It runs on the operator machine. Nothing is installed on the nodes to support it beyond SSH and Python.
 
 ## How it reaches the nodes

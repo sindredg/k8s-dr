@@ -41,7 +41,7 @@ Created the Healthchecks.io check `k8s-dr-backup` with a 1-hour period and a 1-h
 
 ### Backup tool image
 
-- Added `images/backup/Dockerfile`: the pinned PostgreSQL 18.6 image plus `age`, `curl`, `jq`, and `kubectl` 1.36.2 verified by SHA-256.
+- Added `backup-image/Dockerfile`: the pinned PostgreSQL 18.6 image plus `age`, `curl`, `jq`, and `kubectl` 1.36.2 verified by SHA-256.
 - Added the `Backup image` workflow. It builds on pull requests and publishes `ghcr.io/sindredg/k8s-dr-backup` from `main`.
 - `scripts/check_pins.py` now checks GHCR digests as well as Docker Hub digests.
 - Corrected decision 0007: other pods on the worker can reach the metadata server, and the decision records why that exposure is accepted.

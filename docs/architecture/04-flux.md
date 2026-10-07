@@ -1,7 +1,5 @@
 # 4. Flux
 
-Status: built on both clusters. The [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) ran a recovery cluster from `deploy/clusters/recovery`.
-
 Flux makes the cluster match the `deploy/` directory on the `main` branch. Nobody runs `kubectl apply` for the application: a merge is the deployment.
 
 ## The loop

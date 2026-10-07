@@ -1,7 +1,5 @@
 # 12. Access and secrets
 
-Status: built. A recovery cluster uses the same identities and keys.
-
 Who can do what, which keys exist, and what each one unlocks.
 
 ## Ways in

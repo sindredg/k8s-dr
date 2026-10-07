@@ -68,7 +68,7 @@ The previous `roles/storage.objectAdmin` grant to a user account is removed; tha
 
 ### Build one tool image in CI
 
-The backup and restore Jobs need `pg_dump` and `pg_restore` from the server's PostgreSQL release, `age`, `curl`, `jq`, and `kubectl` in one container. One container is required because the step that scales Gitea back up must run on every exit path, including a failed dump. No upstream image ships all of these tools. `images/backup/Dockerfile` adds them to the pinned PostgreSQL image, with `kubectl` verified against a pinned SHA-256. GitHub Actions builds the image on pull requests and publishes it to `ghcr.io` from `main`. Manifests pin the published digest, and `scripts/check_pins.py` checks that the digest still resolves. The shell scripts ship in a ConfigMap, so they change without a rebuild.
+The backup and restore Jobs need `pg_dump` and `pg_restore` from the server's PostgreSQL release, `age`, `curl`, `jq`, and `kubectl` in one container. One container is required because the step that scales Gitea back up must run on every exit path, including a failed dump. No upstream image ships all of these tools. `backup-image/Dockerfile` adds them to the pinned PostgreSQL image, with `kubectl` verified against a pinned SHA-256. GitHub Actions builds the image on pull requests and publishes it to `ghcr.io` from `main`. Manifests pin the published digest, and `scripts/check_pins.py` checks that the digest still resolves. The shell scripts ship in a ConfigMap, so they change without a rebuild.
 
 | Option | Trade-off |
 | --- | --- |

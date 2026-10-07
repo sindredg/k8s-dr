@@ -1,7 +1,5 @@
 # 9. Backup and restore
 
-Status: built and validated on the primary cluster, including a test restore. Three [drills](../worklogs/07-faster-recovery.md#comparison) restored a set into a recovery cluster.
-
 Every 15 minutes a CronJob captures the database and the Gitea volume as one consistent set, encrypts it, and uploads it to a bucket in another region. A restore Job reverses it. This is the only path by which data leaves the primary region.
 
 ## Backup

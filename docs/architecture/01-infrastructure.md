@@ -1,7 +1,5 @@
 # 1. Infrastructure
 
-Status: the bootstrap, shared, primary, and recovery roots are built. The recovery root ([decision 0008](../decisions/0008-cold-recovery.md)) was applied for the [milestone 5 gate](../worklogs/05-cold-recovery.md#validation) and is destroyed between drills.
-
 Terraform creates everything in Google Cloud: the buckets, the networks, the VMs, and the load balancers. It creates nothing inside the VMs; that is [Ansible's job](02-ansible.md).
 
 ## Roots

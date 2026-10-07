@@ -17,7 +17,7 @@ The target setting is an organization that must run Kubernetes on VMs it control
 | Observability | Ansible output, cluster metrics in Grafana Cloud, a backup heartbeat, a daily check of the public surface, and an external uptime check. No audit or access logs leave the nodes; see [decision 0010](decisions/0010-service-hardening.md). | Metrics, logs, and alerts for backup age, certificate expiry, node health, and disk usage, routed to an on-call rotation |
 | Supply chain | Images and packages pulled from public registries during recovery | Mirrored images and packages in a registry in each region, with signature or digest verification |
 | Cutover and failback | A DNS change that the operator runs as one command, a backup fence for the returning primary, and no failback | Automated DNS change with approval, a documented failback, and a fencing rule so a returning primary cannot serve or write backups |
-| Drills | One drill, repeated once | Scheduled drills with results tracked over time and runbook owners |
+| Drills | Three drills on one day | Scheduled drills with results tracked over time and runbook owners |
 | Access | One administrator member with project-level grants | Groups, per-environment grants, just-in-time elevation, and separate recovery identities |
 
-Each row is a deliberate scope limit, not an oversight. Items that affect recovery time or data loss are candidates for [milestone 7](../plan.md#7-faster-recovery-optional) once the drill measures them.
+Each row is a deliberate scope limit, not an oversight. [Milestone 7](../plan.md#7-faster-recovery-optional) took one of them, the backup interval, after the drills measured it.
