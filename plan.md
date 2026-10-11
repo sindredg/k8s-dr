@@ -1,6 +1,6 @@
 # Project plan
 
-Every milestone is complete. A step was ticked only after its validation gate passed, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 7 are complete. Milestones 8 to 11 are planned: they rebuild the environment, which was removed after the drills, and automate the recovery. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -12,6 +12,10 @@ Every milestone is complete. A step was ticked only after its validation gate pa
 | 5. Cold recovery | Independent service in second region | Complete |
 | 6. Disaster drill | Measured RTO and RPO | Complete |
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
+| 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Planned |
+| 9. Automated recovery | Recovery runs without a person | Planned |
+| 10. Unattended drills | Measured recovery with nobody present | Planned |
+| 11. Failback with data | Optional return that keeps the recovery writes | Planned |
 
 ## 0. Recovery contract
 
@@ -115,3 +119,42 @@ Close the findings of a security review of the running service. See [decision 00
 - [x] Repeat the same drill and compare recovery time, data loss, and cost.
 
 **Gate:** The improvement has measured benefits and a documented cost trade-off. Passed on 2026-10-04: backups every 15 minutes; see [decision 0012](docs/decisions/0012-backup-every-15-minutes.md) and the [worklog](docs/worklogs/07-faster-recovery.md).
+
+## 8. Rebuild from the runbooks
+
+The environment was removed after milestone 7. Only the Terraform state bucket remains.
+
+- [ ] Build the primary from empty state by following the runbooks as written, and record every deviation.
+- [ ] Fix each deviation in the runbook or the code.
+- [ ] Recreate the fixtures, confirm a backup set, and restore it into the test namespaces.
+
+**Gate:** The primary serves the fixtures, a backup set restores in the test namespaces, and the worklog lists every step that did not work as documented.
+
+## 9. Automated recovery
+
+See [decision 0013](docs/decisions/0013-automated-recovery.md).
+
+- [ ] Move the node service accounts and backup grants to the shared root.
+- [ ] Run every recovery stage from one command that stops at the first failed check and resumes from it.
+- [ ] Run that command from GitHub Actions with workload identity federation and no stored cloud key.
+- [ ] Fence the primary and resume recovery backups without a manual edit or a Git change.
+- [ ] Start the recovery from a scheduled watchdog, with a switch that disables it.
+- [ ] Automate the return to the primary after a drill.
+
+**Gate:** A recovery started by hand from the workflow completes with no other action, and the watchdog does not start one during a backup pause or while its switch is off.
+
+## 10. Unattended drills
+
+- [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
+- [ ] Isolate the primary and take no further action; record the recovery time from the first failed probe, including detection.
+- [ ] Repeat the drill once and compare both with the attended drills.
+- [ ] Record the cloud cost from billing.
+
+**Gate:** Two consecutive unattended drills meet both targets, and the worklog compares them with drills 1 to 3.
+
+## 11. Failback with data (optional)
+
+- [ ] Return to the primary region from a backup of the recovery cluster, so writes accepted during the outage survive.
+- [ ] Measure the downtime and data loss of the return.
+
+**Gate:** A write made on the recovery cluster is present on the primary after the return.
