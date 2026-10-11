@@ -61,7 +61,7 @@ All five are held outside Finland.
 | --- | --- | --- |
 | The Gitea pod | The repositories and the database | No internet egress, no metadata server, a non-root container |
 | The Traefik pod | The TLS private key and all traffic | Egress only to DNS, the Kubernetes API, and Gitea |
-| Any pod on the worker that can reach the metadata server | Read access to encrypted backups; the ability to add objects under the prefix | Backups are encrypted to keys the cluster does not hold; no delete or overwrite |
+| Any pod on the worker that can reach the metadata server | Read access to encrypted backups; the ability to add objects under the prefix | Backups are encrypted to keys the cluster does not hold; no delete or overwrite. It can add a forged set, because the recipients are public: the restore ignores a set dated in the future, and a set dated in the past loses to the next real one. |
 | The cluster or a node | Every secret in the repository through the SOPS key, including the Cloudflare token | Old backups stay unreadable; the retention policy blocks deletion |
 | The GitHub account | Control of the cluster through Flux | The pull request rule; no approval is required |
 | The Google account | Everything | Nothing in this design |

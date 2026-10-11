@@ -1,5 +1,5 @@
 ---
-# Hourly consistent backup of PostgreSQL and the Gitea volume to the offsite
+# Scheduled consistent backup of PostgreSQL and the Gitea volume to the offsite
 # bucket. See decision 0007 and backup/backup.sh.
 apiVersion: v1
 kind: ServiceAccount
