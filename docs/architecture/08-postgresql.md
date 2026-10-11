@@ -4,15 +4,7 @@ One PostgreSQL 18 instance holds all of Gitea's relational data. It is a plain S
 
 ## What runs
 
-```mermaid
-flowchart LR
-    gitea["Gitea"] -- "5432" --> svc["Service postgresql<br/>postgresql.postgresql.svc"]
-    job["Backup and restore Job"] -- "5432" --> svc
-    svc --> pod["Pod postgresql-0"]
-    pod --- pvc[("Claim data-postgresql-0, 10 GiB")]
-    pvc --- disk[("Worker data disk")]
-    secret["Secret postgresql-credentials"] --> pod
-```
+![Architecture diagram showing Gitea and the backup and restore Job connecting to the postgresql Service on port 5432, which fronts the single pod postgresql-0, its credentials Secret, and its 10 GiB claim on the worker data disk.](../diagrams/postgresql-workload.svg)
 
 | Aspect | Setting |
 | --- | --- |
@@ -38,12 +30,6 @@ The password is a random value stored in two SOPS files, one per namespace. Flux
 The image reads the password only when it initializes an empty data directory. Changing it later takes an `ALTER ROLE` in the database as well as a new SOPS value.
 
 ## Data protection
-
-```mermaid
-flowchart LR
-    live[("Live database")] -- "pg_dump, every 15 min" --> dump["Encrypted dump<br/>in the backup bucket"]
-    dump -- "pg_restore" --> restored[("Restored database")]
-```
 
 | Layer | Protects against |
 | --- | --- |

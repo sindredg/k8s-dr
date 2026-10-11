@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 424" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="postgresql-workload-title postgresql-workload-desc" id="postgresql-workload-root">
+        <title id="postgresql-workload-title">The PostgreSQL workload</title>
+        <desc id="postgresql-workload-desc">Architecture diagram showing Gitea and the backup and restore Job connecting to the postgresql Service on port 5432, which fronts the single pod postgresql-0, its credentials Secret, and its 10 GiB claim on the worker data disk.</desc>
+        <defs>
+      <style>#postgresql-workload-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #postgresql-workload-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #postgresql-workload-root .diagram-container { width: 100%; overflow-x: auto; }
+      #postgresql-workload-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="postgresql-workload-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="postgresql-workload-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="postgresql-workload-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 200,104 L 224,104 Q 232,104 232,112 L 232,148 Q 232,156 240,156 L 312,156" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#postgresql-workload-arrow)"/>
+        <path d="M 200,232 L 224,232 Q 232,232 232,224 L 232,188 Q 232,180 240,180 L 312,180" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#postgresql-workload-arrow)"/>
+        <path d="M 472,168 L 536,168" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#postgresql-workload-arrow)"/>
+        <path d="M 696,168 L 760,168" fill="none" stroke="#bfc0c0" stroke-width="1.2"/>
+        <path d="M 840,200 L 840,264" fill="none" stroke="#bfc0c0" stroke-width="1.2"/>
+        <path d="M 616,264 L 616,200" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#postgresql-workload-arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="246" y="136" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="272" y="145" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TCP 5432</text>
+        <rect x="246" y="188" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="272" y="197" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TCP 5432</text>
+
+        <!-- nodes -->
+        <!-- node: Gitea -->
+        <rect x="40" y="72" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="72" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="120" y="101.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Gitea</text>
+        <text x="120" y="116.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">namespace gitea</text>
+        <!-- node: Backup, restore Job -->
+        <rect x="40" y="200" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="200" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="120" y="229.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Backup, restore Job</text>
+        <text x="120" y="244.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">namespace gitea</text>
+        <!-- node: Service postgresql -->
+        <rect x="312" y="136" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="312" y="136" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="392" y="159" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Service postgresql</text>
+        <text x="392" y="174" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">ClusterIP :5432</text>
+        <text x="392" y="187" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">postgresql.postgresql.svc</text>
+        <!-- node: Pod postgresql-0 -->
+        <rect x="536" y="136" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="536" y="136" width="160" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="616" y="159" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Pod postgresql-0</text>
+        <text x="616" y="174" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">postgres:18.6-trixie</text>
+        <text x="616" y="187" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">non-root user 999</text>
+        <!-- node: data-postgresql-0 -->
+        <rect x="760" y="136" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="760" y="136" width="160" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="840" y="159" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">data-postgresql-0</text>
+        <text x="840" y="174" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">claim · 10 GiB</text>
+        <text x="840" y="187" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">local-path</text>
+        <!-- node: Worker data disk -->
+        <rect x="760" y="264" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="760" y="264" width="160" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="840" y="293.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Worker data disk</text>
+        <text x="840" y="308.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">not the boot disk</text>
+        <!-- node: Secret -->
+        <rect x="536" y="264" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="536" y="264" width="160" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="616" y="287" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Secret</text>
+        <text x="616" y="302" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">postgresql-credentials</text>
+        <text x="616" y="315" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">from a SOPS file</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="356" x2="920" y2="356" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="372" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="388" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="60" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Client or Service</text>
+        <rect x="168" y="388" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="188" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The database pod</text>
+        <rect x="292" y="388" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="312" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Storage or secret</text>
+        <line x1="420" y1="393" x2="448" y2="393" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#postgresql-workload-arrow)"/>
+        <text x="456" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Connects or feeds</text>
+        <line x1="564" y1="393" x2="592" y2="393" stroke="#bfc0c0" stroke-width="1.2"/>
+        <text x="600" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Volume</text>
+      </svg>

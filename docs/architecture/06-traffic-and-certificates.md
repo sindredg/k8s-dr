@@ -4,25 +4,7 @@ How a request reaches Gitea, and how the certificate that protects it is issued.
 
 ## The request path
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant DNS as Cloudflare DNS
-    participant LB as Load balancer
-    participant T as Traefik
-    participant G as Gitea
-    participant P as PostgreSQL
-
-    U->>DNS: git.sindrg.com
-    DNS-->>U: The serving cluster's static address
-    U->>LB: TCP 443
-    LB->>T: Passthrough to the worker's host port
-    T->>T: End TLS with the certificate for that name
-    T->>G: HTTP to gitea-http, port 3000
-    G->>P: SQL, port 5432
-    P-->>G: Rows
-    G-->>U: Response
-```
+![Sequence diagram showing a request for git.sindrg.com: Cloudflare DNS answers with the serving cluster's static address, the passthrough load balancer forwards TCP 443 to Traefik on the worker, Traefik ends TLS and forwards HTTP to Gitea, and Gitea queries PostgreSQL before responding.](../diagrams/traffic-request.svg)
 
 | Hop | Detail |
 | --- | --- |
@@ -62,24 +44,11 @@ Traefik is the single way in. Ansible installs it with [Helm](05-helm.md), becau
 
 Flux owns the routes. They live in the `gitea` namespace next to the service they expose.
 
-```mermaid
-flowchart LR
-    gc["GatewayClass traefik<br/>from the Traefik chart"] --> gw["Gateway gitea<br/>HTTP and HTTPS listeners per hostname"]
-    gw --> r1["HTTPRoute gitea-https-redirect<br/>HTTP to HTTPS"]
-    gw --> r2["HTTPRoute gitea<br/>HTTPS to gitea-http:3000"]
-    secret["Secret git-tls"] --> gw
-```
+![Architecture diagram showing the Gateway API objects: the traefik GatewayClass, the gitea Gateway with HTTP and HTTPS listeners per hostname and its two TLS Secrets, the redirect HTTPRoute, and the HTTPRoute that sends HTTPS to the gitea-http Service.](../diagrams/traffic-routes.svg)
 
 ## Certificates
 
-```mermaid
-flowchart LR
-    cert["Certificate git-tls"] --> cm["cert-manager"]
-    cm -- "create a TXT record with the API token" --> cf["Cloudflare DNS"]
-    le["Let's Encrypt"] -- "check the TXT record" --> cf
-    le -- "signed certificate" --> cm
-    cm --> secret["Secret git-tls"] --> traefik["Traefik"]
-```
+![Architecture diagram showing cert-manager creating a TXT record in Cloudflare DNS with the API token, Let's Encrypt checking the record and returning a signed certificate, and cert-manager writing the TLS Secret that Traefik serves.](../diagrams/traffic-certificates.svg)
 
 cert-manager proves control of a name with a DNS-01 challenge. Issuance needs no inbound request, so it works before the name points at the cluster. That is what lets a recovery cluster hold a valid `git.sindrg.com` certificate while the primary still serves the name.
 

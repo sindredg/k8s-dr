@@ -6,24 +6,12 @@ Terraform creates everything in Google Cloud: the buckets, the networks, the VMs
 
 A root is a directory with its own state. The split keeps resources that must outlive a region out of any regional root.
 
-```mermaid
-flowchart LR
-    bootstrap["infra/bootstrap"] --> statebucket[("State bucket")]
-    shared["infra/shared"] --> backupbucket[("Backup bucket")]
-    shared --> iam["Project IAM for the administrator"]
-    primary["infra/primary"] --> module["modules/regional_cluster"]
-    primary --> disk["Worker data disk"]
-    recovery["infra/recovery"] --> module
-    recovery --> rdisk["Recovery data disk"]
-    statebucket -. "holds the state of" .-> shared
-    statebucket -. "holds the state of" .-> primary
-    statebucket -. "holds the state of" .-> recovery
-```
+![Architecture diagram showing four Terraform roots, bootstrap, shared, primary, and recovery, the resources each creates, the regional cluster module that the primary and recovery roots both call, and the state bucket that holds every root's state under its own prefix.](../diagrams/infra-roots.svg)
 
 | Root | Creates | Lifetime |
 | --- | --- | --- |
 | `infra/bootstrap` | The state bucket and the operator's access to it | Permanent. Starts with local state, then migrates into the bucket it created. |
-| `infra/shared` | The backup bucket, its IAM, and the administrator's IAP, OS Login, and instance admin roles | Permanent. Shared by every region. |
+| `infra/shared` | The backup bucket, its IAM, the administrator's IAP, OS Login, and instance admin roles, and the uptime check | Permanent. Shared by every region. |
 | `infra/primary` | The Finland cluster through the module, plus the worker data disk | Permanent. The data disk has `prevent_destroy`. |
 | `infra/recovery` | The Belgium cluster through the same module, plus its own data disk | Created for a drill or a disaster, destroyed afterwards. Its disk has no `prevent_destroy`. |
 
@@ -35,23 +23,7 @@ The recovery root mirrors the primary root: the same module, the same outputs, a
 
 `modules/regional_cluster` is one cluster in one region. The primary and recovery roots call it with different inputs, so the two clusters cannot drift apart.
 
-```mermaid
-flowchart TB
-    internet(["Internet"]) -- "80, 443" --> address["Static address"]
-    address --> rule["Forwarding rule"] --> backend["Backend service, passthrough"] --> worker
-
-    subgraph vpc["VPC and subnet"]
-        cp["Control-plane VM"]
-        worker["Worker VM"]
-        disk[("Data disk")]
-        worker --- disk
-        cp <-- "all ports, subnet only" --> worker
-    end
-
-    iap["IAP range 35.235.240.0/20"] -- "22" --> cp
-    iap -- "22" --> worker
-    vpc -- "outbound only" --> nat["Cloud NAT"] --> out(["Internet"])
-```
+![Architecture diagram showing one regional cluster: two VMs without external addresses in one subnet, SSH allowed only from the Google IAP range, public ports 80 and 443 reaching the worker through a passthrough load balancer, and outbound traffic leaving through Cloud NAT.](../diagrams/infra-network.svg)
 
 | Resource | Detail |
 | --- | --- |

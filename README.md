@@ -30,17 +30,7 @@ The external uptime check during the three drills, in UTC+2. The wide gaps are t
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    U["User and external health probe"] --> D["DNS and service endpoint"]
-    D --> P["Primary region: VM control plane and worker"]
-    P --> A["Kubernetes: Gitea and PostgreSQL"]
-    A --> B["Offsite backup storage"]
-    G["External GitHub repo: Terraform, Ansible, Flux config"] --> P
-    G --> R["Recovery region: cold VM rebuild"]
-    B --> R
-    R --> D
-```
+![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a recovery cluster in Belgium that is built from the same Git repository and restored from the bucket.](docs/diagrams/readme-overview.svg)
 
 The recovery region has no running VMs until a drill. Terraform state, deployment source, backup storage, and recovery credentials remain available if the primary region is unavailable. The backup includes PostgreSQL data and Gitea repositories and configuration as one consistent recovery point.
 

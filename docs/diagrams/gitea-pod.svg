@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 536" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="gitea-pod-title gitea-pod-desc" id="gitea-pod-root">
+        <title id="gitea-pod-title">The Gitea pod and its dependencies</title>
+        <desc id="gitea-pod-desc">Architecture diagram showing the Gitea pod: four init containers prepare the volume, write the configuration, and migrate the database before the gitea container starts, which receives HTTP from Traefik, queries PostgreSQL, and stores repositories on a 10 GiB volume.</desc>
+        <defs>
+      <style>#gitea-pod-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #gitea-pod-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #gitea-pod-root .diagram-container { width: 100%; overflow-x: auto; }
+      #gitea-pod-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="gitea-pod-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="gitea-pod-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="gitea-pod-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+        <rect x="232" y="56" width="304" height="280" rx="8" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.20" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="244" y="60" width="212" height="12" rx="2" fill="#2d3142"/>
+        <text x="350" y="69" fill="#949eb2" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">GITEA POD · ONE REPLICA · WORKER NODE</text>
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 168,264 L 264,264" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#gitea-pod-arrow)"/>
+        <path d="M 384,168 L 384,232" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#gitea-pod-arrow)"/>
+        <path d="M 504,252 L 584,252 Q 592,252 592,244 L 592,200 Q 592,192 600,192 L 680,192" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#gitea-pod-arrow)"/>
+        <path d="M 504,276 L 584,276 Q 592,276 592,284 L 592,288 Q 592,296 600,296 L 680,296" fill="none" stroke="#bfc0c0" stroke-width="1.2"/>
+        <path d="M 384,376 L 384,296" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#gitea-pod-arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="178" y="244" width="60" height="12" rx="2" fill="#2d3142"/>
+        <text x="208" y="253" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HTTP 3000</text>
+        <rect x="392" y="194" width="68" height="12" rx="2" fill="#2d3142"/>
+        <text x="426" y="203" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">THEN STARTS</text>
+        <rect x="610" y="172" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="636" y="181" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SQL 5432</text>
+        <rect x="392" y="350" width="64" height="12" rx="2" fill="#2d3142"/>
+        <text x="424" y="359" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">REFERENCED</text>
+
+        <!-- nodes -->
+        <!-- node: Traefik -->
+        <rect x="40" y="232" width="128" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="232" width="128" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="104" y="261.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Traefik</text>
+        <text x="104" y="276.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">only allowed client</text>
+        <!-- node: Init containers -->
+        <rect x="264" y="88" width="240" height="80" rx="6" fill="#2d3142"/>
+        <rect x="264" y="88" width="240" height="80" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="384" y="112.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Init containers</text>
+        <text x="384" y="127.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">volume-owner · init-directories</text>
+        <text x="384" y="140.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">init-app-ini · configure-gitea</text>
+        <text x="384" y="153.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">config, then database migration</text>
+        <!-- node: gitea container -->
+        <rect x="264" y="232" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="264" y="232" width="240" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="384" y="255" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">gitea container</text>
+        <text x="384" y="270" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">non-root · capabilities dropped</text>
+        <text x="384" y="283" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">256 MiB to 1 GiB</text>
+        <!-- node: PostgreSQL -->
+        <rect x="680" y="160" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="160" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="768" y="183" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">PostgreSQL</text>
+        <text x="768" y="198" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">users · issues · sessions</text>
+        <text x="768" y="211" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">separate namespace</text>
+        <!-- node: Volume, 10 GiB -->
+        <rect x="680" y="264" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="264" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="768" y="287" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Volume, 10 GiB</text>
+        <text x="768" y="302" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">repositories · attachments</text>
+        <text x="768" y="315" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">avatars · queues</text>
+        <!-- node: Secrets -->
+        <rect x="264" y="376" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="264" y="376" width="240" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="384" y="399" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Secrets</text>
+        <text x="384" y="414" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">gitea-admin · gitea-database</text>
+        <text x="384" y="427" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">decrypted from SOPS files</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="468" x2="920" y2="468" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="484" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="500" width="14" height="10" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="60" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Pod</text>
+        <rect x="100" y="500" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="120" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Supporting container or pod</text>
+        <rect x="280" y="500" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="300" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The application</text>
+        <rect x="400" y="500" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="420" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">State or secret</text>
+        <line x1="520" y1="505" x2="548" y2="505" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#gitea-pod-arrow)"/>
+        <text x="556" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Call or order</text>
+        <line x1="644" y1="505" x2="672" y2="505" stroke="#bfc0c0" stroke-width="1.2"/>
+        <text x="680" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Mounted volume</text>
+      </svg>

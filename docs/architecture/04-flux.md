@@ -4,24 +4,7 @@ Flux makes the cluster match the `deploy/` directory on the `main` branch. Nobod
 
 ## The loop
 
-```mermaid
-sequenceDiagram
-    participant D as Developer
-    participant G as GitHub main
-    participant S as source-controller
-    participant K as kustomize-controller
-    participant H as helm-controller
-    participant C as Cluster
-
-    D->>G: Merge a pull request
-    S->>G: Fetch main every minute
-    S->>K: New revision available
-    K->>K: Build, decrypt SOPS files, substitute cluster settings
-    K->>C: Apply manifests, prune what was removed
-    K->>H: HelmRelease objects changed
-    H->>C: Install or upgrade charts
-    K->>C: Recheck every 10 minutes and correct drift
-```
+![Sequence diagram showing the Flux loop: the source controller fetches the main branch every minute, the kustomize controller decrypts, substitutes, applies, and prunes, the helm controller installs or upgrades charts, and drift is rechecked every 10 minutes.](../diagrams/flux-loop.svg)
 
 Flux reads the public repository anonymously over HTTPS. It holds no GitHub credential and never writes to Git.
 
@@ -35,15 +18,7 @@ To test a branch before merging, run `make bootstrap FLUX_GIT_BRANCH=<branch>`.
 
 The root Kustomization applies the cluster's directory, which holds two things: that cluster's settings, and a reference to `deploy/sync`, the list of Kustomizations every cluster runs. Because both clusters read the same list, a recovery cluster cannot drift from the primary's layout. Each Kustomization is applied and health-checked on its own.
 
-```mermaid
-flowchart TB
-    root["flux-system<br/>deploy/clusters/primary or recovery"] --> infra["infrastructure<br/>cert-manager, Traefik policy"]
-    root --> pg["postgresql"]
-    root --> mon["monitoring"]
-    infra --> certs["certificates<br/>issuers, Cloudflare token, git-tls"]
-    pg --> gitea["gitea<br/>release, gateway, policies, backup"]
-    certs --> gitea
-```
+![Dependency diagram showing the five Flux Kustomizations that the root applies on every cluster: certificates waits for infrastructure, gitea waits for certificates and postgresql, and monitoring depends on nothing.](../diagrams/flux-kustomizations.svg)
 
 | Kustomization | Path | Waits for health | Note |
 | --- | --- | --- | --- |
@@ -72,13 +47,7 @@ Each cluster directory has a `cluster-settings.yaml` ConfigMap with the only val
 
 Secrets are committed to the public repository, encrypted with SOPS and age. Only the `data` and `stringData` fields are encrypted, so the files still diff and review.
 
-```mermaid
-flowchart LR
-    op["Operator: sops encrypts with the age public key"] --> git["*.sops.yaml in Git"]
-    git --> kc["kustomize-controller"]
-    key["flux-system/sops-age<br/>age private key"] --> kc
-    kc --> secret["Plain Secret in the cluster"]
-```
+![Architecture diagram showing secrets encrypted with an age public key on the operator machine, committed to the public repository, and decrypted in the cluster by the kustomize controller with the age private key that Ansible sends once at bootstrap.](../diagrams/flux-secrets.svg)
 
 The private key reaches the cluster once, from the operator machine, during the bootstrap. It also lives in the operator's credential store, because a recovery cluster needs it.
 

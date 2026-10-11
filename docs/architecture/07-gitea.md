@@ -4,18 +4,7 @@ Gitea is the application. It was chosen because it holds state in two places at 
 
 ## What runs
 
-```mermaid
-flowchart LR
-    traefik["Traefik"] -- "HTTP 3000" --> pod
-
-    subgraph pod["Gitea pod"]
-        init["Init containers:<br/>fix volume owner, write config, migrate database"] --> app["gitea container"]
-    end
-
-    app -- "SQL 5432" --> pg[("PostgreSQL")]
-    app --- vol[("Volume, 10 GiB<br/>repositories, attachments, queues")]
-    secrets["Secrets: gitea-admin, gitea-database"] --> pod
-```
+![Architecture diagram showing the Gitea pod: four init containers prepare the volume, write the configuration, and migrate the database before the gitea container starts, which receives HTTP from Traefik, queries PostgreSQL, and stores repositories on a 10 GiB volume.](../diagrams/gitea-pod.svg)
 
 | Aspect | Setting |
 | --- | --- |

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service deployment layout</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · k8s-dr</p>
+    <h1>Service deployment layout</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 536" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="adr0006-layout-title adr0006-layout-desc">
+        <title id="adr0006-layout-title">Service deployment layout</title>
+        <desc id="adr0006-layout-desc">Architecture diagram showing the service layout: Flux fetches the public repository and deploys cert-manager, Gitea, and PostgreSQL, while users reach Gitea through the passthrough load balancer and Traefik, and Gitea and PostgreSQL keep their data on the worker data disk.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 200,88 L 280,88" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 456,88 L 776,88" fill="none" stroke="#bfc0c0" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <path d="M 392,120 L 392,168 Q 392,176 400,176 L 624,176 Q 632,176 632,184 L 632,232" fill="none" stroke="#bfc0c0" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <path d="M 424,120 L 424,144 Q 424,152 432,152 L 840,152 Q 848,152 848,160 L 848,232" fill="none" stroke="#bfc0c0" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <path d="M 152,264 L 192,264" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 336,264 L 376,264" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 504,264 L 560,264" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 704,264 L 776,264" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 632,296 L 632,328 Q 632,336 640,336 L 696,336 Q 704,336 704,344 L 704,376" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 848,296 L 848,328 Q 848,336 840,336 L 792,336 Q 784,336 784,344 L 784,376" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="222" y="68" width="36" height="12" rx="2" fill="#2d3142"/>
+        <text x="240" y="77" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">FETCH</text>
+        <rect x="726" y="244" width="28" height="12" rx="2" fill="#2d3142"/>
+        <text x="740" y="253" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SQL</text>
+
+        <!-- nodes -->
+        <!-- node: GitHub repository -->
+        <rect x="40" y="56" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="56" width="160" height="64" rx="6" fill="rgba(245,245,245,0.03)" stroke="rgba(245,245,245,0.30)" stroke-width="1"/>
+        <text x="120" y="85.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">GitHub repository</text>
+        <text x="120" y="100.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">public · deploy/</text>
+        <!-- node: Flux controllers -->
+        <rect x="280" y="56" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="280" y="56" width="176" height="64" rx="6" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
+        <text x="368" y="79" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Flux controllers</text>
+        <text x="368" y="94" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">source · kustomize · helm</text>
+        <text x="368" y="107" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">decrypt with sops-age</text>
+        <!-- node: cert-manager -->
+        <rect x="776" y="56" width="144" height="64" rx="6" fill="#2d3142"/>
+        <rect x="776" y="56" width="144" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="848" y="85.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">cert-manager</text>
+        <text x="848" y="100.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">HelmRelease</text>
+        <!-- node: Users -->
+        <rect x="40" y="232" width="112" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="232" width="112" height="64" rx="6" fill="rgba(191,192,192,0.10)" stroke="#949eb2" stroke-width="1"/>
+        <text x="96" y="268" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Users</text>
+        <!-- node: Load balancer -->
+        <rect x="192" y="232" width="144" height="64" rx="6" fill="#2d3142"/>
+        <rect x="192" y="232" width="144" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="264" y="261.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Load balancer</text>
+        <text x="264" y="276.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">TCP passthrough</text>
+        <!-- node: Traefik -->
+        <rect x="376" y="232" width="128" height="64" rx="6" fill="#2d3142"/>
+        <rect x="376" y="232" width="128" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="440" y="261.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Traefik</text>
+        <text x="440" y="276.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">on the worker</text>
+        <!-- node: Gitea -->
+        <rect x="560" y="232" width="144" height="64" rx="6" fill="#2d3142"/>
+        <rect x="560" y="232" width="144" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="632" y="261.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Gitea</text>
+        <text x="632" y="276.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">HelmRelease</text>
+        <!-- node: PostgreSQL -->
+        <rect x="776" y="232" width="144" height="64" rx="6" fill="#2d3142"/>
+        <rect x="776" y="232" width="144" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="848" y="261.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">PostgreSQL</text>
+        <text x="848" y="276.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">StatefulSet</text>
+        <!-- node: Worker data disk -->
+        <rect x="656" y="376" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="656" y="376" width="176" height="64" rx="6" fill="rgba(245,245,245,0.05)" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="744" y="405.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Worker data disk</text>
+        <text x="744" y="420.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">both volumes</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="468" x2="920" y2="468" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
+        <text x="40" y="484" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="500" width="14" height="10" rx="2" fill="rgba(191,192,192,0.10)" stroke="#949eb2" stroke-width="1"/>
+        <text x="60" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Clients</text>
+        <rect x="120" y="500" width="14" height="10" rx="2" fill="rgba(245,245,245,0.03)" stroke="rgba(245,245,245,0.30)" stroke-width="1"/>
+        <text x="140" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Git source</text>
+        <rect x="216" y="500" width="14" height="10" rx="2" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
+        <text x="236" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Deploys from Git</text>
+        <rect x="340" y="500" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="360" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Component</text>
+        <rect x="432" y="500" width="14" height="10" rx="2" fill="rgba(245,245,245,0.05)" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="452" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Disk</text>
+        <line x1="496" y1="505" x2="524" y2="505" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="532" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">HTTPS</text>
+        <line x1="584" y1="505" x2="612" y2="505" stroke="#bfc0c0" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <text x="620" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Deployed by Flux</text>
+        <line x1="724" y1="505" x2="752" y2="505" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="760" y="508" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Data path</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

@@ -202,22 +202,7 @@ The trade-off is the last row. If Flux, cert-manager, or Let's Encrypt fails, th
 
 ## Data and credential flow
 
-```mermaid
-flowchart LR
-    T["Terraform outputs"] --> I["Ignored generated inventory"]
-    O["Operator gcloud and OS Login credentials"] --> P["Local IAP SSH tunnels"]
-    I --> A["Ansible controller"]
-    P --> A
-    A --> C["Control-plane VM"]
-    A --> W["Worker VM"]
-    C --> J["Short-lived join command"]
-    J --> W
-    C --> K["Kubernetes API"]
-    K --> N["Calico"]
-    K --> G["Gateway API and Traefik"]
-    K --> L["Local Path Provisioner"]
-    D["Dedicated worker disk"] --> L
-```
+![Architecture diagram showing the bootstrap flow: Terraform outputs become the generated inventory, the operator's identity opens IAP SSH tunnels, the Ansible controller configures both VMs, the control plane issues a short-lived join token to the worker, and the add-ons use the dedicated worker disk.](../diagrams/adr0005-bootstrap-flow.svg)
 
 Real inventory, kubeconfigs, SSH keys, join commands, tokens, and raw command output remain untracked. The repository contains examples with placeholders, pinned public artifact references, and sanitized validation instructions only.
 

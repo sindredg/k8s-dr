@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="helm-owners-title helm-owners-desc" id="helm-owners-root">
+        <title id="helm-owners-title">Two ways Helm runs</title>
+        <desc id="helm-owners-desc">Architecture diagram showing the two owners of Helm: Ansible runs the helm binary on the control plane for the Traefik release during bootstrap, and the Flux helm controller installs cert-manager, Gitea, and k8s-monitoring from HelmRepository and HelmRelease objects in Git.</desc>
+        <defs>
+      <style>#helm-owners-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #helm-owners-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #helm-owners-root .diagram-container { width: 100%; overflow-x: auto; }
+      #helm-owners-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="helm-owners-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="helm-owners-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="helm-owners-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+        <rect x="40" y="40" width="880" height="128" rx="8" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.20" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="52" y="44" width="180" height="12" rx="2" fill="#2d3142"/>
+        <text x="142" y="53" fill="#949eb2" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">ANSIBLE · DURING MAKE BOOTSTRAP</text>
+        <rect x="40" y="200" width="880" height="264" rx="8" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.20" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="52" y="204" width="168" height="12" rx="2" fill="#2d3142"/>
+        <text x="136" y="213" fill="#949eb2" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">FLUX · CONTINUOUSLY, FROM GIT</text>
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 280,104 L 680,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+        <path d="M 280,264 L 320,264 Q 328,264 328,272 L 328,312 Q 328,320 336,320 L 376,320" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+        <path d="M 280,400 L 320,400 Q 328,400 328,392 L 328,352 Q 328,344 336,344 L 376,344" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+        <path d="M 584,316 L 624,316 Q 632,316 632,308 L 632,268 Q 632,260 640,260 L 680,260" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+        <path d="M 584,332 L 680,332" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+        <path d="M 584,348 L 624,348 Q 632,348 632,356 L 632,396 Q 632,404 640,404 L 680,404" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="442" y="84" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="480" y="93" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HELM UPGRADE</text>
+
+        <!-- nodes -->
+        <!-- node: helm binary -->
+        <rect x="72" y="72" width="208" height="64" rx="6" fill="#2d3142"/>
+        <rect x="72" y="72" width="208" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="176" y="95" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">helm binary</text>
+        <text x="176" y="110" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">on the control plane</text>
+        <text x="176" y="123" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">role cluster_addons</text>
+        <!-- node: traefik release -->
+        <rect x="680" y="72" width="208" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="72" width="208" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="784" y="101.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">traefik release</text>
+        <text x="784" y="116.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">chart 41.6.0</text>
+        <!-- node: HelmRepository -->
+        <rect x="72" y="232" width="208" height="64" rx="6" fill="#2d3142"/>
+        <rect x="72" y="232" width="208" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="176" y="255" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">HelmRepository</text>
+        <text x="176" y="270" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">repository.yaml</text>
+        <text x="176" y="283" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">where the chart is</text>
+        <!-- node: HelmRelease -->
+        <rect x="72" y="368" width="208" height="64" rx="6" fill="#2d3142"/>
+        <rect x="72" y="368" width="208" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="176" y="391" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">HelmRelease</text>
+        <text x="176" y="406" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">release.yaml</text>
+        <text x="176" y="419" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">exact version and values</text>
+        <!-- node: helm-controller -->
+        <rect x="376" y="300" width="208" height="64" rx="6" fill="#2d3142"/>
+        <rect x="376" y="300" width="208" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="480" y="329.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">helm-controller</text>
+        <text x="480" y="344.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no command to run</text>
+        <!-- node: cert-manager release -->
+        <rect x="680" y="232" width="208" height="56" rx="6" fill="#2d3142"/>
+        <rect x="680" y="232" width="208" height="56" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="784" y="257.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">cert-manager release</text>
+        <text x="784" y="272.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">chart v1.21.2</text>
+        <!-- node: gitea release -->
+        <rect x="680" y="304" width="208" height="56" rx="6" fill="#2d3142"/>
+        <rect x="680" y="304" width="208" height="56" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="784" y="329.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">gitea release</text>
+        <text x="784" y="344.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">chart 12.7.0</text>
+        <!-- node: k8s-monitoring release -->
+        <rect x="680" y="376" width="208" height="56" rx="6" fill="#2d3142"/>
+        <rect x="680" y="376" width="208" height="56" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="784" y="401.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">k8s-monitoring release</text>
+        <text x="784" y="416.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">chart 4.5.2</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="492" x2="920" y2="492" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="508" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="524" width="14" height="10" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="60" y="532" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Owner</text>
+        <rect x="112" y="524" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="132" y="532" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Run by Ansible</text>
+        <rect x="228" y="524" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="248" y="532" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Object in Git</text>
+        <rect x="336" y="524" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="356" y="532" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Run by Flux</text>
+        <rect x="436" y="524" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="456" y="532" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Installed release</text>
+        <line x1="564" y1="529" x2="592" y2="529" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#helm-owners-arrow)"/>
+        <text x="600" y="532" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Installs or feeds</text>
+      </svg>

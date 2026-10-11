@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 584" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="infra-network-title infra-network-desc" id="infra-network-root">
+        <title id="infra-network-title">One regional cluster: network and firewall</title>
+        <desc id="infra-network-desc">Architecture diagram showing one regional cluster: two VMs without external addresses in one subnet, SSH allowed only from the Google IAP range, public ports 80 and 443 reaching the worker through a passthrough load balancer, and outbound traffic leaving through Cloud NAT.</desc>
+        <defs>
+      <style>#infra-network-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #infra-network-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #infra-network-root .diagram-container { width: 100%; overflow-x: auto; }
+      #infra-network-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="infra-network-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="infra-network-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="infra-network-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+        <rect x="456" y="40" width="440" height="320" rx="8" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.20" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="468" y="44" width="216" height="12" rx="2" fill="#2d3142"/>
+        <text x="576" y="53" fill="#949eb2" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">VPC AND SUBNET · NO EXTERNAL ADDRESSES</text>
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 216,104 L 488,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#infra-network-arrow)"/>
+        <path d="M 128,136 L 128,192 Q 128,200 136,200 L 528,200 Q 536,200 536,208 L 536,264" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#infra-network-arrow)"/>
+        <path d="M 184,296 L 224,296" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#infra-network-arrow-link)"/>
+        <path d="M 400,296 L 488,296" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#infra-network-arrow-link)"/>
+        <path d="M 616,136 L 616,264" fill="none" stroke="#bfc0c0" stroke-width="1.2"/>
+        <path d="M 664,296 L 744,296" fill="none" stroke="#bfc0c0" stroke-width="1.2"/>
+        <path d="M 576,360 L 576,424" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#infra-network-arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="298" y="84" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="336" y="93" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">IAP-SSH · 22</text>
+        <rect x="298" y="180" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="336" y="189" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">IAP-SSH · 22</text>
+        <rect x="412" y="276" width="64" height="12" rx="2" fill="#2d3142"/>
+        <text x="444" y="285" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PUBLIC-WEB</text>
+        <rect x="624" y="194" width="80" height="12" rx="2" fill="#2d3142"/>
+        <text x="664" y="203" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">NODE-INTERNAL</text>
+        <rect x="584" y="386" width="80" height="12" rx="2" fill="#2d3142"/>
+        <text x="624" y="395" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">OUTBOUND ONLY</text>
+
+        <!-- nodes -->
+        <!-- node: Google IAP -->
+        <rect x="40" y="72" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="72" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="128" y="101.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Google IAP</text>
+        <text x="128" y="116.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">35.235.240.0/20</text>
+        <!-- node: Internet clients -->
+        <rect x="40" y="264" width="144" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="264" width="144" height="64" rx="6" fill="#bfc0c0" fill-opacity="0.10" stroke="#949eb2" stroke-width="1"/>
+        <text x="112" y="293.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Internet clients</text>
+        <text x="112" y="308.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">0.0.0.0/0</text>
+        <!-- node: Load balancer -->
+        <rect x="224" y="264" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="224" y="264" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="312" y="287" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Load balancer</text>
+        <text x="312" y="302" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">regional passthrough</text>
+        <text x="312" y="315" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">static address · TCP 80, 443</text>
+        <!-- node: Control-plane VM -->
+        <rect x="488" y="72" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="488" y="72" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="576" y="95" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Control-plane VM</text>
+        <text x="576" y="110" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Ubuntu 24.04 · Shielded VM</text>
+        <text x="576" y="123" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no API scope</text>
+        <!-- node: Worker VM -->
+        <rect x="488" y="264" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="488" y="264" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="576" y="287" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Worker VM</text>
+        <text x="576" y="302" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Ubuntu 24.04 · Shielded VM</text>
+        <text x="576" y="315" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">scope: storage read/write</text>
+        <!-- node: Data disk -->
+        <rect x="744" y="264" width="136" height="64" rx="6" fill="#2d3142"/>
+        <rect x="744" y="264" width="136" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="812" y="293.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Data disk</text>
+        <text x="812" y="308.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">attached to the worker</text>
+        <!-- node: Cloud NAT -->
+        <rect x="488" y="424" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="488" y="424" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="576" y="447" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Cloud NAT</text>
+        <text x="576" y="462" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">packages and images</text>
+        <text x="576" y="475" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no inbound path</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="516" x2="920" y2="516" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="532" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="548" width="14" height="10" rx="2" fill="#bfc0c0" fill-opacity="0.10" stroke="#949eb2" stroke-width="1"/>
+        <text x="60" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Client</text>
+        <rect x="116" y="548" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="136" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Google service</text>
+        <rect x="232" y="548" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="252" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Module resource</text>
+        <rect x="352" y="548" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="372" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Disk</text>
+        <line x1="416" y1="553" x2="444" y2="553" stroke="#739fdf" stroke-width="1.2" marker-end="url(#infra-network-arrow-link)"/>
+        <text x="452" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Public traffic</text>
+        <line x1="548" y1="553" x2="576" y2="553" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#infra-network-arrow)"/>
+        <text x="584" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Allowed by the named firewall rule</text>
+      </svg>

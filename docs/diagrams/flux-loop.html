@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>From a merge to cluster state</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Sequence · k8s-dr</p>
+    <h1>From a merge to cluster state</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="flux-loop-title flux-loop-desc">
+        <title id="flux-loop-title">From a merge to cluster state</title>
+        <desc id="flux-loop-desc">Sequence diagram showing the Flux loop: the source controller fetches the main branch every minute, the kustomize controller decrypts, substitutes, applies, and prunes, the helm controller installs or upgrades charts, and drift is rechecked every 10 minutes.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+
+
+        <!-- rules, lifelines and callouts -->
+        <line x1="112" y1="96" x2="112" y2="524" stroke="rgba(245,245,245,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="296" y1="96" x2="296" y2="524" stroke="rgba(245,245,245,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="480" y1="96" x2="480" y2="524" stroke="rgba(245,245,245,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="664" y1="96" x2="664" y2="524" stroke="rgba(245,245,245,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="848" y1="96" x2="848" y2="524" stroke="rgba(245,245,245,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 112,140 L 140,140 Q 148,140 148,148 L 148,160 Q 148,168 140,168 L 112,168" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 296,208 L 112,208" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 296,252 L 480,252" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 480,296 L 508,296 Q 516,296 516,304 L 516,316 Q 516,324 508,324 L 480,324" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 480,364 L 848,364" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <path d="M 480,408 L 664,408" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 664,452 L 848,452" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 480,496 L 848,496" fill="none" stroke="#bfc0c0" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="156" y="148" width="112" height="12" rx="2" fill="#2d3142"/>
+        <text x="212" y="157" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PULL REQUEST MERGED</text>
+        <rect x="134" y="188" width="140" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="197" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">FETCH MAIN · EVERY 1 MIN</text>
+        <rect x="350" y="232" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="388" y="241" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">NEW REVISION</text>
+        <rect x="524" y="304" width="112" height="12" rx="2" fill="#2d3142"/>
+        <text x="580" y="313" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">DECRYPT, SUBSTITUTE</text>
+        <rect x="526" y="344" width="92" height="12" rx="2" fill="#2d3142"/>
+        <text x="572" y="353" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">APPLY AND PRUNE</text>
+        <rect x="516" y="388" width="112" height="12" rx="2" fill="#2d3142"/>
+        <text x="572" y="397" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HELMRELEASE CHANGED</text>
+        <rect x="702" y="432" width="108" height="12" rx="2" fill="#2d3142"/>
+        <text x="756" y="441" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">INSTALL OR UPGRADE</text>
+        <rect x="508" y="476" width="128" height="12" rx="2" fill="#2d3142"/>
+        <text x="572" y="485" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">RECHECK · EVERY 10 MIN</text>
+
+        <!-- nodes -->
+        <!-- node: GitHub main -->
+        <rect x="40" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
+        <rect x="40" y="40" width="144" height="56" rx="6" fill="rgba(245,245,245,0.03)" stroke="rgba(245,245,245,0.30)" stroke-width="1"/>
+        <text x="112" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">GitHub main</text>
+        <text x="112" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">deploy/</text>
+        <!-- node: Source -->
+        <rect x="224" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
+        <rect x="224" y="40" width="144" height="56" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="296" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Source</text>
+        <text x="296" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">source-controller</text>
+        <!-- node: Kustomize -->
+        <rect x="408" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
+        <rect x="408" y="40" width="144" height="56" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="480" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Kustomize</text>
+        <text x="480" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kustomize-controller</text>
+        <!-- node: Helm -->
+        <rect x="592" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
+        <rect x="592" y="40" width="144" height="56" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="664" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Helm</text>
+        <text x="664" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">helm-controller</text>
+        <!-- node: Cluster -->
+        <rect x="776" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
+        <rect x="776" y="40" width="144" height="56" rx="6" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
+        <text x="848" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Cluster</text>
+        <text x="848" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Kubernetes API</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="552" x2="920" y2="552" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
+        <text x="40" y="568" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="584" width="14" height="10" rx="2" fill="rgba(245,245,245,0.03)" stroke="rgba(245,245,245,0.30)" stroke-width="1"/>
+        <text x="60" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Git source</text>
+        <rect x="136" y="584" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="156" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Flux controller</text>
+        <rect x="256" y="584" width="14" height="10" rx="2" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
+        <text x="276" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Target</text>
+        <line x1="332" y1="589" x2="360" y2="589" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="368" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Anonymous HTTPS fetch</text>
+        <line x1="496" y1="589" x2="524" y2="589" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="532" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Step</text>
+        <line x1="576" y1="589" x2="604" y2="589" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="612" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The deployment</text>
+        <line x1="708" y1="589" x2="736" y2="589" stroke="#bfc0c0" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <text x="744" y="592" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Drift correction</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

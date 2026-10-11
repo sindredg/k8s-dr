@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 288" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ansible-bootstrap-title ansible-bootstrap-desc" id="ansible-bootstrap-root">
+        <title id="ansible-bootstrap-title">The six plays of the bootstrap playbook</title>
+        <desc id="ansible-bootstrap-desc">Flow diagram showing the six plays of bootstrap.yml in order with the hosts each runs on: prepare both nodes, prepare worker storage, initialize the control plane, join the worker, install add-ons, and install Flux.</desc>
+        <defs>
+      <style>#ansible-bootstrap-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #ansible-bootstrap-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #ansible-bootstrap-root .diagram-container { width: 100%; overflow-x: auto; }
+      #ansible-bootstrap-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="ansible-bootstrap-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="ansible-bootstrap-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="ansible-bootstrap-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+
+
+        <!-- rules, lifelines and callouts -->
+        <text x="920" y="188" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="end"><tspan x="920" dy="0">After the last play, Flux deploys everything else from Git.</tspan></text>
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 160,104 L 192,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#ansible-bootstrap-arrow)"/>
+        <path d="M 312,104 L 344,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#ansible-bootstrap-arrow)"/>
+        <path d="M 464,104 L 496,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#ansible-bootstrap-arrow)"/>
+        <path d="M 616,104 L 648,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#ansible-bootstrap-arrow)"/>
+        <path d="M 768,104 L 800,104" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#ansible-bootstrap-arrow)"/>
+
+        <!-- connector labels -->
+
+
+        <!-- nodes -->
+        <!-- node: Prepare nodes -->
+        <rect x="40" y="56" width="120" height="96" rx="6" fill="#2d3142"/>
+        <rect x="40" y="56" width="120" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <rect x="48" y="64" width="60" height="12" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.5" stroke-width="0.8"/>
+        <text x="78" y="73" fill="#f5f5f5" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">BOTH NODES</text>
+        <text x="100" y="96.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Prepare nodes</text>
+        <text x="100" y="111.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">node_prepare</text>
+        <text x="100" y="124.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">container_runtime</text>
+        <text x="100" y="137.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kubernetes_packages</text>
+        <!-- node: Storage -->
+        <rect x="192" y="56" width="120" height="96" rx="6" fill="#2d3142"/>
+        <rect x="192" y="56" width="120" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <rect x="200" y="64" width="40" height="12" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.5" stroke-width="0.8"/>
+        <text x="220" y="73" fill="#f5f5f5" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
+        <text x="252" y="96.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Storage</text>
+        <text x="252" y="111.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">worker_storage</text>
+        <text x="252" y="124.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">format if blank,</text>
+        <text x="252" y="137.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">mount by UUID</text>
+        <!-- node: Control plane -->
+        <rect x="344" y="56" width="120" height="96" rx="6" fill="#2d3142"/>
+        <rect x="344" y="56" width="120" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <rect x="352" y="64" width="72" height="12" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.5" stroke-width="0.8"/>
+        <text x="388" y="73" fill="#f5f5f5" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">CONTROL PLANE</text>
+        <text x="404" y="103" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Control plane</text>
+        <text x="404" y="118" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">control_plane</text>
+        <text x="404" y="131" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kubeadm init, once</text>
+        <!-- node: Join -->
+        <rect x="496" y="56" width="120" height="96" rx="6" fill="#2d3142"/>
+        <rect x="496" y="56" width="120" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <rect x="504" y="64" width="40" height="12" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.5" stroke-width="0.8"/>
+        <text x="524" y="73" fill="#f5f5f5" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
+        <text x="556" y="103" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Join</text>
+        <text x="556" y="118" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">worker_join</text>
+        <text x="556" y="131" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">15-minute token</text>
+        <!-- node: Add-ons -->
+        <rect x="648" y="56" width="120" height="96" rx="6" fill="#2d3142"/>
+        <rect x="648" y="56" width="120" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <rect x="656" y="64" width="72" height="12" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.5" stroke-width="0.8"/>
+        <text x="692" y="73" fill="#f5f5f5" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">CONTROL PLANE</text>
+        <text x="708" y="90" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Add-ons</text>
+        <text x="708" y="105" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">cluster_addons</text>
+        <text x="708" y="118" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Calico · Traefik</text>
+        <text x="708" y="131" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Gateway API CRDs</text>
+        <text x="708" y="144" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Local Path</text>
+        <!-- node: Flux -->
+        <rect x="800" y="56" width="120" height="96" rx="6" fill="#2d3142"/>
+        <rect x="800" y="56" width="120" height="96" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <rect x="808" y="64" width="72" height="12" rx="2" fill="none" stroke="#f08a59" stroke-opacity="0.5" stroke-width="0.8"/>
+        <text x="844" y="73" fill="#f08a59" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">CONTROL PLANE</text>
+        <text x="860" y="96.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Flux</text>
+        <text x="860" y="111.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">flux</text>
+        <text x="860" y="124.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">SOPS key</text>
+        <text x="860" y="137.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Git source</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="220" x2="920" y2="220" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="236" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="252" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="60" y="260" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Play, with its roles</text>
+        <rect x="184" y="252" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="204" y="260" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Hands over to Flux</text>
+        <line x1="320" y1="257" x2="348" y2="257" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#ansible-bootstrap-arrow)"/>
+        <text x="356" y="260" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Runs next</text>
+      </svg>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 424" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="restore-steps-title restore-steps-desc" id="restore-steps-root">
+        <title id="restore-steps-title">The restore Job, step by step</title>
+        <desc id="restore-steps-desc">Flow diagram showing the restore Job: three checks that change nothing, then Gitea is stopped, the database is recreated and the volume replaced, and Gitea is started again; a failure in the destructive steps leaves Gitea stopped.</desc>
+        <defs>
+      <style>#restore-steps-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #restore-steps-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #restore-steps-root .diagram-container { width: 100%; overflow-x: auto; }
+      #restore-steps-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="restore-steps-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="restore-steps-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="restore-steps-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+        <rect x="40" y="56" width="880" height="112" rx="8" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.20" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="52" y="60" width="220" height="12" rx="2" fill="#2d3142"/>
+        <text x="162" y="69" fill="#949eb2" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">CHECKS · A FAILURE HERE CHANGES NOTHING</text>
+        <rect x="256" y="216" width="448" height="112" rx="8" fill="#f08a59" fill-opacity="0.04" stroke="#f08a59" stroke-opacity="0.50" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="268" y="220" width="276" height="12" rx="2" fill="#2d3142"/>
+        <text x="406" y="229" fill="#f08a59" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">DESTRUCTIVE · A FAILURE HERE LEAVES GITEA STOPPED</text>
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 312,120 L 360,120" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+        <path d="M 600,120 L 648,120" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+        <path d="M 768,152 L 768,184 Q 768,192 760,192 L 136,192 Q 128,192 128,200 L 128,248" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+        <path d="M 216,280 L 272,280" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+        <path d="M 464,280 L 496,280" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+        <path d="M 688,280 L 744,280" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+
+        <!-- connector labels -->
+
+
+        <!-- nodes -->
+        <!-- node: Pick the set -->
+        <rect x="72" y="88" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="72" y="88" width="240" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="192" y="111" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Pick the set</text>
+        <text x="192" y="126" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">newest with a manifest,</text>
+        <text x="192" y="139" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">or the one in RESTORE_SET</text>
+        <!-- node: Download and verify -->
+        <rect x="360" y="88" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="360" y="88" width="240" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="480" y="111" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Download and verify</text>
+        <text x="480" y="126" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">SHA-256 and size of both</text>
+        <text x="480" y="139" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">archives match the manifest</text>
+        <!-- node: Test decryption -->
+        <rect x="648" y="88" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="648" y="88" width="240" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="768" y="111" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Test decryption</text>
+        <text x="768" y="126" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">age + pg_restore --list</text>
+        <text x="768" y="139" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">age + tar -t</text>
+        <!-- node: Scale Gitea to 0 -->
+        <rect x="40" y="248" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="248" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="128" y="277.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Scale Gitea to 0</text>
+        <text x="128" y="292.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">wait until no pod is left</text>
+        <!-- node: Recreate the database -->
+        <rect x="272" y="248" width="192" height="64" rx="6" fill="#2d3142"/>
+        <rect x="272" y="248" width="192" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="368" y="271" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Recreate the database</text>
+        <text x="368" y="286" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">DROP, CREATE, pg_restore</text>
+        <text x="368" y="299" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">in one transaction</text>
+        <!-- node: Replace the volume -->
+        <rect x="496" y="248" width="192" height="64" rx="6" fill="#2d3142"/>
+        <rect x="496" y="248" width="192" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="592" y="271" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Replace the volume</text>
+        <text x="592" y="286" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">delete the contents</text>
+        <text x="592" y="299" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">extract the archive</text>
+        <!-- node: Scale Gitea to 1 -->
+        <rect x="744" y="248" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="744" y="248" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="832" y="277.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Scale Gitea to 1</text>
+        <text x="832" y="292.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">wait for the rollout</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="356" x2="920" y2="356" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="372" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="388" width="14" height="10" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="60" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Safe to fail</text>
+        <rect x="144" y="388" width="14" height="10" rx="2" fill="none" stroke="#f08a59" stroke-opacity="0.50" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="164" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Not safe to fail</text>
+        <rect x="268" y="388" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="288" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Step</text>
+        <rect x="332" y="388" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="352" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Replaces live data</text>
+        <line x1="468" y1="393" x2="496" y2="393" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#restore-steps-arrow)"/>
+        <text x="504" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Then</text>
+      </svg>
