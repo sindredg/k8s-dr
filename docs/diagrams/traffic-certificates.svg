@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 376" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="traffic-certificates-title traffic-certificates-desc" id="traffic-certificates-root">
+        <title id="traffic-certificates-title">Issuing a certificate with DNS-01</title>
+        <desc id="traffic-certificates-desc">Architecture diagram showing cert-manager creating a TXT record in Cloudflare DNS with the API token, Let&#x27;s Encrypt checking the record and returning a signed certificate, and cert-manager writing the TLS Secret that Traefik serves.</desc>
+        <defs>
+      <style>#traffic-certificates-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #traffic-certificates-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #traffic-certificates-root .diagram-container { width: 100%; overflow-x: auto; }
+      #traffic-certificates-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="traffic-certificates-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="traffic-certificates-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="traffic-certificates-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 200,88 L 280,88" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow)"/>
+        <path d="M 440,76 L 600,76" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow-link)"/>
+        <path d="M 688,216 L 688,120" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow-link)"/>
+        <path d="M 600,248 L 528,248 Q 520,248 520,240 L 520,108 Q 520,100 512,100 L 440,100" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#traffic-certificates-arrow-accent)"/>
+        <path d="M 360,120 L 360,216" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow)"/>
+        <path d="M 280,248 L 200,248" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="476" y="56" width="88" height="12" rx="2" fill="#2d3142"/>
+        <text x="520" y="65" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">1 · CREATE TXT</text>
+        <rect x="696" y="162" width="80" height="12" rx="2" fill="#2d3142"/>
+        <text x="736" y="171" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">2 · CHECK TXT</text>
+        <rect x="424" y="170" width="88" height="12" rx="2" fill="#2d3142"/>
+        <text x="468" y="179" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">3 · SIGNS CERT</text>
+
+        <!-- nodes -->
+        <!-- node: Certificates -->
+        <rect x="40" y="56" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="56" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="120" y="79" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Certificates</text>
+        <text x="120" y="94" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git-tls</text>
+        <text x="120" y="107" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git-cluster-tls</text>
+        <!-- node: cert-manager -->
+        <rect x="280" y="56" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="280" y="56" width="160" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="360" y="79" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">cert-manager</text>
+        <text x="360" y="94" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">ClusterIssuer</text>
+        <text x="360" y="107" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">DNS-01 solver</text>
+        <!-- node: Cloudflare DNS -->
+        <rect x="600" y="56" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="600" y="56" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="688" y="79" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Cloudflare DNS</text>
+        <text x="688" y="94" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">zone sindrg.com</text>
+        <text x="688" y="107" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">API token from SOPS</text>
+        <!-- node: Let&#x27;s Encrypt -->
+        <rect x="600" y="216" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="600" y="216" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="688" y="239" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Let&#x27;s Encrypt</text>
+        <text x="688" y="254" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">production</text>
+        <text x="688" y="267" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">or staging</text>
+        <!-- node: TLS Secrets -->
+        <rect x="280" y="216" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="280" y="216" width="160" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="360" y="239" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">TLS Secrets</text>
+        <text x="360" y="254" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git-tls</text>
+        <text x="360" y="267" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git-cluster-tls</text>
+        <!-- node: Traefik -->
+        <rect x="40" y="216" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="216" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="120" y="245.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Traefik</text>
+        <text x="120" y="260.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">ends TLS</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="308" x2="920" y2="308" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="324" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="340" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="60" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">In the cluster</text>
+        <rect x="156" y="340" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="176" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Issues and renews</text>
+        <rect x="284" y="340" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="304" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">External service</text>
+        <rect x="408" y="340" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="428" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Secret</text>
+        <line x1="484" y1="345" x2="512" y2="345" stroke="#739fdf" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow-link)"/>
+        <text x="520" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Outbound call</text>
+        <line x1="608" y1="345" x2="636" y2="345" stroke="#f08a59" stroke-width="1.4" marker-end="url(#traffic-certificates-arrow-accent)"/>
+        <text x="644" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Signed certificate</text>
+        <line x1="760" y1="345" x2="788" y2="345" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#traffic-certificates-arrow)"/>
+        <text x="796" y="348" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Feeds</text>
+      </svg>

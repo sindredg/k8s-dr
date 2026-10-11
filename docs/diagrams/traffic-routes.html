@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gateway API objects for Gitea</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · k8s-dr</p>
+    <h1>Gateway API objects for Gitea</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 424" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="traffic-routes-title traffic-routes-desc">
+        <title id="traffic-routes-title">Gateway API objects for Gitea</title>
+        <desc id="traffic-routes-desc">Architecture diagram showing the Gateway API objects: the traefik GatewayClass, the gitea Gateway with HTTP and HTTPS listeners per hostname and its two TLS Secrets, the redirect HTTPRoute, and the HTTPRoute that sends HTTPS to the gitea-http Service.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 200,152 L 264,152" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 456,136 L 500,136 Q 508,136 508,128 L 508,96 Q 508,88 516,88 L 560,88" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 456,168 L 500,168 Q 508,168 508,176 L 508,208 Q 508,216 516,216 L 560,216" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <path d="M 736,216 L 784,216" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <path d="M 360,264 L 360,200" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- connector labels -->
+        <rect x="520" y="68" width="32" height="12" rx="2" fill="#2d3142"/>
+        <text x="536" y="77" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HTTP</text>
+        <rect x="518" y="196" width="36" height="12" rx="2" fill="#2d3142"/>
+        <text x="536" y="205" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HTTPS</text>
+        <rect x="368" y="226" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="406" y="235" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">CERTIFICATES</text>
+
+        <!-- nodes -->
+        <!-- node: GatewayClass -->
+        <rect x="40" y="120" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="120" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="120" y="143" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">GatewayClass</text>
+        <text x="120" y="158" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">traefik</text>
+        <text x="120" y="171" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">from the Traefik chart</text>
+        <!-- node: Gateway gitea -->
+        <rect x="264" y="104" width="192" height="96" rx="6" fill="#2d3142"/>
+        <rect x="264" y="104" width="192" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="360" y="136.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Gateway gitea</text>
+        <text x="360" y="151.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">HTTP :8000 · HTTPS :8443</text>
+        <text x="360" y="164.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">one pair of listeners</text>
+        <text x="360" y="177.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">per hostname</text>
+        <!-- node: gitea-https-redirect -->
+        <rect x="560" y="56" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="560" y="56" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="648" y="79" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">gitea-https-redirect</text>
+        <text x="648" y="94" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">HTTPRoute</text>
+        <text x="648" y="107" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">301 to HTTPS</text>
+        <!-- node: gitea -->
+        <rect x="560" y="184" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="560" y="184" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="648" y="207" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">gitea</text>
+        <text x="648" y="222" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">HTTPRoute</text>
+        <text x="648" y="235" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">both hostnames</text>
+        <!-- node: gitea-http -->
+        <rect x="784" y="184" width="136" height="64" rx="6" fill="#2d3142"/>
+        <rect x="784" y="184" width="136" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="852" y="213.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">gitea-http</text>
+        <text x="852" y="228.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Service :3000</text>
+        <!-- node: TLS Secrets -->
+        <rect x="264" y="264" width="192" height="64" rx="6" fill="#2d3142"/>
+        <rect x="264" y="264" width="192" height="64" rx="6" fill="rgba(245,245,245,0.05)" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="360" y="287" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">TLS Secrets</text>
+        <text x="360" y="302" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git-tls</text>
+        <text x="360" y="315" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git-cluster-tls</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="356" x2="920" y2="356" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
+        <text x="40" y="372" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="388" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="60" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Object in namespace gitea, or the class</text>
+        <rect x="276" y="388" width="14" height="10" rx="2" fill="rgba(245,245,245,0.05)" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="296" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Secret</text>
+        <line x1="352" y1="393" x2="380" y2="393" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="388" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Attaches to</text>
+        <line x1="468" y1="393" x2="496" y2="393" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="504" y="396" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">HTTPS traffic</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

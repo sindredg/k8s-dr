@@ -15,25 +15,7 @@ Backups run every 15 minutes, so the expected data loss is under 15 minutes plus
 
 Belgium has no VMs until they are needed. That is the cheapest design and the slowest: the whole cluster is built during the outage.
 
-```mermaid
-flowchart LR
-    subgraph before["Normal operation"]
-        direction TB
-        u1(["Users"]) --> p1["Primary, Finland"]
-        p1 -- "every 15 min" --> b1[("Backups, Belgium")]
-        r1["Recovery: nothing running"]
-    end
-
-    subgraph after["After a regional failure"]
-        direction TB
-        u2(["Users"]) --> r2["Recovery, Belgium"]
-        b2[("Backups, Belgium")] -- "restore" --> r2
-        r2 -- "every 15 min" --> b2
-        p2["Primary: down, fenced"]
-    end
-
-    before --> after
-```
+![Architecture diagram with two panels: in normal operation users reach the primary in Finland, which backs up to Belgium while no recovery VMs exist; after a failure users reach the recovery cluster in Belgium, restored from the bucket, and the primary is down and fenced.](../diagrams/recovery-before-after.svg)
 
 ## What survives the loss of Finland
 
@@ -50,29 +32,7 @@ Nothing on the list is in Finland. Drill 1 recovered with both primary VMs stopp
 
 ## The procedure
 
-```mermaid
-sequenceDiagram
-    participant O as Operator
-    participant TF as Terraform
-    participant A as Ansible
-    participant F as Flux
-    participant B as Backup bucket
-    participant DNS as Cloudflare
-
-    Note over O: The uptime probe fails. The clock starts.
-    O->>TF: Apply infra/recovery
-    O->>TF: Add the recovery worker to backup_clusters, apply infra/shared
-    O->>A: make bootstrap CLUSTER=recovery
-    A->>F: Install Flux with the SOPS key
-    F->>F: Deploy cert-manager, PostgreSQL, Gitea, monitoring. Certificates are issued.
-    O->>A: make restore CLUSTER=recovery RESTORE_NAMESPACE=gitea
-    B->>A: Newest complete set from primary/
-    O->>O: make check-fixtures and write-check against git-dr.sindrg.com
-    O->>DNS: Point git.sindrg.com at the recovery address
-    O->>O: Repeat the checks through git.sindrg.com
-    Note over O: All checks pass. The clock stops.
-    O->>TF: Remove primary from backup_clusters to fence it
-```
+![Swimlane diagram showing the nine recovery steps in order across Terraform, Ansible and Flux, Cloudflare DNS, and the operator's checks: build the infrastructure, grant bucket access, create the direct DNS name, bootstrap, restore, check, cut over, check again, and fence the primary.](../diagrams/recovery-procedure.svg)
 
 | Step | Reuses |
 | --- | --- |

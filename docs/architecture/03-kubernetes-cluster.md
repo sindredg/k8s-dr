@@ -4,27 +4,7 @@ A kubeadm cluster with one control-plane node and one worker. This page covers w
 
 ## Nodes
 
-```mermaid
-flowchart TB
-    subgraph cp["Control-plane VM"]
-        api["kube-apiserver, private address, port 6443"]
-        etcd[("etcd")]
-        sched["scheduler and controller manager"]
-    end
-
-    subgraph worker["Worker VM"]
-        traefik["Traefik, host ports 80 and 443"]
-        apps["Gitea, PostgreSQL, monitoring"]
-        fluxc["Flux, cert-manager, and other controllers"]
-        lpp["Local Path volumes"]
-        disk[("Data disk at /var/lib/k8s-dr")]
-        lpp --- disk
-    end
-
-    kubelet1["kubelet and containerd"] --- cp
-    kubelet2["kubelet and containerd"] --- worker
-    cp <-- "Calico VXLAN" --> worker
-```
+![Architecture diagram showing the control-plane VM with the API server and the other control-plane components, and the worker VM with Traefik, the service pods, the controllers, and the data disk that holds every volume, joined by a Calico VXLAN overlay.](../diagrams/cluster-nodes.svg)
 
 | Component | Choice | Note |
 | --- | --- | --- |
@@ -53,16 +33,7 @@ Traffic between pods is not encrypted. It stays inside one VPC.
 
 The `gitea` and `postgresql` namespaces deny all traffic by default. These are the only flows allowed.
 
-```mermaid
-flowchart LR
-    traefik["Traefik"] -- "3000" --> gitea["Gitea"]
-    gitea -- "5432" --> pg["PostgreSQL"]
-    backup["Backup and restore Job"] -- "5432" --> pg
-    backup -- "443, 6443" --> out["Cloud Storage, Healthchecks.io, Kubernetes API"]
-    backup -- "80" --> meta["Metadata server"]
-    gitea -. "53" .-> dns["Cluster DNS"]
-    pg -. "53" .-> dns
-```
+![Architecture diagram showing the only connections allowed in the default-deny gitea and postgresql namespaces: Traefik to Gitea, Gitea and the backup Job to PostgreSQL, and the backup Job to the metadata server and to ports 443 and 6443.](../diagrams/cluster-policies.svg)
 
 | Namespace | Policy |
 | --- | --- |
@@ -76,12 +47,7 @@ The metadata server matters because it hands the node's service account token to
 
 ## Storage
 
-```mermaid
-flowchart LR
-    pvc["PersistentVolumeClaim"] --> sc["StorageClass local-path"] --> dir["Directory under /var/lib/k8s-dr/local-path"] --> disk[("Worker data disk")]
-```
-
-The Local Path Provisioner turns each claim into a directory on the worker's dedicated data disk. The disk is separate from the boot disk, so rebuilding the VM keeps the data. The provisioner is restricted to the worker node and to that one path.
+The Local Path Provisioner turns each claim of the `local-path` StorageClass into a directory under `/var/lib/k8s-dr/local-path` on the worker's dedicated data disk. The disk is separate from the boot disk, so rebuilding the VM keeps the data. The provisioner is restricted to the worker node and to that one path.
 
 This is node-local storage. It does not replicate, and a volume cannot move to another node. The [offsite backup](09-backup-and-restore.md) is the only copy outside the region.
 

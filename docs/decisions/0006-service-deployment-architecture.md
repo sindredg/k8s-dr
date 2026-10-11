@@ -96,22 +96,7 @@ Create the recovery fixtures from the operator machine through the public endpoi
 
 ## Layout
 
-```mermaid
-flowchart TD
-    GH["Public GitHub repository"] --> F["Flux source-controller"]
-    K["Operator age key"] -->|Ansible creates Secret| S["flux-system/sops-age"]
-    F --> KC["kustomize-controller and helm-controller"]
-    S --> KC
-    KC --> CM["cert-manager"]
-    KC --> PG["PostgreSQL StatefulSet"]
-    KC --> GT["Gitea HelmRelease"]
-    U["Users"] --> LB["Passthrough load balancer"]
-    LB --> T["Traefik on the worker"]
-    T --> GT
-    GT --> PG
-    PG --> D["Worker data disk"]
-    GT --> D
-```
+![Architecture diagram showing the service layout: Flux fetches the public repository and deploys cert-manager, Gitea, and PostgreSQL, while users reach Gitea through the passthrough load balancer and Traefik, and Gitea and PostgreSQL keep their data on the worker data disk.](../diagrams/adr0006-layout.svg)
 
 The `deploy/` tree holds shared manifests in `deploy/base/`, `deploy/infrastructure/`, `deploy/certificates/`, and `deploy/apps/`, and one directory per cluster under `deploy/clusters/`. The primary and recovery clusters differ only in hostname and certificate issuer, which each cluster sets in its `cluster-settings.yaml`.
 

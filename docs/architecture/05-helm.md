@@ -4,20 +4,7 @@ Helm packages a set of Kubernetes manifests as a chart with adjustable values. T
 
 ## Two ways Helm runs
 
-```mermaid
-flowchart TB
-    subgraph ansible["During make bootstrap"]
-        bin["helm binary on the control plane"] -- "helm upgrade --install" --> traefik["Traefik release"]
-    end
-
-    subgraph flux["Continuously, from Git"]
-        repo["HelmRepository<br/>where the chart is"] --> hc["helm-controller"]
-        rel["HelmRelease<br/>chart version and values"] --> hc
-        hc --> cm["cert-manager release"]
-        hc --> gitea["Gitea release"]
-        hc --> mon["k8s-monitoring release"]
-    end
-```
+![Architecture diagram showing the two owners of Helm: Ansible runs the helm binary on the control plane for the Traefik release during bootstrap, and the Flux helm controller installs cert-manager, Gitea, and k8s-monitoring from HelmRepository and HelmRelease objects in Git.](../diagrams/helm-owners.svg)
 
 | | Helm run by Ansible | Helm run by Flux |
 | --- | --- | --- |

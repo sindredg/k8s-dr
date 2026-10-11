@@ -6,24 +6,7 @@ Every 15 minutes a CronJob captures the database and the Gitea volume as one con
 
 The CronJob `gitea-backup` runs at minutes 7, 22, 37, and 52 of every hour on the worker ([decision 0012](../decisions/0012-backup-every-15-minutes.md)), with the Gitea volume mounted read-only.
 
-```mermaid
-sequenceDiagram
-    participant J as Backup Job
-    participant K as Kubernetes API
-    participant P as PostgreSQL
-    participant B as Backup bucket
-    participant H as Healthchecks.io
-
-    J->>H: Ping start
-    J->>K: Scale Gitea to 0
-    J->>P: pg_dump, encrypted with age
-    J->>J: tar the volume, encrypted with age
-    J->>K: Scale Gitea to 1
-    J->>B: Upload both archives
-    J->>B: Upload manifest.json last
-    J->>K: Wait for Gitea to be ready
-    J->>H: Ping success
-```
+![Sequence diagram showing one backup run: ping the heartbeat, scale Gitea to zero, dump the database and archive the volume with age encryption, scale Gitea back, upload both archives and then the manifest, wait for Gitea, and ping success.](../diagrams/backup-sequence.svg)
 
 Stopping Gitea for the capture is what makes the set consistent: the database and the files are taken while nothing writes. Gitea is back before the upload starts, so the pause is seconds, not the upload time.
 
@@ -68,15 +51,7 @@ Healthchecks.io expects a success ping every hour with one hour of grace. It ale
 
 `make restore RESTORE_NAMESPACE=<namespace>` runs a Job with the same image, service account, and network policy as the backup.
 
-```mermaid
-flowchart TB
-    a["Pick the newest set with a manifest, or the named set"] --> b["Download and verify every digest"]
-    b --> c["Decrypt both archives once as a test"]
-    c --> d["Scale Gitea to 0"]
-    d --> e["Drop and recreate the database, pg_restore"]
-    e --> f["Replace the volume contents"]
-    f --> g["Scale Gitea to 1 and wait"]
-```
+![Flow diagram showing the restore Job: three checks that change nothing, then Gitea is stopped, the database is recreated and the volume replaced, and Gitea is started again; a failure in the destructive steps leaves Gitea stopped.](../diagrams/restore-steps.svg)
 
 Everything above the scale-down changes nothing, so a wrong key or a damaged set fails while the current data is intact. After the first destructive step, a failure leaves Gitea stopped so that nothing serves a partial restore.
 

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 544" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="cluster-policies-title cluster-policies-desc" id="cluster-policies-root">
+        <title id="cluster-policies-title">Flows the network policies allow</title>
+        <desc id="cluster-policies-desc">Architecture diagram showing the only connections allowed in the default-deny gitea and postgresql namespaces: Traefik to Gitea, Gitea and the backup Job to PostgreSQL, and the backup Job to the metadata server and to ports 443 and 6443.</desc>
+        <defs>
+      <style>#cluster-policies-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #cluster-policies-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #cluster-policies-root .diagram-container { width: 100%; overflow-x: auto; }
+      #cluster-policies-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="cluster-policies-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="cluster-policies-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="cluster-policies-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+        <rect x="248" y="72" width="224" height="304" rx="8" fill="#f08a59" fill-opacity="0.04" stroke="#f08a59" stroke-opacity="0.50" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="260" y="76" width="172" height="12" rx="2" fill="#2d3142"/>
+        <text x="346" y="85" fill="#f08a59" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">NAMESPACE GITEA · DEFAULT DENY</text>
+        <rect x="576" y="72" width="208" height="112" rx="8" fill="#f08a59" fill-opacity="0.04" stroke="#f08a59" stroke-opacity="0.50" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="588" y="76" width="156" height="12" rx="2" fill="#2d3142"/>
+        <text x="666" y="85" fill="#f08a59" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">NAMESPACE POSTGRESQL · DENY</text>
+
+        <!-- rules, lifelines and callouts -->
+        <text x="40" y="252" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="start"><tspan x="40" dy="0">Every pod in both</tspan><tspan x="40" dy="17">namespaces may also</tspan><tspan x="40" dy="17">query cluster DNS</tspan><tspan x="40" dy="17">on port 53.</tspan></text>
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 184,136 L 272,136" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#cluster-policies-arrow)"/>
+        <path d="M 448,124 L 600,124" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#cluster-policies-arrow)"/>
+        <path d="M 448,276 L 516,276 Q 524,276 524,268 L 524,156 Q 524,148 532,148 L 600,148" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#cluster-policies-arrow)"/>
+        <path d="M 448,304 L 600,304" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#cluster-policies-arrow)"/>
+        <path d="M 448,332 L 516,332 Q 524,332 524,340 L 524,408 Q 524,416 532,416 L 600,416" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#cluster-policies-arrow-accent)"/>
+
+        <!-- connector labels -->
+        <rect x="190" y="116" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="216" y="125" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TCP 3000</text>
+        <rect x="498" y="104" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="524" y="113" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TCP 5432</text>
+        <rect x="532" y="210" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="558" y="219" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TCP 5432</text>
+        <rect x="534" y="284" width="60" height="12" rx="2" fill="#2d3142"/>
+        <text x="564" y="293" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">443, 6443</text>
+        <rect x="542" y="396" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="564" y="405" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TCP 80</text>
+
+        <!-- nodes -->
+        <!-- node: Traefik -->
+        <rect x="40" y="104" width="144" height="64" rx="6" fill="#2d3142"/>
+        <rect x="40" y="104" width="144" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="112" y="133.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Traefik</text>
+        <text x="112" y="148.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">namespace traefik</text>
+        <!-- node: Gitea -->
+        <rect x="272" y="104" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="272" y="104" width="176" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="360" y="133.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Gitea</text>
+        <text x="360" y="148.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">app.kubernetes.io/name</text>
+        <!-- node: Backup, restore Job -->
+        <rect x="272" y="256" width="176" height="96" rx="6" fill="#2d3142"/>
+        <rect x="272" y="256" width="176" height="96" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="360" y="288.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Backup, restore Job</text>
+        <text x="360" y="303.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">label gitea-backup</text>
+        <text x="360" y="316.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">only pod that may reach</text>
+        <text x="360" y="329.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">the metadata server</text>
+        <!-- node: PostgreSQL -->
+        <rect x="600" y="104" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="600" y="104" width="160" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="680" y="133.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">PostgreSQL</text>
+        <text x="680" y="148.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no egress except DNS</text>
+        <!-- node: Any address, by port -->
+        <rect x="600" y="272" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="600" y="272" width="240" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="720" y="295" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Any address, by port</text>
+        <text x="720" y="310" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Cloud Storage · Healthchecks.io</text>
+        <text x="720" y="323" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Kubernetes API</text>
+        <!-- node: Metadata server -->
+        <rect x="600" y="384" width="240" height="64" rx="6" fill="#2d3142"/>
+        <rect x="600" y="384" width="240" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="720" y="407" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Metadata server</text>
+        <text x="720" y="422" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">169.254.169.254</text>
+        <text x="720" y="435" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">hands out the node&#x27;s token</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="476" x2="920" y2="476" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="492" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="508" width="14" height="10" rx="2" fill="none" stroke="#f08a59" stroke-opacity="0.50" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="60" y="516" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Default-deny namespace</text>
+        <rect x="192" y="508" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="212" y="516" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Pod</text>
+        <rect x="252" y="508" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
+        <text x="272" y="516" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Database</text>
+        <rect x="336" y="508" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="356" y="516" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Outside the namespaces</text>
+        <line x1="488" y1="513" x2="516" y2="513" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#cluster-policies-arrow)"/>
+        <text x="524" y="516" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Allowed flow</text>
+        <line x1="608" y1="513" x2="636" y2="513" stroke="#f08a59" stroke-width="1.4" marker-end="url(#cluster-policies-arrow-accent)"/>
+        <text x="644" y="516" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Node token path</text>
+      </svg>

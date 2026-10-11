@@ -4,15 +4,7 @@ Who can do what, which keys exist, and what each one unlocks.
 
 ## Ways in
 
-```mermaid
-flowchart TB
-    internet(["Anyone"]) -- "HTTPS, sign-in required" --> gitea["Gitea"]
-    operator(["Operator"]) -- "Google account" --> gcp["Google Cloud: Terraform, IAP, OS Login"]
-    operator -- "GitHub account" --> main["main branch"]
-    gcp -- "SSH through IAP, sudo" --> nodes["Nodes and kubectl"]
-    main -- "Flux applies it" --> cluster["Cluster state"]
-    nodes --> cluster
-```
+![Architecture diagram showing the ways into the system: anyone reaches only Gitea's sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies.](../diagrams/access-paths.svg)
 
 There are three ways to change the system, and each is one account:
 

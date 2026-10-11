@@ -6,55 +6,7 @@ The pages describe the final design: a primary cluster in Finland, and a recover
 
 ## The whole system
 
-```mermaid
-flowchart TB
-    subgraph operator["Operator machine"]
-        tf["Terraform"]
-        make["make and Ansible"]
-        keys["age private keys"]
-    end
-
-    subgraph github["GitHub"]
-        repo["k8s-dr repository"]
-        actions["Actions: checks, pins, surface scan, image build"]
-    end
-
-    subgraph gcp["Google Cloud project"]
-        subgraph belgium["Belgium"]
-            state[("State bucket")]
-            backups[("Backup bucket")]
-            recovery["Recovery cluster<br/>built for a drill or a disaster"]
-        end
-        subgraph finland["Finland"]
-            primary["Primary cluster<br/>always running"]
-        end
-    end
-
-    subgraph external["External services"]
-        cf["Cloudflare DNS"]
-        le["Let's Encrypt"]
-        grafana["Grafana Cloud"]
-        hc["Healthchecks.io"]
-        probe["Uptime probe"]
-    end
-
-    user(["User"]) --> cf
-    cf -- "git.sindrg.com, normally" --> primary
-    cf -. "git.sindrg.com, after cutover" .-> recovery
-    tf --> state
-    tf --> primary
-    tf -.-> recovery
-    make -- "SSH through IAP" --> primary
-    make -. "SSH through IAP" .-> recovery
-    repo -- "Flux pulls main" --> primary
-    repo -. "Flux pulls main" .-> recovery
-    primary -- "encrypted backup every 15 min" --> backups
-    backups -. "restore" .-> recovery
-    primary -- "metrics" --> grafana
-    primary -- "heartbeat" --> hc
-    probe --> cf
-    actions -- "daily scan" --> cf
-```
+![Architecture diagram showing the operator machine, GitHub, and Cloudflare DNS driving a primary cluster in Finland and an on-demand recovery cluster in Belgium, with the Terraform state bucket and the backup bucket in Belgium and monitoring held by external services.](../diagrams/arch-system.svg)
 
 Solid lines exist all the time. Dashed lines exist only while the recovery cluster does.
 

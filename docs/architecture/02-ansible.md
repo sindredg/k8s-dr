@@ -6,20 +6,7 @@ Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, 
 
 The nodes have no public address, so every run goes through Google's Identity-Aware Proxy (IAP). `scripts/run_with_iap.py` wraps each playbook run.
 
-```mermaid
-sequenceDiagram
-    participant O as Operator machine
-    participant I as Google IAP
-    participant N as Nodes
-
-    O->>O: make inventory reads Terraform outputs
-    O->>I: Open one tunnel per node on 127.0.0.1:2201 and 2202
-    I->>N: Forward to port 22
-    O->>N: ssh-keyscan through each tunnel
-    O->>O: Write a private known_hosts file
-    O->>N: ansible-playbook over SSH, strict host key checking
-    O->>I: Close the tunnels
-```
+![Sequence diagram showing the operator machine opening one IAP tunnel per node, scanning host keys through the tunnels, running the playbook over SSH with strict host key checking, and closing the tunnels.](../diagrams/ansible-iap.svg)
 
 | Piece | What it does |
 | --- | --- |
@@ -38,14 +25,7 @@ One variable, `CLUSTER`, selects the Terraform root, the inventory, the Flux clu
 
 `make bootstrap` runs `bootstrap.yml`: six plays, in order.
 
-```mermaid
-flowchart LR
-    a["node_prepare, container_runtime, kubernetes_packages<br/>both nodes"] --> b["worker_storage<br/>worker"]
-    b --> c["control_plane<br/>control plane"]
-    c --> d["worker_join<br/>worker"]
-    d --> e["cluster_addons<br/>control plane"]
-    e --> f["flux<br/>control plane"]
-```
+![Flow diagram showing the six plays of bootstrap.yml in order with the hosts each runs on: prepare both nodes, prepare worker storage, initialize the control plane, join the worker, install add-ons, and install Flux.](../diagrams/ansible-bootstrap.svg)
 
 | Role | What it does |
 | --- | --- |

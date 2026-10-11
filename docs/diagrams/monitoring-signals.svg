@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 584" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="monitoring-signals-title monitoring-signals-desc" id="monitoring-signals-root">
+        <title id="monitoring-signals-title">What watches the system</title>
+        <desc id="monitoring-signals-desc">Architecture diagram showing the monitoring signals: metric sources scraped by the Alloy collector and written to Grafana Cloud, the backup Job pinging Healthchecks.io, a Cloud Monitoring uptime check requesting the health endpoint every minute, and a daily GitHub Actions scan of the public surface.</desc>
+        <defs>
+      <style>#monitoring-signals-root { --color-paper:   #2d3142;
+      --color-ink:     #f5f5f5;
+      --color-muted:   #bfc0c0;
+      --color-accent:  #f08a59;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #monitoring-signals-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #monitoring-signals-root .diagram-container { width: 100%; overflow-x: auto; }
+      #monitoring-signals-root .diagram-container { overflow-x: visible; }</style>
+          <marker id="monitoring-signals-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
+          <marker id="monitoring-signals-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
+          <marker id="monitoring-signals-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#739fdf"/></marker>
+          
+        </defs>
+
+        <rect width="100%" height="100%" fill="#2d3142"/>
+
+        <!-- zones -->
+        <rect x="40" y="56" width="432" height="400" rx="8" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.20" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="52" y="60" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="78" y="69" fill="#949eb2" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">CLUSTER</text>
+
+        <!-- rules, lifelines and callouts -->
+
+
+        <!-- connectors (behind nodes) -->
+        <path d="M 232,136 L 296,136" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#monitoring-signals-arrow)"/>
+        <path d="M 456,136 L 680,136" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#monitoring-signals-arrow-link)"/>
+        <path d="M 456,264 L 680,264" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#monitoring-signals-arrow-link)"/>
+        <path d="M 680,360 L 576,360 Q 568,360 568,368 L 568,372 Q 568,380 560,380 L 456,380" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#monitoring-signals-arrow-accent)"/>
+        <path d="M 680,456 L 576,456 Q 568,456 568,448 L 568,412 Q 568,404 560,404 L 456,404" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#monitoring-signals-arrow-link)"/>
+
+        <!-- connector labels -->
+        <rect x="242" y="116" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="264" y="125" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SCRAPE</text>
+        <rect x="530" y="116" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="568" y="125" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">REMOTE WRITE</text>
+        <rect x="538" y="244" width="60" height="12" rx="2" fill="#2d3142"/>
+        <text x="568" y="253" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HEARTBEAT</text>
+        <rect x="586" y="340" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="624" y="349" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">/API/HEALTHZ</text>
+        <rect x="592" y="436" width="64" height="12" rx="2" fill="#2d3142"/>
+        <text x="624" y="445" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">DAILY SCAN</text>
+
+        <!-- nodes -->
+        <!-- node: Metric sources -->
+        <rect x="56" y="96" width="176" height="80" rx="6" fill="#2d3142"/>
+        <rect x="56" y="96" width="176" height="80" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="144" y="120.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Metric sources</text>
+        <text x="144" y="135.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kubelet · cAdvisor</text>
+        <text x="144" y="148.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">node-exporter</text>
+        <text x="144" y="161.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kube-state-metrics</text>
+        <!-- node: Alloy collector -->
+        <rect x="296" y="104" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="296" y="104" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="376" y="127" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Alloy collector</text>
+        <text x="376" y="142" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">alloy-metrics</text>
+        <text x="376" y="155" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">metrics only</text>
+        <!-- node: Backup Job -->
+        <rect x="296" y="232" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="296" y="232" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="376" y="255" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Backup Job</text>
+        <text x="376" y="270" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">start, success,</text>
+        <text x="376" y="283" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">or failure ping</text>
+        <!-- node: Public endpoint -->
+        <rect x="296" y="360" width="160" height="64" rx="6" fill="#2d3142"/>
+        <rect x="296" y="360" width="160" height="64" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="376" y="383" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Public endpoint</text>
+        <text x="376" y="398" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">git.sindrg.com</text>
+        <text x="376" y="411" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Traefik and Gitea</text>
+        <!-- node: Grafana Cloud -->
+        <rect x="680" y="104" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="104" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="768" y="133.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Grafana Cloud</text>
+        <text x="768" y="148.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">label: cluster name</text>
+        <!-- node: Healthchecks.io -->
+        <rect x="680" y="232" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="232" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="768" y="261.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Healthchecks.io</text>
+        <text x="768" y="276.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">ping URL from a Secret</text>
+        <!-- node: Uptime check -->
+        <rect x="680" y="328" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="328" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="768" y="351" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Uptime check</text>
+        <text x="768" y="366" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Cloud Monitoring</text>
+        <text x="768" y="379" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">every 60 s · 3 regions</text>
+        <!-- node: GitHub Actions -->
+        <rect x="680" y="424" width="176" height="64" rx="6" fill="#2d3142"/>
+        <rect x="680" y="424" width="176" height="64" rx="6" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="768" y="447" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">GitHub Actions</text>
+        <text x="768" y="462" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">public surface scan</text>
+        <text x="768" y="475" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no credential</text>
+
+        <!-- legend strip -->
+        <line x1="40" y1="516" x2="920" y2="516" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
+        <text x="40" y="532" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="548" width="14" height="10" rx="2" fill="none" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <text x="60" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Cluster</text>
+        <rect x="120" y="548" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="140" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Runs in the cluster</text>
+        <rect x="260" y="548" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
+        <text x="280" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">What users reach</text>
+        <rect x="384" y="548" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
+        <text x="404" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Outside the cluster</text>
+        <line x1="524" y1="553" x2="552" y2="553" stroke="#739fdf" stroke-width="1.2" marker-end="url(#monitoring-signals-arrow-link)"/>
+        <text x="560" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">HTTPS</text>
+        <line x1="612" y1="553" x2="640" y2="553" stroke="#f08a59" stroke-width="1.4" marker-end="url(#monitoring-signals-arrow-accent)"/>
+        <text x="648" y="556" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Starts and stops the recovery clock</text>
+      </svg>

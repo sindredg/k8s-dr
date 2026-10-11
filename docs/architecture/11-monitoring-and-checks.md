@@ -4,39 +4,13 @@ What watches the system, from inside and from outside, and what does not.
 
 ## Overview
 
-```mermaid
-flowchart LR
-    subgraph cluster["Cluster"]
-        alloy["Alloy collector"]
-        ksm["kube-state-metrics"]
-        ne["node-exporter"]
-        kubelet["kubelet and cAdvisor"]
-        job["Backup Job"]
-    end
-
-    ksm --> alloy
-    ne --> alloy
-    kubelet --> alloy
-    alloy -- "remote write" --> grafana["Grafana Cloud"]
-    job -- "start, success, fail" --> hc["Healthchecks.io"]
-    hc -- "alert" --> owner(["Owner"])
-
-    subgraph gha["GitHub Actions"]
-        surface["Public surface, daily"]
-        pins["Pins, weekly"]
-        ci["Checks on every pull request"]
-    end
-
-    surface -- "probe from outside" --> cluster
-    probe["Uptime probe, every minute"] -- "probe from outside" --> cluster
-    gha -- "mail on failure" --> owner
-```
+![Architecture diagram showing the monitoring signals: metric sources scraped by the Alloy collector and written to Grafana Cloud, the backup Job pinging Healthchecks.io, a Cloud Monitoring uptime check requesting the health endpoint every minute, and a daily GitHub Actions scan of the public surface.](../diagrams/monitoring-signals.svg)
 
 | Signal | Where it runs | Tells you | Alerts |
 | --- | --- | --- | --- |
 | Cluster metrics | In the cluster, stored in Grafana Cloud | Node, pod, and object state, during and after a failure | No |
 | Backup heartbeat | Healthchecks.io | Whether a backup completed in the last two hours | Yes |
-| Uptime probe | An external service, every minute | When the service stopped answering and when it came back | Yes |
+| Uptime probe | An external service, every minute | When the service stopped answering and when it came back | No |
 | Public surface scan | GitHub Actions, daily | Whether the outside view has regressed | Yes, by workflow failure mail |
 | Pin check | GitHub Actions, weekly | Whether a pinned download has disappeared upstream | Yes, by workflow failure mail |
 | Validation playbooks | Operator machine, on demand | Whether the cluster and service are healthy now | No |
