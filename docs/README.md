@@ -19,6 +19,7 @@ The [project plan](../plan.md) defines each milestone and its validation gate. T
 | [Service deployment](runbooks/service-deployment.md) | Expose the cluster and deploy the service through Flux. |
 | [Backup and restore](runbooks/backup-restore.md) | Check the backup sets and restore one with the restore Job. |
 | [Regional recovery](runbooks/regional-recovery.md) | Recover the service in the second region, measure it, and return to the primary. |
+| [Snapshot backups](runbooks/snapshot-backups.md) | Convert the worker data disk to LVM, check captures, and remove a leftover snapshot. |
 
 ## Worklogs
 
@@ -37,6 +38,7 @@ Each worklog records what was built and the commands and results that passed its
 | [Disaster drill](worklogs/06-disaster-drill.md) | 6: two drills, their timelines, and their comparison |
 | [Faster recovery](worklogs/07-faster-recovery.md) | 7: the 15-minute backup schedule, the third drill, and the cost |
 | [Rebuild from the runbooks](worklogs/08-rebuild-from-runbooks.md) | 8, in progress: the rebuild from empty state and every deviation |
+| [Backups without downtime](worklogs/09-backups-without-downtime.md) | 9, in progress: the LVM snapshot capture and its validation |
 
 ## Decisions
 

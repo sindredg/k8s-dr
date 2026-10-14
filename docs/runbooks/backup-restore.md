@@ -17,7 +17,7 @@ Check the scheduled backups and restore a backup set with the restore Job. [Deci
    gcloud storage ls "gs://${BUCKET}/primary/*/manifest.json"
    ```
 
-   Expected: one set per hour, named by its UTC start time, such as `primary/20260929T140701Z/`.
+   Expected: one set every 15 minutes, named by its UTC snapshot time, such as `primary/20260929T140701Z/`.
 
 2. Verify one set locally without the cluster. Run from an empty directory.
 

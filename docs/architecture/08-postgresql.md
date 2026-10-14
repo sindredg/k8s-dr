@@ -38,7 +38,7 @@ The image reads the password only when it initializes an empty data directory. C
 | The disk has `prevent_destroy` in Terraform | A `terraform destroy` deleting the data |
 | The `pg_dump` every 15 minutes in the [backup set](09-backup-and-restore.md) | Losing the disk, the zone, or the region |
 
-The dump is taken while Gitea is scaled to zero, so it matches the file archive taken at the same moment. The backup tool image is built from the same PostgreSQL image as the server, so `pg_dump` and `pg_restore` always match the server version.
+The dump is read from a temporary server on an LVM snapshot that also holds the Gitea volume, so it matches the file archive from the same instant while the live server keeps running ([decision 0014](../decisions/0014-snapshot-backups.md)). The backup tool image is built from the same PostgreSQL image as the server, so `pg_dump` and `pg_restore` always match the server version.
 
 A restore drops and recreates the `gitea` database, then loads the dump in a single transaction: it either fully applies or leaves an empty database with Gitea stopped.
 

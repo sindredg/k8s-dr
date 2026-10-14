@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 7 are complete. Milestones 8 to 14 are planned: they rebuild the environment, which was removed after the drills, remove the backup downtime, automate and shorten the recovery, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 7 are complete. Milestones 8 and 9 are in progress, and 10 to 14 are planned. Together they rebuild the environment, which was removed after the drills, remove the backup downtime, automate and shorten the recovery, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -12,8 +12,8 @@ Milestones 0 to 7 are complete. Milestones 8 to 14 are planned: they rebuild the
 | 5. Cold recovery | Independent service in second region | Complete |
 | 6. Disaster drill | Measured RTO and RPO | Complete |
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
-| 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Planned |
-| 9. Backups without downtime | Gitea stays up while every backup is captured | Planned |
+| 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | In progress |
+| 9. Backups without downtime | Gitea stays up while every backup is captured | In progress |
 | 10. Automated recovery | Recovery runs without a person | Planned |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
 | 12. Unattended drills | Measured recovery and cost with nobody present | Planned |

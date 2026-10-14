@@ -32,7 +32,7 @@ One variable, `CLUSTER`, selects the Terraform root, the inventory, the Flux clu
 | `node_prepare` | Checks the OS, installs prerequisites, disables swap, loads kernel modules, sets the networking sysctls |
 | `container_runtime` | Installs a pinned `containerd.io` from Docker's repository and configures it for Kubernetes |
 | `kubernetes_packages` | Installs and holds pinned `kubelet`, `kubeadm`, and `kubectl` |
-| `worker_storage` | Formats the data disk only if it is blank, mounts it by UUID, and refuses the boot disk or an unexpected filesystem |
+| `worker_storage` | Puts a blank data disk into the LVM volume group `k8sdr`, with an ext4 logical volume `data` on 80% of it and 20% free for the backup snapshot. Reuses an existing volume group, refuses the boot disk or any other filesystem, mounts by UUID, and installs `k8sdr-snapshot` |
 | `control_plane` | Runs `kubeadm init` once and waits for the API |
 | `worker_join` | Creates a 15-minute join token on the control plane and joins the worker |
 | `cluster_addons` | Installs Calico, the Gateway API CRDs, Helm, Traefik, and the Local Path Provisioner |

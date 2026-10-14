@@ -28,12 +28,16 @@ The set format does not change, so `restore.sh`, the restore test, and the recov
 
 | Step | Runs as | Why |
 | --- | --- | --- |
-| Create, mount, and remove the snapshot | `/usr/local/sbin/k8sdr-snapshot` on the worker, installed by Ansible, called through `nsenter` from a privileged native sidecar in the backup Pod | LVM and mounts need root on the host. The sidecar starts before the capture steps and receives `SIGTERM` after them, so removal runs on every exit path that is not `SIGKILL`. The next run removes a snapshot left by `SIGKILL` before it creates one. |
+| Create, mount, and remove the snapshot | `/usr/local/sbin/k8sdr-snapshot` on the worker, installed by Ansible, called through `nsenter` from a privileged native sidecar in the backup Pod. The sidecar enters the worker's mount and IPC namespaces through the worker's `/proc`, mounted read-only. | LVM and mounts need root on the host. LVM waits for udev through System V semaphores, so it runs in the host IPC namespace. The host `/proc` mount replaces `hostPID`, so the other containers keep their own PID namespace. The sidecar starts before the capture steps and receives `SIGTERM` after them, so removal runs on every exit path that is not `SIGKILL`. The next run removes a snapshot left by `SIGKILL` before it creates one. |
 | Dump PostgreSQL | An init container as UID 999 | The data directory belongs to the PostgreSQL user, and the server refuses to run as root. |
 | Archive the Gitea volume | An init container as UID 1000 | The same user Gitea runs as. |
 | Upload, manifest, and heartbeat | The main container as UID 1000 | Unchanged from decision 0007. |
 
-The backup Job no longer scales Gitea, so its Role loses the `deployments/scale` permission. It also no longer connects to PostgreSQL over the network.
+The backup Job no longer scales Gitea, so its Role loses the `deployments/scale` permission. It also no longer connects to PostgreSQL over the network. The restore Job still needs both, so it gets its own service account, Role, and network policies, `gitea-restore`, instead of sharing the backup's.
+
+### Data disk layout
+
+This replaces steps 2 and 3 of the worker disk rules in [decision 0005](0005-kubernetes-bootstrap-architecture.md#preserve-the-worker-disk-and-fail-safely). The storage role makes a blank data disk the only physical volume of the volume group `k8sdr`, creates the logical volume `data` on 80% of it, and formats that as ext4. It reuses an existing `k8sdr` volume group and fails on any other signature, including the plain ext4 disk of the earlier layout. Converting that disk in place is not possible, so it is rebuilt; the [snapshot backups runbook](../runbooks/snapshot-backups.md) gives the steps.
 
 ## Alternatives
 
@@ -48,7 +52,7 @@ The backup Job no longer scales Gitea, so its Role loses the `deployments/scale`
 ## Consequences
 
 - The capture is crash-consistent at one instant, not quiesced. A restore equals the state after a power loss at that instant. PostgreSQL recovers from that by design. Git writes objects before it updates a ref, and the freeze flushes the page cache, so a repository is never half-written. One window remains: a push whose refs are updated but whose post-receive hook has not yet updated the database. That window lasts milliseconds, against seconds for a live dump. The restore check covers the fixtures, not that window.
-- The backup Pod contains a privileged container with the host PID namespace. Anyone who can create Pods in the `gitea` namespace could already read the Gitea data; with this change they can also gain root on the worker. Flux is the only writer of that namespace.
+- The backup Pod contains a privileged container that enters the host mount and IPC namespaces. Anyone who can create Pods in the `gitea` namespace could already read the Gitea data; with this change they can also gain root on the worker. Flux is the only writer of that namespace.
 - The snapshot is classic copy-on-write. If more than the free space (20% of the disk) is written during one capture, the snapshot becomes invalid, that backup fails and alerts, and the data volume is unaffected. A thin pool would avoid the reserve, but an overfilled thin pool can stop writes to the data volume itself.
 - Writes to the data volume are slower while a snapshot exists, because each first write to a block is also copied. A capture lasts seconds to minutes.
 - The recovery cluster uses the same storage role, so its backups after a failover have no pause either.
