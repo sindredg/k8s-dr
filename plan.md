@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 7 are complete. Milestones 8 to 11 are planned: they rebuild the environment, which was removed after the drills, and automate the recovery. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 7 are complete. Milestones 8 to 12 are planned: they rebuild the environment, which was removed after the drills, remove the backup downtime, and automate the recovery. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -13,9 +13,10 @@ Milestones 0 to 7 are complete. Milestones 8 to 11 are planned: they rebuild the
 | 6. Disaster drill | Measured RTO and RPO | Complete |
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
 | 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Planned |
-| 9. Automated recovery | Recovery runs without a person | Planned |
-| 10. Unattended drills | Measured recovery with nobody present | Planned |
-| 11. Failback with data | Optional return that keeps the recovery writes | Planned |
+| 9. Backups without downtime | Gitea stays up while every backup is captured | Planned |
+| 10. Automated recovery | Recovery runs without a person | Planned |
+| 11. Unattended drills | Measured recovery with nobody present | Planned |
+| 12. Failback with data | Optional return that keeps the recovery writes | Planned |
 
 ## 0. Recovery contract
 
@@ -130,7 +131,19 @@ The environment was removed after milestone 7. Only the Terraform state bucket r
 
 **Gate:** The primary serves the fixtures, a backup set restores in the test namespaces, and the worklog lists every step that did not work as documented.
 
-## 9. Automated recovery
+## 9. Backups without downtime
+
+Every backup since milestone 4 scales Gitea to zero for the capture. At one capture every 15 minutes, the service has a short outage four times an hour, and the uptime check records it. The backup causes the unavailability the project exists to prevent. See [decision 0014](docs/decisions/0014-snapshot-backups.md).
+
+- [ ] Put the worker data filesystem on an LVM logical volume, with free space in the volume group for a snapshot.
+- [ ] Capture PostgreSQL and the Gitea volume from one LVM snapshot while Gitea keeps running, and remove the backup job's permission to scale Gitea.
+- [ ] Keep the encrypted set format, so the restore path and the earlier drills stay comparable.
+- [ ] Prove that no request fails during captures: run a write and probe loop across several scheduled backups.
+- [ ] Restore a set taken under write load into the test namespaces.
+
+**Gate:** Across at least four scheduled captures under a write loop, the uptime check and the loop record no failure, every manifest reports no pause, and a set taken under load restores with the fixtures intact.
+
+## 10. Automated recovery
 
 See [decision 0013](docs/decisions/0013-automated-recovery.md).
 
@@ -143,7 +156,7 @@ See [decision 0013](docs/decisions/0013-automated-recovery.md).
 
 **Gate:** A recovery started by hand from the workflow completes with no other action, and the watchdog does not start one during a backup pause or while its switch is off.
 
-## 10. Unattended drills
+## 11. Unattended drills
 
 - [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
 - [ ] Isolate the primary and take no further action; record the recovery time from the first failed probe, including detection.
@@ -152,7 +165,7 @@ See [decision 0013](docs/decisions/0013-automated-recovery.md).
 
 **Gate:** Two consecutive unattended drills meet both targets, and the worklog compares them with drills 1 to 3.
 
-## 11. Failback with data (optional)
+## 12. Failback with data (optional)
 
 - [ ] Return to the primary region from a backup of the recovery cluster, so writes accepted during the outage survive.
 - [ ] Measure the downtime and data loss of the return.
