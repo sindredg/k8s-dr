@@ -261,9 +261,93 @@ class BackupTests(unittest.TestCase):
         image = self.pod["containers"][0]["image"]
         self.assertRegex(image, r"^ghcr\.io/sindredg/k8s-dr-backup@sha256:[0-9a-f]{64}$")
 
-    def test_mounts_the_gitea_volume_read_only(self):
-        data = next(volume for volume in self.pod["volumes"] if volume["name"] == "data")
-        self.assertEqual(data["persistentVolumeClaim"], {"claimName": "gitea-shared-storage", "readOnly": True})
+    def _containers(self):
+        return {container["name"]: container for container in self.pod["initContainers"] + self.pod["containers"]}
+
+    def test_does_not_mount_the_live_volumes(self):
+        # The capture reads the snapshot, so Gitea and PostgreSQL keep their
+        # volumes. See decision 0014.
+        self.assertFalse([volume for volume in self.pod["volumes"] if "persistentVolumeClaim" in volume])
+
+    def test_snapshot_sidecar_starts_first_and_is_the_only_privileged_container(self):
+        containers = self._containers()
+        self.assertEqual(
+            [container["name"] for container in self.pod["initContainers"]],
+            ["snapshot", "dump-postgresql", "archive-gitea"],
+        )
+        sidecar = containers.pop("snapshot")
+        self.assertEqual(sidecar["restartPolicy"], "Always")
+        self.assertTrue(sidecar["securityContext"]["privileged"])
+        self.assertEqual(sidecar["startupProbe"]["exec"]["command"], ["test", "-s", "/state/snapshot"])
+        for name, container in containers.items():
+            with self.subTest(container=name):
+                context = container["securityContext"]
+                self.assertNotIn("privileged", context)
+                self.assertFalse(context["allowPrivilegeEscalation"])
+                self.assertTrue(context["readOnlyRootFilesystem"])
+                self.assertEqual(context["capabilities"], {"drop": ["ALL"]})
+                self.assertNotEqual(context["runAsUser"], 0)
+                self.assertNotIn("host-proc", [mount["name"] for mount in container["volumeMounts"]])
+        for key in ("hostPID", "hostIPC", "hostNetwork"):
+            self.assertNotIn(key, self.pod)
+
+    def test_capture_steps_run_as_the_volume_owners(self):
+        containers = self._containers()
+        self.assertEqual(containers["dump-postgresql"]["securityContext"]["runAsUser"], 999)
+        self.assertEqual(containers["archive-gitea"]["securityContext"]["runAsUser"], 1000)
+        statefulset = _documents(APPS / "postgresql/statefulset.yaml")[0]
+        server = statefulset["spec"]["template"]["spec"]["containers"][0]
+        self.assertEqual(server["securityContext"]["runAsUser"], 999)
+
+    def test_snapshot_mounts_follow_the_host_binds(self):
+        # k8sdr-snapshot binds the volumes after the Pod's volumes are set up.
+        snapshot = next(volume for volume in self.pod["volumes"] if volume["name"] == "snapshot")
+        self.assertEqual(snapshot["hostPath"], {"path": "/var/lib/k8s-dr-backup", "type": "Directory"})
+        for name, read_only in (("dump-postgresql", False), ("archive-gitea", True)):
+            mount = next(m for m in self._containers()[name]["volumeMounts"] if m["name"] == "snapshot")
+            self.assertEqual(mount["mountPropagation"], "HostToContainer")
+            self.assertEqual(mount.get("readOnly", False), read_only)
+
+    def test_snapshot_claims_name_the_live_volumes(self):
+        env = {item["name"]: item.get("value") for item in self._containers()["snapshot"]["env"]}
+        statefulset = _documents(APPS / "postgresql/statefulset.yaml")[0]
+        claim = statefulset["spec"]["volumeClaimTemplates"][0]["metadata"]["name"]
+        postgresql = f"postgresql/{claim}-{statefulset['metadata']['name']}-0"
+        # The chart's default claim name; the restore Job mounts the same one.
+        release = _documents(APPS / "gitea/release.yaml")[0]
+        gitea_claim = release["spec"]["values"]["persistence"].get("claimName", "gitea-shared-storage")
+        restore_job = Path("ansible/playbooks/templates/restore-job.yml.j2").read_text()
+        self.assertIn(f"claimName: {gitea_claim}\n", restore_job)
+        self.assertEqual(env["SNAPSHOT_CLAIMS"].split(), [postgresql, f"gitea/{gitea_claim}"])
+
+    def test_dumps_the_data_directory_of_the_server_image(self):
+        # The postgres image keeps PGDATA at <major>/docker below the volume.
+        statefulset = _documents(APPS / "postgresql/statefulset.yaml")[0]
+        server = statefulset["spec"]["template"]["spec"]["containers"][0]
+        major = re.match(r"postgres:(\d+)\.", server["image"]).group(1)
+        self.assertEqual(server["volumeMounts"][0]["mountPath"], "/var/lib/postgresql")
+        env = {item["name"]: item.get("value") for item in self._containers()["dump-postgresql"]["env"]}
+        self.assertEqual(env["SNAPSHOT_PGDATA"], f"/snapshot/postgresql/{major}/docker")
+
+    def test_every_container_runs_one_script_step_from_the_same_image(self):
+        image = self.pod["containers"][0]["image"]
+        steps = {}
+        for name, container in self._containers().items():
+            self.assertEqual(container["image"], image)
+            self.assertEqual(container["command"][0], "/backup/backup.sh")
+            steps[name] = container["command"][1]
+        self.assertEqual(
+            steps,
+            {"snapshot": "snapshot", "dump-postgresql": "dump-postgresql",
+             "archive-gitea": "archive-gitea", "backup": "upload"},
+        )
+        for step in steps.values():
+            self.assertIn(f"  {step}) ", self.script)
+
+    def test_manifest_records_no_pause(self):
+        self.assertIn("pause_seconds: 0", self.script)
+        self.assertIn('capture: "lvm-snapshot"', self.script)
+        self.assertNotIn("scale", self.script)
 
     def test_flux_does_not_substitute_the_script(self):
         # Flux would replace the script's ${VAR} references with empty strings.
@@ -278,8 +362,16 @@ class BackupTests(unittest.TestCase):
         generator = self.kustomization["configMapGenerator"][0]
         self.assertEqual(generator["namespace"], "gitea")
 
-    def test_role_can_scale_only_gitea(self):
-        rules = self.documents["Role", "gitea-backup"]["rules"]
+    def test_backup_role_only_reads_the_gitea_deployment(self):
+        self.assertEqual(self.documents["Role", "gitea-backup"]["rules"], [{
+            "apiGroups": ["apps"],
+            "resources": ["deployments"],
+            "resourceNames": ["gitea"],
+            "verbs": ["get"],
+        }])
+
+    def test_restore_role_can_scale_only_gitea(self):
+        rules = self.documents["Role", "gitea-restore"]["rules"]
         writes = [rule for rule in rules if set(rule["verbs"]) - {"get", "list", "watch"}]
         self.assertEqual(writes, [{
             "apiGroups": ["apps"],
@@ -291,7 +383,7 @@ class BackupTests(unittest.TestCase):
     def test_uploads_cannot_replace_objects_and_the_manifest_is_last(self):
         self.assertIn("x-goog-if-generation-match: 0", self.script)
         self.assertIn("Content-MD5", self.script)
-        uploads = re.findall(r"^\s*upload \S+ (\S+)", self.script, re.MULTILINE)
+        uploads = re.findall(r"^\s*put \S+ (\S+)", self.script, re.MULTILINE)
         self.assertEqual(uploads[-1], "manifest.json")
 
     def test_encrypts_only_to_public_keys(self):
@@ -350,9 +442,9 @@ class RestoreTests(unittest.TestCase):
         makefile = Path("Makefile").read_text()
         self.assertRegex(makefile, r"(?m)^RESTORE_NAMESPACE \?=$")
 
-    def test_job_uses_the_backup_identity_and_image(self):
-        self.assertIn("serviceAccountName: gitea-backup", self.job)
-        self.assertIn("app.kubernetes.io/name: gitea-backup", self.job)
+    def test_job_uses_the_restore_identity_and_the_backup_image(self):
+        self.assertIn("serviceAccountName: gitea-restore", self.job)
+        self.assertIn("app.kubernetes.io/name: gitea-restore", self.job)
         self.assertIn("backup.yaml", self.playbook["vars"]["restore_image"])
 
     def test_backups_suspended_by_the_cluster_settings_stay_suspended(self):
@@ -506,19 +598,24 @@ class NetworkPolicyTests(unittest.TestCase):
             flows,
             {
                 ("postgresql/postgresql", "ingress", "gitea/gitea", "TCP", 5432),
-                ("postgresql/postgresql", "ingress", "gitea/gitea-backup", "TCP", 5432),
+                ("postgresql/postgresql", "ingress", "gitea/gitea-restore", "TCP", 5432),
                 ("postgresql/*", "egress", "kube-system/kube-dns", "UDP", 53),
                 ("postgresql/*", "egress", "kube-system/kube-dns", "TCP", 53),
                 ("gitea/gitea", "ingress", "traefik/traefik", "TCP", 3000),
                 ("gitea/gitea", "egress", "postgresql/postgresql", "TCP", 5432),
                 ("gitea/*", "egress", "kube-system/kube-dns", "UDP", 53),
                 ("gitea/*", "egress", "kube-system/kube-dns", "TCP", 53),
-                # The backup Job: database, metadata server token, Cloud
-                # Storage, Healthchecks.io, and the Kubernetes API.
-                ("gitea/gitea-backup", "egress", "postgresql/postgresql", "TCP", 5432),
+                # The backup Job: metadata server token, Cloud Storage,
+                # Healthchecks.io, and the Kubernetes API. No database: it
+                # reads PostgreSQL from the snapshot.
                 ("gitea/gitea-backup", "egress", "169.254.169.254/32", "TCP", 80),
                 ("gitea/gitea-backup", "egress", "any", "TCP", 443),
                 ("gitea/gitea-backup", "egress", "any", "TCP", 6443),
+                # The restore Job also writes the database.
+                ("gitea/gitea-restore", "egress", "postgresql/postgresql", "TCP", 5432),
+                ("gitea/gitea-restore", "egress", "169.254.169.254/32", "TCP", 80),
+                ("gitea/gitea-restore", "egress", "any", "TCP", 443),
+                ("gitea/gitea-restore", "egress", "any", "TCP", 6443),
             },
         )
 

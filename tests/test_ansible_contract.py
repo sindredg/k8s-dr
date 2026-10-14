@@ -101,12 +101,40 @@ class AnsibleContractTests(unittest.TestCase):
             "lsblk -n -o PKNAME",
             "blkid -o value -s TYPE",
             "unexpected filesystem",
+            'worker_storage_signature.stdout in ["", "LVM2_member"]',
+            'when: worker_storage_signature.stdout == ""',
             "mkfs.ext4",
             "mountpoint -q {{ worker_data_mount }}",
         ):
             self.assertIn(required, text)
-        self.assertNotIn("wipefs", text)
-        self.assertNotIn("force: true", text)
+        for forbidden in ("wipefs", "force: true", "pvremove", "vgremove", "lvremove", "--force"):
+            self.assertNotIn(forbidden, text)
+
+    def test_storage_role_leaves_the_snapshot_reserve_free(self):
+        role_vars = yaml.safe_load(Path("ansible/roles/worker_storage/vars/main.yml").read_text())
+        text = Path("ansible/roles/worker_storage/tasks/main.yml").read_text()
+        self.assertEqual(role_vars["worker_storage_snapshot_reserve_percent"], 20)
+        self.assertIn("--extents {{ 100 - worker_storage_snapshot_reserve_percent }}%VG", text)
+        self.assertIn("Require the snapshot reserve in the volume group", text)
+
+    def test_snapshot_command_matches_the_storage_layout(self):
+        # k8sdr-snapshot hardcodes the names the role creates.
+        script = Path("ansible/roles/worker_storage/files/k8sdr-snapshot.sh").read_text()
+        role_vars = yaml.safe_load(Path("ansible/roles/worker_storage/vars/main.yml").read_text())
+        group_vars = yaml.safe_load(Path("ansible/playbooks/group_vars/all.yml").read_text())
+        self.assertIn(f"\nVG={role_vars['worker_storage_vg']}\n", script)
+        self.assertIn(f"\nORIGIN={role_vars['worker_storage_lv']}\n", script)
+        local_path = group_vars["local_path_root"].removeprefix(group_vars["worker_data_mount"] + "/")
+        self.assertIn(f"\nLOCAL_PATH={local_path}\n", script)
+        self.assertIn("\nTARGET_ROOT=/var/lib/k8s-dr-backup\n", script)
+        backup = Path("deploy/apps/gitea/backup.yaml").read_text()
+        self.assertIn("path: /var/lib/k8s-dr-backup\n", backup)
+        self.assertIn("/usr/local/sbin/k8sdr-snapshot", backup.replace("\n", " ") + Path(
+            "deploy/apps/gitea/backup/backup.sh").read_text())
+        tasks = yaml.safe_load(Path("ansible/roles/worker_storage/tasks/main.yml").read_text())
+        install = next(task for task in tasks if task["name"] == "Install the backup snapshot command")
+        self.assertEqual(install["ansible.builtin.copy"]["dest"], "/usr/local/sbin/k8sdr-snapshot")
+        self.assertEqual(install["ansible.builtin.copy"]["mode"], "0755")
 
     def test_storage_role_uses_util_linux_mountpoint_exit_codes(self):
         # util-linux mountpoint returns 32 for "not a mountpoint" and 1 for errors.

@@ -1,7 +1,7 @@
-# Rendered by restore.yml. The Pod carries the backup Job's name label and
-# ServiceAccount, so the backup network policies and Role apply to it: the
-# restore needs the same database, metadata server, Cloud Storage, and
-# Kubernetes API access, and the same scale permission on Gitea.
+# Rendered by restore.yml. The Pod carries the gitea-restore name label and
+# ServiceAccount, so the restore network policies and Role apply to it:
+# database, metadata server, Cloud Storage, and Kubernetes API access, and the
+# scale permission on Gitea.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -14,10 +14,10 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: gitea-backup
+        app.kubernetes.io/name: gitea-restore
         app.kubernetes.io/component: restore
     spec:
-      serviceAccountName: gitea-backup
+      serviceAccountName: gitea-restore
       restartPolicy: Never
       # The Gitea volume is local to the worker disk.
       nodeSelector:

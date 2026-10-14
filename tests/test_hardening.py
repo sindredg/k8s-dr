@@ -82,7 +82,7 @@ class MetadataServerTests(unittest.TestCase):
                     },
                 )
 
-    def test_only_the_backup_job_is_allowed_the_metadata_server(self):
+    def test_only_the_backup_and_restore_jobs_are_allowed_the_metadata_server(self):
         allowed = set()
         for path in DEPLOY.rglob("network-policies.yaml"):
             for policy in _documents(path):
@@ -91,7 +91,7 @@ class MetadataServerTests(unittest.TestCase):
                         if peer.get("ipBlock", {}).get("cidr") == METADATA_SERVER:
                             pods = policy["spec"]["podSelector"].get("matchLabels", {})
                             allowed.add((policy["metadata"]["namespace"], pods.get("app.kubernetes.io/name")))
-        self.assertEqual(allowed, {("gitea", "gitea-backup")})
+        self.assertEqual(allowed, {("gitea", "gitea-backup"), ("gitea", "gitea-restore")})
 
 
 class NodeScopeTests(unittest.TestCase):

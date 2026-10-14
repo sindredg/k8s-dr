@@ -1,0 +1,7 @@
+---
+# k8sdr-snapshot.sh hardcodes the same names. See decision 0014.
+worker_storage_vg: k8sdr
+worker_storage_lv: data
+worker_storage_lv_device: "/dev/{{ worker_storage_vg }}/{{ worker_storage_lv }}"
+# Share of the volume group left free for the copy-on-write snapshot.
+worker_storage_snapshot_reserve_percent: 20

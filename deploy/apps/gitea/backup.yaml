@@ -1,17 +1,51 @@
 ---
-# Scheduled consistent backup of PostgreSQL and the Gitea volume to the offsite
-# bucket. See decision 0007 and backup/backup.sh.
+# Scheduled backup of PostgreSQL and the Gitea volume to the offsite bucket,
+# captured from one LVM snapshot while Gitea keeps running. See decisions 0007
+# and 0014 and backup/backup.sh.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gitea-backup
   namespace: gitea
 ---
-# Scale Gitea to zero for the capture and back up afterwards.
+# Read the Gitea version for the manifest.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: gitea-backup
+  namespace: gitea
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["gitea"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-backup
+  namespace: gitea
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitea-backup
+subjects:
+  - kind: ServiceAccount
+    name: gitea-backup
+    namespace: gitea
+---
+# The restore Job of ansible/playbooks/restore.yml. It stops Gitea while it
+# replaces the data, so it keeps the scale permission the backup gave up.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitea-restore
+  namespace: gitea
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitea-restore
   namespace: gitea
 rules:
   - apiGroups: ["apps"]
@@ -32,15 +66,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: gitea-backup
+  name: gitea-restore
   namespace: gitea
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: gitea-backup
+  name: gitea-restore
 subjects:
   - kind: ServiceAccount
-    name: gitea-backup
+    name: gitea-restore
     namespace: gitea
 ---
 apiVersion: batch/v1
@@ -71,44 +105,83 @@ spec:
         spec:
           serviceAccountName: gitea-backup
           restartPolicy: Never
-          # The Gitea volume is local to the worker disk.
+          # The volumes and the snapshot command are on the worker.
           nodeSelector:
             node-role.kubernetes.io/worker: ""
+          # The snapshot container removes the snapshot when it receives
+          # SIGTERM.
+          terminationGracePeriodSeconds: 60
           securityContext:
-            runAsUser: 1000
-            runAsGroup: 1000
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
-          containers:
-            - name: backup
+          initContainers:
+            # Native sidecar: starts first and stops last. It creates the
+            # snapshot on the host through nsenter, and removes it when the
+            # Pod stops. Privileged, because LVM and mounts need root on the
+            # worker. Anyone who can create Pods in this namespace can already
+            # read the Gitea data; Flux is its only writer. See decision 0014.
+            - name: snapshot
               # yamllint disable-line rule:line-length
               image: ghcr.io/sindredg/k8s-dr-backup@sha256:275f4646e3f15bfcd28486c170cf6d3a2d19b3d43ce328c985462cf59bd2a1a7
-              command: ["/backup/backup.sh"]
+              command: ["/backup/backup.sh", "snapshot"]
+              restartPolicy: Always
               env:
+                - name: SNAPSHOT_CLAIMS
+                  value: postgresql/data-postgresql-0 gitea/gitea-shared-storage
                 - name: BACKUP_CLUSTER
                   value: ${backup_cluster}
-                - name: BACKUP_BUCKET
-                  valueFrom:
-                    secretKeyRef:
-                      name: gitea-backup
-                      key: bucket
                 - name: PING_URL
                   valueFrom:
                     secretKeyRef:
                       name: gitea-backup
                       key: ping_url
-                - name: PGHOST
-                  value: postgresql.postgresql.svc.cluster.local
+              # The capture steps start when the result file exists.
+              startupProbe:
+                exec:
+                  command: ["test", "-s", "/state/snapshot"]
+                periodSeconds: 2
+                failureThreshold: 150
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  memory: 64Mi
+              securityContext:
+                runAsUser: 0
+                runAsNonRoot: false
+                privileged: true
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: host-proc
+                  mountPath: /host/proc
+                  readOnly: true
+                - name: state
+                  mountPath: /state
+                - name: backup
+                  mountPath: /backup
+            # Starts a PostgreSQL server without a network listener on the
+            # snapshot's data directory, as the user that owns it.
+            - name: dump-postgresql
+              # yamllint disable-line rule:line-length
+              image: ghcr.io/sindredg/k8s-dr-backup@sha256:275f4646e3f15bfcd28486c170cf6d3a2d19b3d43ce328c985462cf59bd2a1a7
+              command: ["/backup/backup.sh", "dump-postgresql"]
+              env:
+                - name: BACKUP_CLUSTER
+                  value: ${backup_cluster}
+                - name: PING_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-backup
+                      key: ping_url
+                # PGDATA of the postgres image, below the volume root.
+                - name: SNAPSHOT_PGDATA
+                  value: /snapshot/postgresql/18/docker
                 - name: PGUSER
                   value: gitea
                 - name: PGDATABASE
                   value: gitea
-                - name: PGPASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: gitea-database
-                      key: password
                 - name: HOME
                   value: /tmp
               resources:
@@ -118,13 +191,104 @@ spec:
                 limits:
                   memory: 512Mi
               securityContext:
+                runAsUser: 999
+                runAsGroup: 999
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities:
                   drop: ["ALL"]
               volumeMounts:
-                - name: data
-                  mountPath: /data
+                # The binds appear after the volume is set up, so they need
+                # mount propagation from the host.
+                - name: snapshot
+                  mountPath: /snapshot
+                  mountPropagation: HostToContainer
+                - name: state
+                  mountPath: /state
+                  readOnly: true
+                - name: staging
+                  mountPath: /staging
+                - name: tmp
+                  mountPath: /tmp
+                - name: backup
+                  mountPath: /backup
+            - name: archive-gitea
+              # yamllint disable-line rule:line-length
+              image: ghcr.io/sindredg/k8s-dr-backup@sha256:275f4646e3f15bfcd28486c170cf6d3a2d19b3d43ce328c985462cf59bd2a1a7
+              command: ["/backup/backup.sh", "archive-gitea"]
+              env:
+                - name: BACKUP_CLUSTER
+                  value: ${backup_cluster}
+                - name: PING_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-backup
+                      key: ping_url
+                - name: HOME
+                  value: /tmp
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: snapshot
+                  mountPath: /snapshot
+                  mountPropagation: HostToContainer
+                  readOnly: true
+                - name: state
+                  mountPath: /state
+                  readOnly: true
+                - name: staging
+                  mountPath: /staging
+                - name: tmp
+                  mountPath: /tmp
+                - name: backup
+                  mountPath: /backup
+          containers:
+            - name: backup
+              # yamllint disable-line rule:line-length
+              image: ghcr.io/sindredg/k8s-dr-backup@sha256:275f4646e3f15bfcd28486c170cf6d3a2d19b3d43ce328c985462cf59bd2a1a7
+              command: ["/backup/backup.sh", "upload"]
+              env:
+                - name: BACKUP_CLUSTER
+                  value: ${backup_cluster}
+                - name: PING_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-backup
+                      key: ping_url
+                - name: BACKUP_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-backup
+                      key: bucket
+                - name: HOME
+                  value: /tmp
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              securityContext:
+                runAsUser: 1000
+                runAsGroup: 1000
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: state
+                  mountPath: /state
                   readOnly: true
                 - name: staging
                   mountPath: /staging
@@ -133,10 +297,19 @@ spec:
                 - name: backup
                   mountPath: /backup
           volumes:
-            - name: data
-              persistentVolumeClaim:
-                claimName: gitea-shared-storage
-                readOnly: true
+            - name: host-proc
+              hostPath:
+                path: /proc
+                type: Directory
+            # The worker_storage role creates it; k8sdr-snapshot binds the
+            # snapshot's volume directories below it.
+            - name: snapshot
+              hostPath:
+                path: /var/lib/k8s-dr-backup
+                type: Directory
+            - name: state
+              emptyDir:
+                sizeLimit: 1Mi
             - name: staging
               emptyDir:
                 sizeLimit: 4Gi
