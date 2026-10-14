@@ -53,6 +53,7 @@ Each worklog records what was built and the commands and results that passed its
 | [0010 Service hardening](decisions/0010-service-hardening.md) | Sign-in, pod egress, node scopes, and the daily surface scan. |
 | [0011 External uptime probe](decisions/0011-external-uptime-probe.md) | Measuring the outage with a Cloud Monitoring uptime check. |
 | [0012 Back up every 15 minutes](decisions/0012-backup-every-15-minutes.md) | The shorter data-loss window and what it costs. |
+| [0013 Automated recovery](decisions/0013-automated-recovery.md) | Proposed: a pipeline and a watchdog recover the service with nobody present. |
 
 ## Troubleshooting
 

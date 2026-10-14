@@ -2,7 +2,7 @@
 
 Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
 
-Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. The project is complete: every milestone in [plan.md](plan.md) passed its gate.
+Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 7 in [plan.md](plan.md) passed their gates. The environment was removed after the drills. Milestones 8 to 11 rebuild it and automate the recovery; they are planned, not implemented.
 
 The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds.
 
