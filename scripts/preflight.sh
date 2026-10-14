@@ -7,7 +7,7 @@
 # Usage: scripts/preflight.sh
 set -uo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 FLUX_AGE_KEY_FILE=${FLUX_AGE_KEY_FILE:-$HOME/.config/k8s-dr/age.agekey}
 BACKUP_AGE_KEY_FILE=${BACKUP_AGE_KEY_FILE:-$HOME/.config/k8s-dr/backup.agekey}

@@ -143,6 +143,7 @@ check: ## Run the local unit tests, linters, and syntax checks
 	$(BIN)python -m unittest discover -s tests
 	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy recovery .sops.yaml .github/workflows
 	$(BIN)ansible-lint ansible
+	$(BIN)shellcheck $$(git ls-files '*.sh')
 	for playbook in $(PLAYBOOKS); do \
 		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \
 	done
