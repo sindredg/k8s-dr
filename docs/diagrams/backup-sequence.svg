@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 960 684" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="backup-sequence-title backup-sequence-desc" id="backup-sequence-root">
         <title id="backup-sequence-title">One backup run</title>
-        <desc id="backup-sequence-desc">Sequence diagram showing one backup run: ping the heartbeat, scale Gitea to zero, dump the database and archive the volume with age encryption, scale Gitea back, upload both archives and then the manifest, wait for Gitea, and ping success.</desc>
+        <desc id="backup-sequence-desc">Sequence diagram showing one backup run while Gitea keeps running: ping the heartbeat, create an LVM snapshot of the worker data volume and bind its volume directories, dump the database from a temporary server on the snapshot and archive the Gitea volume with age encryption, upload both archives and then the manifest, ping success, and remove the snapshot.</desc>
         <defs>
       <style>#backup-sequence-root { --color-paper:   #2d3142;
       --color-ink:     #f5f5f5;
@@ -25,60 +25,60 @@
 
 
         <!-- rules, lifelines and callouts -->
-        <line x1="112" y1="96" x2="112" y2="544" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="296" y1="96" x2="296" y2="544" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="480" y1="96" x2="480" y2="544" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="664" y1="96" x2="664" y2="544" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
-        <line x1="848" y1="96" x2="848" y2="544" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
-        <text x="920" y="564" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="end"><tspan x="920" dy="0">Gitea is stopped only between the two scale calls:</tspan><tspan x="920" dy="17">seconds, not the upload time.</tspan></text>
+        <line x1="112" y1="96" x2="112" y2="520" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="296" y1="96" x2="296" y2="520" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="480" y1="96" x2="480" y2="520" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="664" y1="96" x2="664" y2="520" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="848" y1="96" x2="848" y2="520" stroke="#f5f5f5" stroke-opacity="0.22" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="920" y="552" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="end"><tspan x="920" dy="0">Gitea keeps running. The filesystem freezes only while</tspan><tspan x="920" dy="17">the snapshot switches in, for milliseconds.</tspan></text>
 
         <!-- connectors (behind nodes) -->
         <path d="M 112,140 L 848,140" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#backup-sequence-arrow-link)"/>
         <path d="M 112,184 L 296,184" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
-        <path d="M 112,228 L 480,228" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
-        <path d="M 112,272 L 140,272 Q 148,272 148,280 L 148,292 Q 148,300 140,300 L 112,300" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
-        <path d="M 112,340 L 296,340" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
-        <path d="M 112,384 L 664,384" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#backup-sequence-arrow-link)"/>
-        <path d="M 112,428 L 664,428" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#backup-sequence-arrow-accent)"/>
-        <path d="M 112,472 L 296,472" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
-        <path d="M 112,516 L 848,516" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#backup-sequence-arrow-link)"/>
+        <path d="M 296,228 L 480,228" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
+        <path d="M 112,272 L 480,272" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
+        <path d="M 112,316 L 480,316" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
+        <path d="M 112,360 L 664,360" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#backup-sequence-arrow-link)"/>
+        <path d="M 112,404 L 664,404" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#backup-sequence-arrow-accent)"/>
+        <path d="M 112,448 L 848,448" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#backup-sequence-arrow-link)"/>
+        <path d="M 112,492 L 296,492" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
 
         <!-- connector labels -->
         <rect x="172" y="120" width="64" height="12" rx="2" fill="#2d3142"/>
         <text x="204" y="129" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PING START</text>
-        <rect x="156" y="164" width="96" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="173" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SCALE GITEA TO 0</text>
-        <rect x="132" y="208" width="144" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="217" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PG_DUMP, ENCRYPT WITH AGE</text>
-        <rect x="156" y="280" width="112" height="12" rx="2" fill="#2d3142"/>
-        <text x="212" y="289" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TAR VOLUME, ENCRYPT</text>
-        <rect x="156" y="320" width="96" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="329" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SCALE GITEA TO 1</text>
-        <rect x="144" y="364" width="120" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="373" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">UPLOAD BOTH ARCHIVES</text>
-        <rect x="132" y="408" width="144" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="417" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">UPLOAD MANIFEST.JSON LAST</text>
-        <rect x="128" y="452" width="152" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="461" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">WAIT FOR GITEA TO BE READY</text>
-        <rect x="166" y="496" width="76" height="12" rx="2" fill="#2d3142"/>
-        <text x="204" y="505" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PING SUCCESS</text>
+        <rect x="158" y="164" width="92" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="173" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">CREATE SNAPSHOT</text>
+        <rect x="324" y="208" width="128" height="12" rx="2" fill="#2d3142"/>
+        <text x="388" y="217" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">MOUNT AND BIND VOLUMES</text>
+        <rect x="132" y="252" width="144" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="261" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PG_DUMP, ENCRYPT WITH AGE</text>
+        <rect x="148" y="296" width="112" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="305" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">TAR VOLUME, ENCRYPT</text>
+        <rect x="146" y="340" width="116" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="349" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">UPLOAD BOTH ARCHIVES</text>
+        <rect x="132" y="384" width="144" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="393" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">UPLOAD MANIFEST.JSON LAST</text>
+        <rect x="166" y="428" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="437" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">PING SUCCESS</text>
+        <rect x="152" y="472" width="104" height="12" rx="2" fill="#2d3142"/>
+        <text x="204" y="481" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">REMOVE ON SIGTERM</text>
 
         <!-- nodes -->
-        <!-- node: Backup Job -->
+        <!-- node: Backup Pod -->
         <rect x="40" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
         <rect x="40" y="40" width="144" height="56" rx="6" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
-        <text x="112" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Backup Job</text>
+        <text x="112" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Backup Pod</text>
         <text x="112" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">gitea-backup · worker</text>
-        <!-- node: Kubernetes API -->
+        <!-- node: Worker host -->
         <rect x="224" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
         <rect x="224" y="40" width="144" height="56" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="296" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Kubernetes API</text>
-        <text x="296" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Deployment gitea</text>
-        <!-- node: PostgreSQL -->
+        <text x="296" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Worker host</text>
+        <text x="296" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">k8sdr-snapshot</text>
+        <!-- node: LVM snapshot -->
         <rect x="408" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
         <rect x="408" y="40" width="144" height="56" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
-        <text x="480" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">PostgreSQL</text>
-        <text x="480" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">database gitea</text>
+        <text x="480" y="65.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">LVM snapshot</text>
+        <text x="480" y="80.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">k8sdr/backup</text>
         <!-- node: Backup bucket -->
         <rect x="592" y="40" width="144" height="56" rx="6" fill="#2d3142"/>
         <rect x="592" y="40" width="144" height="56" rx="6" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
@@ -94,15 +94,15 @@
         <line x1="40" y1="616" x2="920" y2="616" stroke="#f5f5f5" stroke-opacity="0.10" stroke-width="0.8"/>
         <text x="40" y="632" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
         <rect x="40" y="648" width="14" height="10" rx="2" fill="#f08a59" fill-opacity="0.10" stroke="#f08a59" stroke-width="1"/>
-        <text x="60" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The Job</text>
+        <text x="60" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The Pod</text>
         <rect x="120" y="648" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="140" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Cluster</text>
+        <text x="140" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Host</text>
         <rect x="200" y="648" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.05" stroke="#bfc0c0" stroke-width="1"/>
         <text x="220" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Data</text>
         <rect x="264" y="648" width="14" height="10" rx="2" fill="#f5f5f5" fill-opacity="0.03" stroke="#f5f5f5" stroke-opacity="0.30" stroke-width="1"/>
         <text x="284" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">External service</text>
         <line x1="388" y1="653" x2="416" y2="653" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#backup-sequence-arrow)"/>
-        <text x="424" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">In-cluster call</text>
+        <text x="424" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Local call</text>
         <line x1="524" y1="653" x2="552" y2="653" stroke="#739fdf" stroke-width="1.2" marker-end="url(#backup-sequence-arrow-link)"/>
         <text x="560" y="656" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">HTTPS to outside</text>
         <line x1="664" y1="653" x2="692" y2="653" stroke="#f08a59" stroke-width="1.4" marker-end="url(#backup-sequence-arrow-accent)"/>

@@ -23,7 +23,9 @@ Nothing else has administrative access. There are no service account keys, no SS
 | Worker node service account, one per cluster | Read the backup bucket; create objects under its own cluster's prefix | Delete or overwrite backups; call any other Google API |
 | Control-plane node service account | Nothing; it has no API scope | |
 | Flux | Read the public repository anonymously; cluster admin inside the cluster | Write to Git |
-| Backup Job service account | Scale the `gitea` Deployment and read pods in its namespace | Anything else in the cluster |
+| Backup Job service account | Read the `gitea` Deployment | Anything else in the cluster |
+| Backup Pod `snapshot` container | Run as root on the worker, privileged, to create and remove the LVM snapshot | Nothing is withheld: it can act as root on the worker. Flux is the only writer of the `gitea` namespace ([decision 0014](../decisions/0014-snapshot-backups.md)). |
+| Restore Job service account | Scale the `gitea` Deployment and read pods in its namespace | Anything else in the cluster |
 | GitHub Actions | Read the repository; publish the backup image from `main` | Reach the cluster or the project |
 
 ## Keys and secrets

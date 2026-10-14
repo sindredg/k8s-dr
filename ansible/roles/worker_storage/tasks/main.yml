@@ -64,30 +64,129 @@
       - worker_storage_resolved_device != worker_storage_root_device
     fail_msg: The worker data device resolves to the root filesystem source.
 
-- name: Detect an existing filesystem signature
+# The data filesystem is a logical volume that leaves part of the volume
+# group free for the backup snapshot. See decision 0014.
+- name: Install LVM
+  ansible.builtin.apt:
+    name: lvm2
+    state: present
+
+- name: Detect an existing signature on the worker data device
   ansible.builtin.command: >-
     blkid -o value -s TYPE {{ worker_storage_resolved_device }}
+  register: worker_storage_signature
+  changed_when: false
+  failed_when: worker_storage_signature.rc not in [0, 2]
+
+# A plain ext4 data disk predates decision 0014. Converting it in place is
+# not possible, so the role stops before it touches the data.
+- name: Refuse a data disk that is not blank or an LVM physical volume
+  ansible.builtin.assert:
+    that:
+      - worker_storage_signature.stdout in ["", "LVM2_member"]
+    fail_msg: >-
+      Refusing unexpected filesystem '{{ worker_storage_signature.stdout }}'
+      on {{ worker_storage_resolved_device }}. The data disk must be blank or
+      an LVM physical volume in volume group {{ worker_storage_vg }}. A plain
+      ext4 disk from before decision 0014 must be rebuilt; see
+      docs/runbooks/snapshot-backups.md.
+
+- name: Create the volume group only on a blank worker data device
+  ansible.builtin.command: >-
+    vgcreate {{ worker_storage_vg }} {{ worker_storage_resolved_device }}
+  when: worker_storage_signature.stdout == ""
+  changed_when: true
+
+- name: Read the volume group of the worker data device
+  ansible.builtin.command: >-
+    pvs --noheadings -o vg_name {{ worker_storage_resolved_device }}
+  register: worker_storage_pv_vg
+  changed_when: false
+
+- name: Require the worker data device in the expected volume group
+  ansible.builtin.assert:
+    that:
+      - worker_storage_pv_vg.stdout | trim == worker_storage_vg
+    fail_msg: >-
+      {{ worker_storage_resolved_device }} belongs to volume group
+      '{{ worker_storage_pv_vg.stdout | trim }}', not {{ worker_storage_vg }}.
+
+- name: Look for the data logical volume
+  ansible.builtin.command: >-
+    lvs --noheadings -o lv_name {{ worker_storage_vg }}/{{ worker_storage_lv }}
+  register: worker_storage_lv_lookup
+  changed_when: false
+  failed_when: false
+
+# The rest of the volume group stays free for the copy-on-write snapshot.
+- name: Create the data logical volume
+  ansible.builtin.command: >-
+    lvcreate --yes --name {{ worker_storage_lv }}
+    --extents {{ 100 - worker_storage_snapshot_reserve_percent }}%VG
+    {{ worker_storage_vg }}
+  when: worker_storage_lv_lookup.rc != 0
+  changed_when: true
+
+- name: Activate the volume group
+  ansible.builtin.command: "vgchange --activate y {{ worker_storage_vg }}"
+  changed_when: false
+
+- name: Detect an existing filesystem on the data logical volume
+  ansible.builtin.command: >-
+    blkid -o value -s TYPE {{ worker_storage_lv_device }}
   register: worker_storage_filesystem
   changed_when: false
   failed_when: worker_storage_filesystem.rc not in [0, 2]
 
-- name: Refuse an unexpected filesystem
+- name: Refuse an unexpected filesystem on the data logical volume
   ansible.builtin.assert:
     that:
       - worker_storage_filesystem.stdout in ["", "ext4"]
     fail_msg: >-
       Refusing unexpected filesystem '{{ worker_storage_filesystem.stdout }}'
-      on {{ worker_storage_resolved_device }}.
+      on {{ worker_storage_lv_device }}.
 
-- name: Create ext4 only on a blank worker data device
+- name: Create ext4 only on a blank data logical volume
   ansible.builtin.command: >-
-    mkfs.ext4 -F -L k8sdr-data {{ worker_storage_resolved_device }}
+    mkfs.ext4 -L k8sdr-data {{ worker_storage_lv_device }}
   when: worker_storage_filesystem.stdout == ""
   changed_when: true
 
+- name: Read the free space of the volume group
+  ansible.builtin.command: >-
+    vgs --noheadings --nosuffix --units b -o vg_size,vg_free {{ worker_storage_vg }}
+  register: worker_storage_vg_space
+  changed_when: false
+
+# A snapshot left by a killed backup holds the free space until the next
+# backup removes it, so its extents count as free here.
+- name: Read the size of a leftover backup snapshot
+  ansible.builtin.command: >-
+    lvs --noheadings --nosuffix --units b -o lv_size {{ worker_storage_vg }}/backup
+  register: worker_storage_leftover_snapshot
+  changed_when: false
+  failed_when: false
+
+- name: Require the snapshot reserve in the volume group
+  vars:
+    worker_storage_vg_size: "{{ worker_storage_vg_space.stdout.split()[0] | int }}"
+    worker_storage_vg_free: >-
+      {{ worker_storage_vg_space.stdout.split()[1] | int
+         + ((worker_storage_leftover_snapshot.stdout | trim | int)
+            if worker_storage_leftover_snapshot.rc == 0 else 0) }}
+  ansible.builtin.assert:
+    that:
+      # Extents round down, so allow one percentage point less.
+      - (worker_storage_vg_free | int) * 100 >=
+        (worker_storage_vg_size | int) * (worker_storage_snapshot_reserve_percent - 1)
+    fail_msg: >-
+      Volume group {{ worker_storage_vg }} has {{ worker_storage_vg_free }} of
+      {{ worker_storage_vg_size }} bytes free; the backup snapshot needs
+      {{ worker_storage_snapshot_reserve_percent }}%.
+
 - name: Read the worker data filesystem UUID
   ansible.builtin.command: >-
-    blkid -o value -s UUID {{ worker_storage_resolved_device }}
+    blkid -o value -s UUID {{ worker_storage_lv_device }}
   register: worker_storage_uuid
   changed_when: false
 
@@ -136,11 +235,17 @@
   register: worker_storage_mounted_resolved
   changed_when: false
 
-- name: Verify the expected worker data device is mounted
+- name: Resolve the data logical volume
+  ansible.builtin.command: "readlink -f {{ worker_storage_lv_device }}"
+  register: worker_storage_lv_resolved
+  changed_when: false
+
+# Both resolve to the same device-mapper node, such as /dev/dm-0.
+- name: Verify the data logical volume is mounted
   ansible.builtin.assert:
     that:
-      - worker_storage_mounted_resolved.stdout == worker_storage_resolved_device
-    fail_msg: The worker data mount does not resolve to the dedicated device.
+      - worker_storage_mounted_resolved.stdout == worker_storage_lv_resolved.stdout
+    fail_msg: The worker data mount does not resolve to the data logical volume.
 
 - name: Create the local path provisioner root
   ansible.builtin.file:
@@ -149,3 +254,28 @@
     owner: root
     group: root
     mode: "0770"
+
+# k8sdr-snapshot finds the volume directories at local-path below the root of
+# the snapshot.
+- name: Require the local path root at local-path on the data filesystem
+  ansible.builtin.assert:
+    that:
+      - local_path_root == worker_data_mount ~ '/local-path'
+    fail_msg: k8sdr-snapshot expects local_path_root at {{ worker_data_mount }}/local-path.
+
+# The backup Pod runs it in the host mount namespace. See decision 0014.
+- name: Install the backup snapshot command
+  ansible.builtin.copy:
+    src: k8sdr-snapshot.sh
+    dest: /usr/local/sbin/k8sdr-snapshot
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create the backup snapshot bind root
+  ansible.builtin.file:
+    path: /var/lib/k8s-dr-backup
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

@@ -11,6 +11,7 @@ class DependencyPinTests(unittest.TestCase):
                 "ansible-core==2.21.4",
                 "ansible-lint==26.9.0",
                 "yamllint==1.38.0",
+                "shellcheck-py==0.11.0.1",
             ],
         )
 

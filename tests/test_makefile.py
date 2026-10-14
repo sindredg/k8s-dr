@@ -11,6 +11,14 @@ class MakefileTests(unittest.TestCase):
         playbooks = {path.stem for path in Path("ansible/playbooks").glob("*.yml")}
         self.assertEqual(listed, playbooks)
 
+    def test_bootstrap_passes_extra_arguments_and_defaults_to_none(self):
+        # The data disk conversion runs the worker plays alone with
+        # BOOTSTRAP_ARGS='--limit worker'. See docs/runbooks/snapshot-backups.md.
+        makefile = Path("Makefile").read_text()
+        self.assertRegex(makefile, r"(?m)^BOOTSTRAP_ARGS \?=$")
+        recipe = re.search(r"(?ms)^bootstrap:.*?(?=^\S|\Z)", makefile).group(0)
+        self.assertIn("$(BOOTSTRAP_ARGS)", recipe)
+
     def test_cluster_selects_the_root_inventory_and_flux_directory(self):
         # One variable, so a recovery command cannot mix a recovery root with
         # the primary inventory. See decision 0008.

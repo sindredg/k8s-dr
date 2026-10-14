@@ -24,6 +24,9 @@ RESTORE_NAMESPACE ?=
 RESTORE_SET ?=
 # Branch Flux reconciles. Override it to test a pushed branch before merging.
 FLUX_GIT_BRANCH ?= main
+# Extra ansible-playbook arguments for bootstrap, such as --limit worker to
+# rebuild worker storage while the worker is drained.
+BOOTSTRAP_ARGS ?=
 # Endpoint for the fixture targets. Empty means git_host from the settings
 # of CLUSTER; set git-dr.sindrg.com to reach a recovery cluster before the
 # DNS cutover.
@@ -91,7 +94,7 @@ age-key:
 bootstrap: age-key ## Run bootstrap.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/bootstrap.yml \
 		-e sops_age_key_file="$(FLUX_AGE_KEY_FILE)" -e flux_git_branch="$(FLUX_GIT_BRANCH)" \
-		-e flux_cluster=$(CLUSTER)
+		-e flux_cluster=$(CLUSTER) $(BOOTSTRAP_ARGS)
 
 validate-cluster: ## Run validate_cluster.yml through IAP
 	$(IAP) $(PLAYBOOK) ansible/playbooks/validate_cluster.yml -v
@@ -143,6 +146,7 @@ check: ## Run the local unit tests, linters, and syntax checks
 	$(BIN)python -m unittest discover -s tests
 	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy recovery .sops.yaml .github/workflows
 	$(BIN)ansible-lint ansible
+	$(BIN)shellcheck $$(git ls-files '*.sh')
 	for playbook in $(PLAYBOOKS); do \
 		$(BIN)ansible-playbook -i 'localhost,' --syntax-check ansible/playbooks/$$playbook.yml || exit 1; \
 	done

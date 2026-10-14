@@ -19,7 +19,7 @@ patches:
         name: unused
   - target:
       kind: NetworkPolicy
-      name: allow-gitea|allow-gitea-backup
+      name: allow-gitea|allow-gitea-restore
     patch: |-
       - op: replace
         path: /spec/ingress/0/from/0/namespaceSelector/matchLabels/kubernetes.io~1metadata.name

@@ -357,7 +357,7 @@ The [milestone 3 gate](../../plan.md#3-service-deployment) requires that Git cha
    make check-fixtures
    ```
 
-   Expected: the reboot command may exit nonzero when the connection drops. Retry `findmnt` until it shows the `ext4` data disk. Both validations and the fixture check end with `failed=0`, and the newest commit is the one from step 4.
+   Expected: the reboot command may exit nonzero when the connection drops. Retry `findmnt` until it shows `/dev/mapper/k8sdr-data` with `ext4`. Both validations and the fixture check end with `failed=0`, and the newest commit is the one from step 4.
 
 6. Show that a Git change reconciles without a bootstrap. Merge a harmless change to `main`, such as a label on the service namespaces in `deploy/base/namespaces.yaml`. The `GitRepository` polls every minute. Then read what Flux applied:
 

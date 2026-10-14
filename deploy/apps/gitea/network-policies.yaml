@@ -77,10 +77,11 @@ spec:
         - protocol: TCP
           port: 53
 ---
-# The backup Job reads PostgreSQL, calls the Kubernetes API to scale Gitea,
-# gets a token from the metadata server, and uploads to Cloud Storage and
-# Healthchecks.io over HTTPS. The API server is reached on its node address
-# after the Service translates it, so the rule allows port 6443 by port.
+# The backup Job gets a token from the metadata server, reads the Gitea
+# version from the Kubernetes API, and uploads to Cloud Storage and
+# Healthchecks.io over HTTPS. It reads PostgreSQL from the snapshot, not over
+# the network. The API server is reached on its node address after the
+# Service translates it, so the rule allows port 6443 by port.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -90,6 +91,33 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: gitea-backup
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 80
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+---
+# The restore Job writes PostgreSQL, reads the set from Cloud Storage with a
+# token from the metadata server, and scales Gitea through the Kubernetes API.
+# The PostgreSQL rule comes first; the restore-test overlay replaces its
+# namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-restore-egress
+  namespace: gitea
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-restore
   policyTypes: ["Egress"]
   egress:
     - to:

@@ -21,7 +21,7 @@ What the numbers do not show:
 
 - **The recovery is staged, not one command.** An operator runs six commands and checks the result between them: two Terraform applies, one Ansible playbook that builds the cluster and installs Flux, one restore, and two DNS changes. Flux deploys the service from Git. [Decision 0013](docs/decisions/0013-automated-recovery.md) replaces these steps with one pipeline started by a watchdog; it is not implemented yet.
 - **Most of the time is the cluster build.** The restore Job takes under 30 seconds. [Milestone 11](plan.md#11-faster-cluster-build) builds nodes from a prepared image.
-- **Each backup pauses the service.** A backup briefly scales Gitea to zero, four times an hour. [Decision 0014](docs/decisions/0014-snapshot-backups.md) replaces this with a snapshot capture that keeps Gitea running; it is not implemented yet.
+- **Each backup paused the service.** In the drills, a backup briefly scaled Gitea to zero, four times an hour. [Decision 0014](docs/decisions/0014-snapshot-backups.md) replaces this with a capture from an LVM snapshot while Gitea keeps running. It is built and not yet validated; see [milestone 9](plan.md#9-backups-without-downtime).
 - **Cost was not read from billing.** The recovery environment existed for 42, 28, and 23 minutes. [Milestone 12](plan.md#12-unattended-drills) reads drill cost from the billing export.
 
 The external uptime check during the three drills, in UTC+2. The wide gaps are the outages and the narrow dips are backups:

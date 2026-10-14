@@ -142,6 +142,8 @@ Address the dedicated disk through its stable Compute Engine device link, not a 
 5. Mount it persistently at `/var/lib/k8s-dr` and verify it is a mount point before creating `/var/lib/k8s-dr/local-path`.
 6. Install Local Path Provisioner with only the worker node mapped to that path.
 
+[Decision 0014](0014-snapshot-backups.md#data-disk-layout) replaces steps 2 and 3 with an LVM layout that leaves room for a backup snapshot.
+
 The playbook never reformats a nonblank disk. This protects later workload data and lets boot-disk replacement preserve the local persistent-volume directory. The trade-off is that local volumes remain tied to one zonal disk and one worker. Offsite backup, not local storage, is the cross-region recovery mechanism.
 
 ### Make cluster creation rerunnable without hiding destructive repair

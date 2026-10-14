@@ -140,7 +140,7 @@ Flux deploys PostgreSQL and Gitea during bootstrap. Their checks prove schedulin
    gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='findmnt /var/lib/k8s-dr'
    ```
 
-   Expected: the reboot command may exit nonzero when the connection drops. Retry the second command until it succeeds. It shows an `ext4` filesystem mounted at `/var/lib/k8s-dr`, restored from the UUID entry in `/etc/fstab`. SSH and the disk may recover before Kubernetes workloads do.
+   Expected: the reboot command may exit nonzero when the connection drops. Retry the second command until it succeeds. It shows the `ext4` filesystem of `/dev/mapper/k8sdr-data` mounted at `/var/lib/k8s-dr`, restored from the UUID entry in `/etc/fstab`. SSH and the disk may recover before Kubernetes workloads do.
 
 2. Rerun validation.
 
@@ -154,7 +154,7 @@ Flux deploys PostgreSQL and Gitea during bootstrap. Their checks prove schedulin
 
 ## Rebuild from fresh VMs
 
-This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, buckets, and state. The data disk has `prevent_destroy`, and the storage role reuses its existing `k8sdr-data` filesystem instead of formatting it.
+This step replaces both boot disks and VMs. It keeps the worker data disk, VPC, buckets, and state. The data disk has `prevent_destroy`, and the storage role reuses its existing `k8sdr` volume group and `k8sdr-data` filesystem instead of formatting it.
 
 1. Confirm the image from [Confirm the boot image](#confirm-the-boot-image) matches the tracked pin. Then save a replacement plan for exactly the two VMs.
 
