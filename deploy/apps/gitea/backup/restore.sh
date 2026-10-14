@@ -20,6 +20,8 @@ KEY=/restore-key/key
 METADATA=http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token
 OBJECTS="https://storage.googleapis.com/${BACKUP_BUCKET}"
 FILES=(postgresql.dump.age gitea-data.tar.gz.age)
+# Tolerance between this clock and the clock that named a set.
+CLOCK_SKEW_SECONDS=300
 
 started=$(date +%s)
 paused=false
@@ -72,12 +74,21 @@ list_manifests() {
   done
 }
 
+# A writer limited to its prefix cannot replace a set, but it can create one
+# under any name. A set dated in the future would be selected ahead of every
+# real set, so the selection ignores such sets and a named one is refused.
+latest_allowed=$(date -u -d "@$((started + CLOCK_SKEW_SECONDS))" +%Y%m%dT%H%M%SZ)
+
 if [[ -z "$RESTORE_SET" ]]; then
   # Set names are UTC timestamps, so the lexical maximum is the newest.
-  RESTORE_SET=$(list_manifests | cut -d/ -f2 | sort | tail -n 1)
+  RESTORE_SET=$(list_manifests | cut -d/ -f2 | awk -v latest="$latest_allowed" '$0 <= latest' | sort | tail -n 1)
 fi
 if [[ ! "$RESTORE_SET" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
   log "no complete set under ${RESTORE_SOURCE}/, or an invalid set name: '${RESTORE_SET}'"
+  exit 1
+fi
+if [[ "$RESTORE_SET" > "$latest_allowed" ]]; then
+  log "set ${RESTORE_SET} is dated in the future; refusing to restore it"
   exit 1
 fi
 PREFIX="${RESTORE_SOURCE}/${RESTORE_SET}"

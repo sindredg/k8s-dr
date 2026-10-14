@@ -16,7 +16,7 @@ locals {
     "roles/compute.instanceAdmin.v1",
   ])
 
-  # Longer than the hourly interval plus a drill window, and about two weeks
+  # Longer than the backup interval plus a drill window, and about two weeks
   # to notice tampering. See decision 0007.
   backup_retention_days = 14
 }

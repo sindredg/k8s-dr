@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 import yaml
@@ -245,7 +246,7 @@ class BackupTests(unittest.TestCase):
         self.kustomization = yaml.safe_load((APPS / "gitea/kustomization.yaml").read_text())
         self.script = (APPS / "gitea/backup/backup.sh").read_text()
 
-    def test_runs_hourly_one_at_a_time_without_retries(self):
+    def test_runs_every_15_minutes_one_at_a_time_without_retries(self):
         self.assertEqual(self.cronjob["schedule"], "7,22,37,52 * * * *")
         self.assertEqual(self.cronjob["concurrencyPolicy"], "Forbid")
         self.assertEqual(self.cronjob["jobTemplate"]["spec"]["backoffLimit"], 0)
@@ -325,6 +326,24 @@ class RestoreTests(unittest.TestCase):
 
     def test_selects_only_sets_with_a_manifest(self):
         self.assertIn('matchGlob=${RESTORE_SOURCE}/*/manifest.json', self.script)
+
+    def test_ignores_and_refuses_sets_dated_in_the_future(self):
+        # The prefix writer can create a set under any name. A future name
+        # must not win the selection, and must not restore when named.
+        selection = self.script.index("RESTORE_SET=$(list_manifests")
+        self.assertIn("awk -v latest=\"$latest_allowed\" '$0 <= latest'", self.script)
+        self.assertLess(self.script.index("latest_allowed=$("), selection)
+        refusal = self.script.index('[[ "$RESTORE_SET" > "$latest_allowed" ]]')
+        self.assertLess(selection, refusal)
+        self.assertLess(refusal, self.script.index("DROP DATABASE"))
+
+    def test_future_filter_keeps_only_sets_up_to_the_limit(self):
+        names = "20261004T140701Z\n20991231T000000Z\n20261004T142201Z\n"
+        result = subprocess.run(
+            ["awk", "-v", "latest=20261004T150000Z", "$0 <= latest"],
+            input=names, capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(result.stdout.split(), ["20261004T140701Z", "20261004T142201Z"])
 
     def test_requires_an_explicit_target_namespace(self):
         self.assertNotIn("restore_namespace", self.playbook["vars"])
