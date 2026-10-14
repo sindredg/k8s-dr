@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 7 are complete. Milestones 8 to 12 are planned: they rebuild the environment, which was removed after the drills, remove the backup downtime, and automate the recovery. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 7 are complete. Milestones 8 to 14 are planned: they rebuild the environment, which was removed after the drills, remove the backup downtime, automate and shorten the recovery, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -15,8 +15,10 @@ Milestones 0 to 7 are complete. Milestones 8 to 12 are planned: they rebuild the
 | 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Planned |
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Planned |
 | 10. Automated recovery | Recovery runs without a person | Planned |
-| 11. Unattended drills | Measured recovery with nobody present | Planned |
-| 12. Failback with data | Optional return that keeps the recovery writes | Planned |
+| 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
+| 12. Unattended drills | Measured recovery and cost with nobody present | Planned |
+| 13. Failback with data | Optional return that keeps the recovery writes | Planned |
+| 14. Close the recovery gaps of the lab | Separate backup project, threat model, and an accurate production readiness page | Planned |
 
 ## 0. Recovery contract
 
@@ -154,20 +156,42 @@ See [decision 0013](docs/decisions/0013-automated-recovery.md).
 - [ ] Start the recovery from a scheduled watchdog, with a switch that disables it.
 - [ ] Automate the return to the primary after a drill.
 
-**Gate:** A recovery started by hand from the workflow completes with no other action, and the watchdog does not start one during a backup pause or while its switch is off.
+**Gate:** A recovery started by hand from the workflow completes with no other action, and the watchdog does not start one during a probe failure shorter than its window or while its switch is off.
 
-## 11. Unattended drills
+## 11. Faster cluster build
+
+In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provisioning 2 min 43 s and the bootstrap playbook 7 min 59 s. The restore took 57 s. Most of the bootstrap installs packages and pulls container images from public sources during the outage. A decision record will compare the options before this is built.
+
+- [ ] Build a node image with the pinned packages and the container images of every deployed workload, from the existing Ansible roles, and store it outside Finland.
+- [ ] Bootstrap both clusters from that image, and keep the playbook able to build from the plain Ubuntu image.
+- [ ] Measure the provisioning and bootstrap stages before and after, from the stage timeline.
+
+**Gate:** The bootstrap stage of a recovery takes at most half of the 7 min 59 s of drill 3, and a recovery succeeds with no public registry or package mirror reachable from the nodes.
+
+## 12. Unattended drills
 
 - [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
+- [ ] Turn on the Cloud Billing export to BigQuery before the first drill, so each drill's cost can be read from billing.
 - [ ] Isolate the primary and take no further action; record the recovery time from the first failed probe, including detection.
 - [ ] Repeat the drill once and compare both with the attended drills.
-- [ ] Record the cloud cost from billing.
+- [ ] Record the cost of each drill from the billing export.
 
-**Gate:** Two consecutive unattended drills meet both targets, and the worklog compares them with drills 1 to 3.
+**Gate:** Two consecutive unattended drills meet both targets, the worklog compares them with drills 1 to 3, and the cost of each comes from billing data.
 
-## 12. Failback with data (optional)
+## 13. Failback with data (optional)
 
 - [ ] Return to the primary region from a backup of the recovery cluster, so writes accepted during the outage survive.
 - [ ] Measure the downtime and data loss of the return.
 
 **Gate:** A write made on the recovery cluster is present on the primary after the return.
+
+## 14. Close the recovery gaps of the lab
+
+[Production readiness](docs/production-readiness.md) lists where this lab differs from production. This milestone closes the gaps that weaken recovery, and leaves the rest documented as lab scope.
+
+- [ ] Keep the backups in a separate project, with a locked retention policy and a second copy in another location.
+- [ ] Write a threat model for the backup, recovery, and pipeline paths.
+- [ ] Check every shell script with ShellCheck in CI.
+- [ ] Update each production readiness row that milestones 9 to 14 changed, and state plainly what remains lab scope.
+
+**Gate:** A recovery restores from the separate backup project, deleting a set there fails for the project owner, and the production readiness page matches what is built.

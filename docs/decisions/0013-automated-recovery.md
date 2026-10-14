@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Proposed on 2026-10-11. Not implemented. [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 11](../../plan.md#11-unattended-drills) measures it.
+Status: Proposed on 2026-10-11. Not implemented. [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it.
 
 Date: 2026-10-11
 
@@ -72,7 +72,7 @@ The run sets a value in the cluster instead, and Flux reads it when it substitut
 
 ### The drill return is a second workflow
 
-Returning to the primary after a drill, and removing the recovery environment, becomes one workflow with the steps of the [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill). It still discards the writes that the recovery cluster accepted. A failback that keeps them is [milestone 12](../../plan.md#12-failback-with-data-optional).
+Returning to the primary after a drill, and removing the recovery environment, becomes one workflow with the steps of the [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill). It still discards the writes that the recovery cluster accepted. A failback that keeps them is [milestone 13](../../plan.md#13-failback-with-data-optional).
 
 ## What a false start costs
 
