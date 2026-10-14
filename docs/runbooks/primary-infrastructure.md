@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, and on 2026-10-14 after a rebuild from empty state. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 
@@ -63,27 +63,11 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
    Expected: Terraform offers to copy the existing state, lists the bucket and IAM resources from the GCS backend, and GCS lists the backend state object. Retain the encrypted offsite copy. Remove the unencrypted local state, any local state backups, and the saved plan only after confirming migration; check their exact paths first. Do not destroy the state bucket or its bootstrap root.
 
-## Apply the shared root
-
-5. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, and the project-level administrator grants that every region uses.
-
-   ```bash
-   cd ../shared
-   umask 077
-   if [ ! -e terraform.tfvars ]; then cp terraform.tfvars.example terraform.tfvars; fi
-   if [ ! -e backend.hcl ]; then cp backend.hcl.example backend.hcl; fi
-   chmod 600 terraform.tfvars backend.hcl
-   # Edit both files and replace every placeholder.
-   terraform init -backend-config=backend.hcl
-   terraform plan -out=shared.tfplan
-   terraform apply shared.tfplan
-   ```
-
-   Expected for an initial apply: the plan contains one Belgium backup bucket, two bucket IAM members, and three project IAM members. Inspect bucket names and IAM members before apply.
-
 ## Apply the primary root
 
-6. Fill in the local primary variables and backend configuration. If these local files already exist, keep them and remove any old `billing_account_id`, `budget_currency_code`, and `budget_amount` entries from `terraform.tfvars`. Do not copy examples over existing local values.
+Apply the primary root before the shared root. The shared root grants backup access to the primary worker service account, which the primary root creates. From empty state, a shared apply that runs first fails with `Service account ... does not exist`.
+
+5. Fill in the local primary variables and backend configuration. Do not copy examples over existing local values.
 
    ```bash
    cd ../primary
@@ -97,9 +81,38 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
    terraform apply primary.tfplan
    ```
 
-   Expected for an initial apply: the plan contains one Finland VPC and subnet, one NAT, two private VMs, one attached worker data disk, and two service account IAM grants. It contains no budget, Belgium VMs, or public VM addresses. Inspect the plan before apply, especially IAM members and disk replacement actions.
+   Expected for an initial apply: `Plan: 20 to add, 0 to change, 0 to destroy.` The plan contains:
 
-   If an earlier apply partially succeeded, make a fresh plan before applying again. After removing the budget configuration, expect no infrastructure changes if the other resources were created. If a budget was created, Terraform may propose deleting that budget. Do not apply if it proposes VM, disk, network, or bucket replacement. Review the plan before `terraform apply primary.tfplan`; skip apply if there are no changes.
+   | Resources | Count |
+   | --- | --- |
+   | VPC, subnet, router, and NAT | 4 |
+   | Firewall rules for IAP SSH, node traffic, and public web | 3 |
+   | Node service accounts and the administrator's use of them | 4 |
+   | VMs, the worker data disk, and its attachment | 4 |
+   | Load balancer: address, health check, instance group, backend service, and forwarding rule | 5 |
+
+   It contains no Belgium VMs and no public VM addresses; the only public address belongs to the load balancer. Inspect the plan before apply, especially IAM members and disk replacement actions.
+
+   If an earlier apply partially succeeded, make a fresh plan before applying again. Do not apply if it proposes VM, disk, network, or bucket replacement.
+
+## Apply the shared root
+
+6. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, the project-level administrator grants that every region uses, and the uptime check.
+
+   ```bash
+   cd ../shared
+   umask 077
+   if [ ! -e terraform.tfvars ]; then cp terraform.tfvars.example terraform.tfvars; fi
+   if [ ! -e backend.hcl ]; then cp backend.hcl.example backend.hcl; fi
+   chmod 600 terraform.tfvars backend.hcl
+   # Edit both files and replace every placeholder.
+   terraform init -backend-config=backend.hcl
+   terraform plan -out=shared.tfplan
+   terraform apply shared.tfplan
+   cd ../primary
+   ```
+
+   Expected for an initial apply: `Plan: 8 to add, 0 to change, 0 to destroy.` The plan contains one Belgium backup bucket, three project IAM members for the administrator, three bucket IAM members (the primary worker's writer and reader grants and the recovery reader), and one uptime check. Inspect bucket names and IAM members before apply. The uptime check fails until the service is deployed.
 
 ## Check the milestone 1 gate
 

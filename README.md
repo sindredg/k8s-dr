@@ -2,7 +2,7 @@
 
 Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
 
-Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 7 in [plan.md](plan.md) passed their gates. The environment was removed after the drills. Milestones 8 to 11 rebuild it and automate the recovery; they are planned, not implemented.
+Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 7 in [plan.md](plan.md) passed their gates. The project is in progress again: milestone 8 is rebuilding the environment from the runbooks, and milestone 9 removes the backup downtime. Milestones 10 to 12 automate the recovery and are planned, not implemented.
 
 The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds.
 
@@ -19,9 +19,9 @@ Recovery time runs from the first failed external probe until sign-in, a known c
 
 What the numbers do not show:
 
-- **The recovery is staged, not one command.** An operator runs six commands and checks the result between them: two Terraform applies, one Ansible playbook that builds the cluster and installs Flux, one restore, and two DNS changes. Flux deploys the service from Git.
+- **The recovery is staged, not one command.** An operator runs six commands and checks the result between them: two Terraform applies, one Ansible playbook that builds the cluster and installs Flux, one restore, and two DNS changes. Flux deploys the service from Git. [Decision 0013](docs/decisions/0013-automated-recovery.md) replaces these steps with one pipeline started by a watchdog; it is not implemented yet.
 - **Most of the time is the cluster build.** The restore Job takes under 30 seconds.
-- **Each backup pauses the service.** A backup briefly scales Gitea to zero, four times an hour.
+- **Each backup pauses the service.** A backup briefly scales Gitea to zero, four times an hour. [Decision 0014](docs/decisions/0014-snapshot-backups.md) replaces this with a snapshot capture that keeps Gitea running; it is not implemented yet.
 - **Cost was not read from billing.** The recovery environment existed for 42, 28, and 23 minutes.
 
 The external uptime check during the three drills, in UTC+2. The wide gaps are the outages and the narrow dips are backups:
