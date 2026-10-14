@@ -34,6 +34,28 @@ All results below are local, from 2026-10-14 and 2026-10-15. None ran on a clust
 
 Not checked locally: a real LVM snapshot (the local kernel has no device-mapper snapshot target), `nsenter` from the amd64 image, mount propagation into the capture containers, and the Pod on Kubernetes. The gate covers them.
 
+## Live conversion of the primary data disk
+
+Date: 2026-10-14. Runbook: [snapshot backups](../runbooks/snapshot-backups.md#convert-a-data-disk-from-the-earlier-layout). The primary worker had the plain ext4 layout from the milestone 8 bootstrap and no fixtures, so no restore was needed.
+
+| Step | Command | Result |
+| --- | --- | --- |
+| Drain | `kubectl drain <worker> --ignore-daemonsets --delete-emptydir-data --timeout=300s` | `node/<worker> drained` |
+| Erase | `umount`, `wipefs --all`, remove the `fstab` line | `2 bytes were erased at offset 0x00000438 (ext4): 53 ef`, then `blank` |
+| Bootstrap, as first written | `make bootstrap FLUX_GIT_BRANCH=feat/snapshot-backups` | Worker `changed=8 failed=0`: the volume group, logical volume, filesystem, mount, and `k8sdr-snapshot` were created. Control plane `failed=1` at `Wait for Traefik`: `timed out waiting for the condition`. See deviation 1 |
+| Uncordon, then bootstrap again | `kubectl uncordon <worker>`, `make bootstrap FLUX_GIT_BRANCH=feat/snapshot-backups` | `failed=0` on both nodes, worker `changed=0`, 214 s |
+| Worker-only bootstrap | `make bootstrap BOOTSTRAP_ARGS='--limit worker'` | Only the worker in the recap, `changed=0 failed=0`; the delegated `Wait until the API lists the worker node` passed |
+| Layout | `vgs k8sdr; lvs k8sdr; findmnt /var/lib/k8s-dr` | Volume group `<50.00g`, free `10.00g`; `data` `<40.00g`; `/dev/mapper/k8sdr-data ext4` |
+| Validation | `make validate-cluster`, `make validate-services` | `failed=0` both |
+| Flux source | `kubectl get gitrepository -n flux-system` | `stored artifact for revision 'feat/snapshot-backups@sha1:a0eb4e7…'` |
+| DNS and fixtures | `make dns-set DNS_NAME=git DNS_ADDRESS=<address>`, `make create-fixtures`, `make check-fixtures` | Record set; `https://git.sindrg.com/api/healthz` returned `200`; both fixture runs `failed=0` |
+
+### Deviations
+
+| # | Step | Documented | Observed | Fix |
+| --- | --- | --- | --- | --- |
+| 1 | Convert, step 5 | `make bootstrap` with the worker still cordoned, uncordon after | The add-on play waits for Traefik, which runs only on the worker, so the bootstrap timed out after the storage play had succeeded | The runbook runs `make bootstrap BOOTSTRAP_ARGS='--limit worker'` while cordoned, then uncordons and runs the full bootstrap. The `bootstrap` target passes `BOOTSTRAP_ARGS` to `ansible-playbook` |
+
 ## Validation
 
-Not run yet. The steps are in the [snapshot backups runbook](../runbooks/snapshot-backups.md).
+In progress.

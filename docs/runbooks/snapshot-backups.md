@@ -67,24 +67,26 @@ Only needed once per data disk, when `make bootstrap` stops with `Refusing unexp
 
    Expected: `wipefs` lists the erased ext4 signature, and the last line is `blank`. If `umount` reports `target is busy`, a Pod still uses the disk: rerun step 3 and check `kc get pods -A -o wide`.
 
-5. Build the new layout.
+5. Build the new layout on the worker only. A full bootstrap would wait for add-ons that cannot start while the worker is cordoned.
 
    ```bash
-   make bootstrap
+   make bootstrap BOOTSTRAP_ARGS='--limit worker'
    ```
 
-   Expected: `failed=0`. The worker recap reports changes from `Create the volume group only on a blank worker data device`, `Create the data logical volume`, `Create ext4 only on a blank data logical volume`, and `Install the backup snapshot command`.
+   Expected: `failed=0`, and only the worker in the recap. The worker reports changes from `Create the volume group only on a blank worker data device`, `Create the data logical volume`, `Create ext4 only on a blank data logical volume`, and `Install the backup snapshot command`. Do not uncordon before this succeeds: Pods would write their volumes to the boot disk.
 
-6. Return the worker to service.
+6. Return the worker to service, then run the full bootstrap and the validations.
 
    ```bash
    kc uncordon "$WORKER_NAME"
+   make bootstrap
    gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap \
      --command='findmnt -n -o SOURCE,FSTYPE /var/lib/k8s-dr; sudo vgs k8sdr; sudo lvs k8sdr'
+   make validate-cluster
    make validate-services
    ```
 
-   Expected: `/dev/mapper/k8sdr-data ext4`; `vgs` shows about 20% of the volume group free; `lvs` lists only `data`. PostgreSQL and Gitea start on empty volumes, and `make validate-services` ends with `failed=0`.
+   Expected: `node/<worker-vm> uncordoned`; the bootstrap ends with `failed=0` and the worker `changed=0`; `/dev/mapper/k8sdr-data ext4`; `vgs` shows about 20% of the volume group free; `lvs` lists only `data`. PostgreSQL and Gitea start on empty volumes, and both validations end with `failed=0`.
 
 7. Restore the set from step 2, if the disk held data.
 
