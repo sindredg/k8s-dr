@@ -25,18 +25,44 @@ TARGET_ROOT=/var/lib/k8s-dr-backup
 log() { printf '%s k8sdr-snapshot: %s\n' "$(date -u +%FT%TZ)" "$*" >&2; }
 fail() { log "$*"; exit 1; }
 
+# util-linux mountpoint returns 32 for "not a mount point" and 1 for errors,
+# including a missing path. /run is empty after a reboot.
+is_mounted() {
+  local status=0
+  [[ -e "$1" ]] || return 1
+  mountpoint -q "$1" || status=$?
+  case $status in
+    0) return 0 ;;
+    32) return 1 ;;
+    *) fail "cannot tell whether $1 is a mount point (mountpoint exit ${status})" ;;
+  esac
+}
+
+# An lvs error is not "no snapshot": a lock or metadata error would leave the
+# snapshot in place while remove reports success.
+snapshot_exists() {
+  local names name
+  names=$(lvs --noheadings -o lv_name "$VG") || fail "cannot list the logical volumes of ${VG}"
+  while read -r name; do
+    [[ "$name" == "$SNAPSHOT" ]] && return 0
+  done <<<"$names"
+  return 1
+}
+
+# Explicit checks, because the EXIT trap calls remove from a list, where
+# errexit does not apply.
 remove() {
   local target
   for target in "$TARGET_ROOT"/*; do
-    if mountpoint -q "$target"; then
-      umount "$target"
+    if is_mounted "$target"; then
+      umount "$target" || fail "cannot unmount ${target}"
     fi
   done
-  if mountpoint -q "$SNAPSHOT_MOUNT"; then
-    umount "$SNAPSHOT_MOUNT"
+  if is_mounted "$SNAPSHOT_MOUNT"; then
+    umount "$SNAPSHOT_MOUNT" || fail "cannot unmount ${SNAPSHOT_MOUNT}"
   fi
-  if lvs "${VG}/${SNAPSHOT}" >/dev/null 2>&1; then
-    lvremove --yes "${VG}/${SNAPSHOT}"
+  if snapshot_exists; then
+    lvremove --yes "${VG}/${SNAPSHOT}" || fail "cannot remove ${VG}/${SNAPSHOT}"
     log "removed ${VG}/${SNAPSHOT}"
   fi
 }

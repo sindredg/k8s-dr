@@ -168,4 +168,4 @@ A backup Pod killed with `SIGKILL` can leave the snapshot in place. The next sch
 gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='sudo /usr/local/sbin/k8sdr-snapshot remove; sudo lvs k8sdr'
 ```
 
-Expected: `removed k8sdr/backup`, then `lvs` lists only `data`. While a snapshot exists, each first write to a block of the data volume is copied, so writes are slower.
+Expected: `removed k8sdr/backup`, then `lvs` lists only `data`. A `cannot ...` line means the command stopped at the step it names and exited non-zero, so the snapshot or a mount can still be present. While a snapshot exists, each first write to a block of the data volume is copied, so writes are slower.
