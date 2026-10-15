@@ -8,8 +8,8 @@ class DependencyPinTests(unittest.TestCase):
         self.assertEqual(
             requirements,
             [
-                "ansible-core==2.21.4",
-                "ansible-lint==26.9.0",
+                "ansible-core==2.21.5",
+                "ansible-lint==26.10.1",
                 "yamllint==1.38.0",
                 "shellcheck-py==0.11.0.1",
             ],
