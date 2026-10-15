@@ -1,6 +1,6 @@
 # Snapshot backups: operator procedure
 
-Status: Written on 2026-10-15, not yet run. [Milestone 9](../../plan.md#9-backups-without-downtime) validates it, and its [worklog](../worklogs/09-backups-without-downtime.md) records the results.
+Status: Verified on 2026-10-14 and 2026-10-15 in [milestone 9](../worklogs/09-backups-without-downtime.md), with these limits: the conversion ran in the order of its first version (see deviation 1 in the worklog), [Check a capture](#check-a-capture) ran without step 1's logs and with step 3's worker check only once, and [Remove a leftover snapshot](#remove-a-leftover-snapshot) is written, not run.
 
 Convert the worker data disk to the LVM layout of [decision 0014](../decisions/0014-snapshot-backups.md), check that captures run without pausing Gitea, and clear a snapshot that a killed run left behind.
 
@@ -127,19 +127,36 @@ Only needed once per data disk, when `make bootstrap` stops with `Refusing unexp
 
 ## Validate captures under write load
 
-1. Start the write loop in a separate terminal. It pushes a commit every 60 seconds and logs each one.
+A capture takes 10 to 20 seconds and the uptime check runs once a minute, so only a dense load can see a short stall.
+
+1. Start back-to-back pushes in a separate terminal. Each push is logged.
 
    ```bash
-   make write-loop WRITE_INTERVAL=60
+   make write-loop WRITE_INTERVAL=0
    ```
 
-   Expected: a line per write in `.drill/writes.tsv`, and no `write check failed` line.
+   Expected: a line per write in `.drill/writes.tsv`, about every 10 seconds, and no `write check failed` line.
 
-2. Let at least four scheduled captures run (one hour). Then check each one as in [Check a capture](#check-a-capture), and read the uptime check for that hour in the Cloud Monitoring console.
+2. Start the probe in another terminal. Every 0.5 seconds it requests `/api/healthz` and runs `git ls-remote` as the admin user, and logs each result.
 
-   Expected: four `Complete` Jobs with `pause_seconds` `0`, no `write check failed` line, and no failed uptime check in any region.
+   ```bash
+   GIT_PROBE_USER=gitea-admin \
+   GIT_PROBE_PASSWORD="$(sops --decrypt --extract '["stringData"]["password"]' deploy/apps/gitea/admin.sops.yaml)" \
+     python3 scripts/capture_probe.py https://git.sindrg.com recovery-fixture/recovery-fixture .drill/probe.tsv 0.5
+   ```
 
-3. Restore the newest set into the test namespaces, as in [backup and restore](backup-restore.md).
+   Expected: lines ending in `200` and a time in seconds. A failed probe shows `slow` (2 seconds or more), `http-<status>`, `git-exit-<code>`, or `error-<type>`.
+
+3. Let at least four scheduled captures run (one hour). Then check each one as in [Check a capture](#check-a-capture), and read the uptime check for that hour with the [decision 0011 query](../decisions/0011-external-uptime-probe.md#reading-the-results). List the probe lines between each Job's start and completion time:
+
+   ```bash
+   kc get jobs -n gitea -o custom-columns=NAME:.metadata.name,START:.status.startTime,DONE:.status.completionTime
+   awk -F'\t' '$3 != "200"' .drill/probe.tsv
+   ```
+
+   Expected: four `Complete` Jobs, no Gitea restart, no `write check failed` line, no `http-`, `git-exit-`, or `error-` probe line, and no failed uptime check in any region. A few `slow` lines during captures are expected: in milestone 9 the slowest `ls-remote` took 2.2 seconds. Stop both loops with Ctrl+C.
+
+4. Restore the newest set into the test namespaces, as in [backup and restore](backup-restore.md).
 
    Expected: the restore and the fixture checks end with `failed=0`, and the newest restored commit is a write from the loop.
 

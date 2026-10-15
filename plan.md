@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 7 are complete. Milestones 8 and 9 are in progress, and 10 to 14 are planned. Together they rebuild the environment, which was removed after the drills, remove the backup downtime, automate and shorten the recovery, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 7 and 9 are complete. Milestone 8 is in progress, and 10 to 14 are planned. Milestone 9 removed the backup downtime. The others rebuild the environment, which was removed after the drills, automate and shorten the recovery, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -13,7 +13,7 @@ Milestones 0 to 7 are complete. Milestones 8 and 9 are in progress, and 10 to 14
 | 6. Disaster drill | Measured RTO and RPO | Complete |
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
 | 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | In progress |
-| 9. Backups without downtime | Gitea stays up while every backup is captured | In progress |
+| 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
 | 10. Automated recovery | Recovery runs without a person | Planned |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
 | 12. Unattended drills | Measured recovery and cost with nobody present | Planned |
@@ -135,15 +135,15 @@ The environment was removed after milestone 7. Only the Terraform state bucket r
 
 ## 9. Backups without downtime
 
-Every backup since milestone 4 scales Gitea to zero for the capture. At one capture every 15 minutes, the service has a short outage four times an hour, and the uptime check records it. The backup causes the unavailability the project exists to prevent. See [decision 0014](docs/decisions/0014-snapshot-backups.md).
+Before milestone 9, every backup scaled Gitea to zero for the capture. At one capture every 15 minutes, the service had a short outage four times an hour, and the uptime check recorded it. The backup caused the unavailability the project exists to prevent. See [decision 0014](docs/decisions/0014-snapshot-backups.md).
 
-- [ ] Put the worker data filesystem on an LVM logical volume, with free space in the volume group for a snapshot.
-- [ ] Capture PostgreSQL and the Gitea volume from one LVM snapshot while Gitea keeps running, and remove the backup job's permission to scale Gitea.
-- [ ] Keep the encrypted set format, so the restore path and the earlier drills stay comparable.
-- [ ] Prove that no request fails during captures: run a write and probe loop across several scheduled backups.
-- [ ] Restore a set taken under write load into the test namespaces.
+- [x] Put the worker data filesystem on an LVM logical volume, with free space in the volume group for a snapshot.
+- [x] Capture PostgreSQL and the Gitea volume from one LVM snapshot while Gitea keeps running, and remove the backup job's permission to scale Gitea.
+- [x] Keep the encrypted set format, so the restore path and the earlier drills stay comparable.
+- [x] Prove that no request fails during captures: run a write and probe loop across several scheduled backups.
+- [x] Restore a set taken under write load into the test namespaces.
 
-**Gate:** Across at least four scheduled captures under a write loop, the uptime check and the loop record no failure, every manifest reports no pause, and a set taken under load restores with the fixtures intact.
+**Gate:** Across at least four scheduled captures under a write loop, the uptime check and the loop record no failure, every manifest reports no pause, and a set taken under load restores with the fixtures intact. Passed on 2026-10-15, with a probe every 0.5 seconds across four of the captures. The manifest field is a constant on the snapshot path, so the Gitea restart count is the evidence of no pause; see the [worklog](docs/worklogs/09-backups-without-downtime.md#gate).
 
 ## 10. Automated recovery
 

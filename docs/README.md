@@ -38,7 +38,7 @@ Each worklog records what was built and the commands and results that passed its
 | [Disaster drill](worklogs/06-disaster-drill.md) | 6: two drills, their timelines, and their comparison |
 | [Faster recovery](worklogs/07-faster-recovery.md) | 7: the 15-minute backup schedule, the third drill, and the cost |
 | [Rebuild from the runbooks](worklogs/08-rebuild-from-runbooks.md) | 8, in progress: the rebuild from empty state and every deviation |
-| [Backups without downtime](worklogs/09-backups-without-downtime.md) | 9, in progress: the LVM snapshot capture and its validation |
+| [Backups without downtime](worklogs/09-backups-without-downtime.md) | 9: the LVM snapshot capture and its validation |
 
 ## Decisions
 
@@ -57,7 +57,7 @@ Each worklog records what was built and the commands and results that passed its
 | [0011 External uptime probe](decisions/0011-external-uptime-probe.md) | Measuring the outage with a Cloud Monitoring uptime check. |
 | [0012 Back up every 15 minutes](decisions/0012-backup-every-15-minutes.md) | The shorter data-loss window and what it costs. |
 | [0013 Automated recovery](decisions/0013-automated-recovery.md) | Proposed: a pipeline and a watchdog recover the service with nobody present. |
-| [0014 Capture backups from an LVM snapshot](decisions/0014-snapshot-backups.md) | Proposed: back up from one snapshot while Gitea keeps running. |
+| [0014 Capture backups from an LVM snapshot](decisions/0014-snapshot-backups.md) | Accepted: back up from one snapshot while Gitea keeps running. |
 
 ## Troubleshooting
 
