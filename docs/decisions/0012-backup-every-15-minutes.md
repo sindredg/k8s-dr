@@ -1,6 +1,6 @@
 # 0012: Back up every 15 minutes
 
-Status: Accepted on 2026-10-04. A third drill measured it; see the [worklog](../worklogs/07-faster-recovery.md). The schedule stays.
+Status: Accepted on 2026-10-04. A third drill measured it; see the [worklog](../worklogs/07-faster-recovery.md). The schedule stays. Since 2026-10-14, [decision 0014](0014-snapshot-backups.md) captures each backup without scaling Gitea to zero.
 
 Date: 2026-10-04
 

@@ -42,7 +42,7 @@ A scheduled workflow runs every five minutes. It starts a recovery only when all
 3. No recovery is running, and the public name does not already point at the recovery cluster.
 4. The repository variable that enables automatic failover is set.
 
-Condition 1 ignores the backup pauses, which fail one check in one or two regions. Condition 4 is the switch for planned work on the primary.
+Condition 1 ignores a failure seen from only some regions. Backups no longer pause the service ([decision 0014](0014-snapshot-backups.md)). Condition 4 is the switch for planned work on the primary.
 
 | Option | Trade-off |
 | --- | --- |

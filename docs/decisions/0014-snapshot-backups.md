@@ -1,6 +1,6 @@
 # 0014: Capture backups from an LVM snapshot
 
-Status: Proposed on 2026-10-14. [Milestone 9](../../plan.md#9-backups-without-downtime) builds and validates it. It replaces the [scale-to-zero capture](0007-consistent-backups.md#pause-gitea-by-scaling-it-to-zero) of decision 0007; the rest of 0007 stands.
+Status: Accepted on 2026-10-15. Implemented; the [milestone 9 gate](../worklogs/09-backups-without-downtime.md#validation) passed on 2026-10-15. It replaces the [scale-to-zero capture](0007-consistent-backups.md#pause-gitea-by-scaling-it-to-zero) of decision 0007; the rest of 0007 stands.
 
 Date: 2026-10-14
 
