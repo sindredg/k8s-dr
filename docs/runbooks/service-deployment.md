@@ -80,6 +80,14 @@ On a build from empty state, the primary root already created these resources in
 
    DNS only keeps TLS termination in the cluster. The 60-second TTL bounds the cutover delay that [decision 0002](../decisions/0002-recovery-contract.md) measures.
 
+   On the primary, also create the CAA records of `sindrg.com` that [decision 0010](../decisions/0010-service-hardening.md) requires. The command creates any that are missing and never deletes a record.
+
+   ```bash
+   make dns-caa
+   ```
+
+   Expected: one `present:` or `created:` line for `issue "letsencrypt.org"` and one for `issuewild ";"`, and exit status 0. Exit status 1 with `CAA records outside the expected set` means the zone holds another CAA record; remove it in the dashboard, because the public surface check fails on it.
+
 7. Confirm the record resolves and reaches Traefik.
 
    ```bash

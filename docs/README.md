@@ -68,5 +68,6 @@ Each worklog records what was built and the commands and results that passed its
 | [Flux rejected the age key](troubleshooting/03-flux-age-key-rejected.md) | A corrupted SOPS key, a stale Flux failure, and a dropped IAP session at the first Flux bootstrap. |
 | [Flux reconciled the previous branch](troubleshooting/04-flux-reconciled-stale-revision.md) | A branch switch where Flux applied the old artifact. |
 | [Git rejected the fixture user](troubleshooting/05-git-clone-rejected-fixture-user.md) | A clone that sent the password as the username after a libcurl update. |
+| [The CAA records of the zone were missing](troubleshooting/06-caa-records-missing.md) | CAA records removed from the zone while the daily surface check was disabled. |
 
 Keep credentials, kubeconfigs, Terraform state, database dumps, and unsanitized command output out of these files.
