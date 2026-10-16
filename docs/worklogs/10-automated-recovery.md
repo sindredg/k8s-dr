@@ -109,8 +109,28 @@ Local, against stubs, 2026-10-16. Expected before the run: every stage runs in r
 | `make check` | Exit 0, 255 tests `OK` | |
 | `make -n recover` | Prints the key checks and `python3 scripts/recover.py --drill-dir .drill run` | |
 
+### Rehearsal against the live system
+
+Live system, 2026-10-16, from this branch, with `make recover DRILL_DIR=.drill/m10-step2 RECOVER_ARGS='--through verification'`. The primary kept serving and `git.sindrg.com` did not move. Expected before the run: every stage through `verification` ends, the plan check notes 16 creates, the run selects the newest primary set, records a restored HEAD that is a primary write, and exits 0.
+
+| Stage | Start (UTC) | Duration | Result |
+| --- | --- | --- | --- |
+| `preflight` | 20:50:01 | 1 min 22 s | `10 passed, 0 failed, 0 missing`; `fixtures` reported as skipped |
+| `provisioning` | 20:51:23 | 2 min 31 s | Plan check: `plan creates 16 and updates 0`. `Apply complete! Resources: 16 added, 0 changed, 0 destroyed.` `git-dr` resolved at 1.1.1.1 on the second query |
+| `bootstrap` | 20:53:54 | 8 min 54 s | Both hosts `failed=0`; the playbook took 531 s |
+| `flux-reconcile` | 21:02:48 | 1 min 33 s | Both validations `failed=0`. The CronJob printed `true`, and the `recovery/` listing returned `One or more URLs matched no objects.` |
+| `restore` | 21:04:21 | 1 min 16 s | Set `20261016T205201Z`, `backup age at restore start 785 seconds`, `restored primary/20261016T205201Z in 26 seconds` |
+| `verification` | 21:05:37 | 28 s | `make check-fixtures` on `git-dr` `failed=0`, restored HEAD `909d15f` recorded. `make write-check` pushed `8855c30`. The suspend and prefix checks repeated with the same results |
+
+The six stages took 16 min 04 s, from 20:50:01 to 21:06:05. The restored HEAD is the write check of 05:14:12Z, the last write before the set; nothing wrote to the primary after it.
+
+The live output confirmed two formats that the stubs assumed: the `matched no objects` error of an empty prefix, and the `Newest commit on main: <sha>` line. The `{.spec.suspend}` JSONPath survived the remote shell of `gcloud compute ssh`.
+
+One fix followed: the runner printed captured output without a final newline, so `true` ran into the next command line. It now ends every captured output with one.
+
+Afterwards `make dns-delete DNS_NAME=git-dr` deleted the record at 21:06:38Z, and the destroy plan of `infra/recovery` showed `Plan: 0 to add, 0 to change, 16 to destroy.`, all in the recovery module or its data disk.
+
 ### Not verified
 
-- `make recover` has not run against the live system. A rehearsal with `RECOVER_ARGS='--through verification'` builds the recovery environment and restores into it without touching the primary or `git.sindrg.com`. It has not run yet.
-- The stub answers stand in for gcloud, Terraform, Ansible, and Cloudflare. Their output formats are taken from the runbook and the playbooks: the `matched no objects` error of an empty prefix, the `Newest commit on <branch>: <sha>` line of `make check-fixtures`, and `True` from `gcloud iam service-accounts describe`. The rehearsal checks the first two; only the fence checks the third.
-- The fence and the cutover run only in a full recovery, which the milestone 10 gate runs.
+- The `fence`, `dns-cutover`, and `probe-recovery` stages have not run live. They run in a full recovery, which the milestone 10 gate runs. `True` from `gcloud iam service-accounts describe` is taken from the runbook.
+- A resume after a failed stage ran against stubs only; the rehearsal had no failure.

@@ -81,7 +81,9 @@ class System:
             stderr=subprocess.PIPE if capture else None,
         )
         if capture and echo:
-            sys.stdout.write(completed.stdout)
+            # kubectl jsonpath output has no final newline.
+            if completed.stdout:
+                print(completed.stdout.rstrip("\n"))
             sys.stderr.write(completed.stderr)
         return Result(completed.returncode, completed.stdout or "", completed.stderr or "")
 
