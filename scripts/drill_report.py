@@ -21,13 +21,16 @@ import sys
 DRILL_DIR = Path(".drill")
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 SET_FORMAT = "%Y%m%dT%H%M%SZ"
+# scripts/recover.py records every stage after detection.
 STAGES = (
     "detection",
+    "preflight",
     "provisioning",
     "bootstrap",
     "flux-reconcile",
     "restore",
     "verification",
+    "fence",
     "dns-cutover",
     "probe-recovery",
 )

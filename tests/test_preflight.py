@@ -47,6 +47,14 @@ class PreflightTests(unittest.TestCase):
             makefile,
         )
 
+    def test_the_recovery_run_can_skip_only_named_checks(self):
+        # scripts/recover.py skips fixtures, which the primary cannot pass in
+        # a real loss. A skipped check is reported, not counted as passed.
+        body = re.search(r"(?ms)^check_fixtures\(\) \{\n(.*?)^\}", self.text).group(1)
+        self.assertTrue(body.startswith('  if [[ " $PREFLIGHT_SKIP " == *" fixtures "* ]]; then\n'
+                                        '    report manual fixtures'))
+        self.assertIn("PREFLIGHT_SKIP=${PREFLIGHT_SKIP:-}", self.text)
+
 
 if __name__ == "__main__":
     unittest.main()

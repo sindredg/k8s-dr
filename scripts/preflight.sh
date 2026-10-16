@@ -18,10 +18,14 @@ MAX_BACKUP_AGE_SECONDS=${MAX_BACKUP_AGE_SECONDS:-7200}
 # The drill must end before the token that issues the recovery certificates
 # expires.
 MIN_TOKEN_DAYS=${MIN_TOKEN_DAYS:-7}
+# Space-separated check IDs to report as skipped. scripts/recover.py skips
+# fixtures: in a real loss the primary cannot pass it, and the run checks the
+# fixtures on the recovery cluster after the restore.
+PREFLIGHT_SKIP=${PREFLIGHT_SKIP:-}
 GIT_URL=$(sed -n 's/^flux_git_url: "\(.*\)"$/\1/p' ansible/playbooks/group_vars/all.yml)
 GIT_BRANCH=$(sed -n 's/^flux_git_branch: "\(.*\)"$/\1/p' ansible/playbooks/group_vars/all.yml)
 ZONE=${ZONE:-sindrg.com}
-TOOLS=(git terraform gcloud sops age age-keygen jq curl sha256sum)
+TOOLS=(git terraform gcloud sops age age-keygen jq curl sha256sum dig)
 
 passed=0
 failed=0
@@ -173,6 +177,10 @@ check_backup() {
 }
 
 check_fixtures() {
+  if [[ " $PREFLIGHT_SKIP " == *" fixtures "* ]]; then
+    report manual fixtures "skipped; checked on the recovery cluster after the restore"
+    return
+  fi
   if make --no-print-directory check-fixtures >/dev/null 2>&1; then
     report pass fixtures "the user, repository, commit, and issue are present on the serving cluster"
   else

@@ -76,3 +76,41 @@ Not run yet. Apply after the change is on `main`, so `main` and the state never 
 - The first-build order and plan counts in the [primary infrastructure runbook](../runbooks/primary-infrastructure.md) are written from the code and the live plans, not run from empty state.
 - The fence by disabled account and the return by enabled account are written, not run. A drill or the milestone 10 gate runs them.
 - The recovery cluster has not run with the LVM layout of [milestone 9](09-backups-without-downtime.md). The milestone 10 gate runs a full recovery.
+
+## Step 2: one command for every stage
+
+[Decision 0013](../decisions/0013-automated-recovery.md#one-entry-point-runs-every-stage) runs the stages of the [regional recovery runbook](../runbooks/regional-recovery.md) from one command that stops at the first failed check and resumes from it. Before this step, a recovery took 18 or 19 commands, and the operator recorded each stage by hand with `scripts/drill_report.py stage`.
+
+### What was built
+
+| Part | File | What it does |
+| --- | --- | --- |
+| Stage runner | `scripts/recover.py` | Runs nine stages in runbook order and records their start, end, failures, and notes in `.drill/timeline.tsv`. Keeps the passed stages and the recorded values in `.drill/recover.json`, so a rerun starts at the failed stage. Holds a lock so that two runs cannot overlap. `--through <stage>` stops early; `status` and `reset` read and archive the state |
+| Plan check | `scripts/recover.py` | Refuses to apply a recovery plan that deletes or replaces a resource, or that changes a service account or an IAM grant |
+| Fence | `scripts/recover.py` | Stops the primary VMs, disables the primary worker's account, and requires the primary's own name to stop returning 200, before the DNS cutover. A failed stop is noted, because it is expected after a regional loss |
+| Command | `Makefile` | `make recover`, with `RECOVER_ARGS` for `--through` |
+| Stages | `scripts/drill_report.py` | Adds `preflight` and `fence` to the stage names, in run order |
+| Preflight | `scripts/preflight.sh` | `PREFLIGHT_SKIP=fixtures` reports the fixture check as skipped, because a lost primary cannot pass it. Adds `dig` to the required tools |
+| Tests | `tests/test_recover.py`, `tests/test_preflight.py` | Run the stages against a stub of every command, request, and the clock |
+| Runbook | [Regional recovery](../runbooks/regional-recovery.md#run-the-procedure-with-one-command) | Maps each stage to its runbook step and check |
+
+Two choices differ from the manual procedure:
+
+- The fence runs before the cutover, as decision 0013 requires. The drills fenced after the cutover. A primary that still answers now stops the run before `git.sindrg.com` moves.
+- Enabling recovery backups stays a manual step. It needs a Git change today, and [step 4](../../plan.md#10-automated-recovery) replaces it with a value in the cluster. The run ends by naming the step.
+
+### Local checks
+
+Local, against stubs, 2026-10-16. Expected before the run: every stage runs in runbook order, each failure stops the run before the next stage, and a rerun resumes at the failed stage with the values of the first attempt.
+
+| Check | Result | Can it fail |
+| --- | --- | --- |
+| `python -m unittest tests.test_recover` | 20 tests `OK` | Fifteen edits to a copy of `scripts/recover.py` each failed at least one test: a plan that deletes allowed, an IAM change allowed, passed stages rerun, the fence after the cutover, `suspend` unchecked, a failed bucket listing taken as an empty prefix, the restored HEAD overwritten on a retry, the set selected again on a retry, no wait for the primary to stop answering, the disabled flag unchecked, a failed stop taken as fatal, the fixture skip dropped from the preflight, no lock, no wait for the `git-dr` record, and a missing restored HEAD accepted |
+| `make check` | Exit 0, 255 tests `OK` | |
+| `make -n recover` | Prints the key checks and `python3 scripts/recover.py --drill-dir .drill run` | |
+
+### Not verified
+
+- `make recover` has not run against the live system. A rehearsal with `RECOVER_ARGS='--through verification'` builds the recovery environment and restores into it without touching the primary or `git.sindrg.com`. It has not run yet.
+- The stub answers stand in for gcloud, Terraform, Ansible, and Cloudflare. Their output formats are taken from the runbook and the playbooks: the `matched no objects` error of an empty prefix, the `Newest commit on <branch>: <sha>` line of `make check-fixtures`, and `True` from `gcloud iam service-accounts describe`. The rehearsal checks the first two; only the fence checks the third.
+- The fence and the cutover run only in a full recovery, which the milestone 10 gate runs.
