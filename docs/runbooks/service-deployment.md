@@ -274,7 +274,7 @@ To rotate the administrator password, replace `password` in `admin.sops.yaml` wi
 
 The recovery checks in [decision 0002](../decisions/0002-recovery-contract.md) need known data: one user, one repository with a known commit on its default branch, and one issue. `recovery/fixtures.yaml` records their identifiers. It is tracked and not secret, so it stays available on GitHub and in every clone when the primary region is lost. The fixture user's password is in `recovery/fixtures.sops.yaml`, encrypted for the same age key as `deploy/`. See the [decision 0006 amendment](../decisions/0006-service-deployment-architecture.md#amendment-recovery-fixtures).
 
-Three make targets run on the operator machine against the public HTTPS endpoint, not through IAP, so they check what users see. Each decrypts passwords locally with `FLUX_AGE_KEY_FILE` and hides them with `no_log`. Git runs over HTTPS and reads the password from stdin through `scripts/git_with_password.sh`, so the password never appears in command arguments or on disk.
+Three make targets run on the operator machine against the public HTTPS endpoint, not through IAP, so they check what users see. Each decrypts passwords locally with `FLUX_AGE_KEY_FILE` and hides them with `no_log`. Git runs over HTTPS through `scripts/git_with_password.sh`, which reads the password from stdin and the user from `GIT_STDIN_USERNAME`, so the password never appears in command arguments or on disk.
 
 | Target | Changes data | What it does |
 | --- | --- | --- |

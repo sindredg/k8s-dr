@@ -18,7 +18,6 @@ import sys
 import threading
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 
 SLOW = 2.0
@@ -40,8 +39,9 @@ def healthz(base):
         return f"error-{type(e).__name__}"
 
 
-def ls_remote(url, password):
+def ls_remote(url, user, password):
     r = subprocess.run([GIT, "ls-remote", "--heads", url], input=password + "\n",
+                       env={**os.environ, "GIT_STDIN_USERNAME": user},
                        capture_output=True, text=True, timeout=TIMEOUT, check=False)
     return "200" if r.returncode == 0 and r.stdout.strip() else f"git-exit-{r.returncode}"
 
@@ -63,10 +63,9 @@ def main():
     base, repo, path = sys.argv[1:4]
     interval = float(sys.argv[4]) if len(sys.argv) > 4 else 0.5
     duration = float(sys.argv[5]) if len(sys.argv) > 5 else float("inf")
-    user = urllib.parse.quote(os.environ["GIT_PROBE_USER"], safe="")
+    user = os.environ["GIT_PROBE_USER"]
     password = os.environ["GIT_PROBE_PASSWORD"]
-    host = urllib.parse.urlsplit(base)
-    git_url = f"{host.scheme}://{user}@{host.netloc}/{repo}.git"
+    git_url = f"{base.rstrip('/')}/{repo}.git"
     lock = threading.Lock()
     end = time.monotonic() + duration
     threads = []
@@ -74,7 +73,7 @@ def main():
         while time.monotonic() < end:
             tick = time.monotonic()
             threads = [t for t in threads if t.is_alive()]
-            for name, fn in (("healthz", lambda: healthz(base)), ("ls-remote", lambda: ls_remote(git_url, password))):
+            for name, fn in (("healthz", lambda: healthz(base)), ("ls-remote", lambda: ls_remote(git_url, user, password))):
                 t = threading.Thread(target=run, args=(name, fn, log, lock))
                 t.start()
                 threads.append(t)

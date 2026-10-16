@@ -67,5 +67,6 @@ Each worklog records what was built and the commands and results that passed its
 | [Billing budget apply errors](troubleshooting/02-billing-budget-apply-errors.md) | The budget errors that led to decision 0004. |
 | [Flux rejected the age key](troubleshooting/03-flux-age-key-rejected.md) | A corrupted SOPS key, a stale Flux failure, and a dropped IAP session at the first Flux bootstrap. |
 | [Flux reconciled the previous branch](troubleshooting/04-flux-reconciled-stale-revision.md) | A branch switch where Flux applied the old artifact. |
+| [Git rejected the fixture user](troubleshooting/05-git-clone-rejected-fixture-user.md) | A clone that sent the password as the username after a libcurl update. |
 
 Keep credentials, kubeconfigs, Terraform state, database dumps, and unsanitized command output out of these files.
