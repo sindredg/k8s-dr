@@ -42,7 +42,7 @@ After the `flux` role, [Flux](04-flux.md) deploys everything else from Git. Ansi
 
 ### Why reruns are safe
 
-Each one-time step checks for its own result first: `kubeadm init` is skipped when `/etc/kubernetes/admin.conf` exists, the join when `/etc/kubernetes/kubelet.conf` exists, and `mkfs` when the disk has a filesystem. Everything else declares a state. The same command bootstraps a new cluster and repairs an existing one.
+Each one-time step checks for its own result first: `kubeadm init` is skipped when `/etc/kubernetes/admin.conf` exists, the join when `/etc/kubernetes/kubelet.conf` exists, `vgcreate` when the data disk has a signature, `lvcreate` when the data logical volume exists, and `mkfs` when that volume has a filesystem. Everything else declares a state. The same command bootstraps a new cluster and repairs an existing one.
 
 ### How versions are managed
 

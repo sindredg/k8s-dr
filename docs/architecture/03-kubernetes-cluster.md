@@ -47,7 +47,7 @@ The metadata server matters because it hands the node's service account token to
 
 ## Storage
 
-The Local Path Provisioner turns each claim of the `local-path` StorageClass into a directory under `/var/lib/k8s-dr/local-path` on the worker's dedicated data disk. The disk is separate from the boot disk, so rebuilding the VM keeps the data. The provisioner is restricted to the worker node and to that one path.
+The Local Path Provisioner turns each claim of the `local-path` StorageClass into a directory under `/var/lib/k8s-dr/local-path` on the worker's dedicated data disk. The directory is on the ext4 logical volume `k8sdr/data`, which leaves 20% of the volume group free for the backup snapshot ([decision 0014](../decisions/0014-snapshot-backups.md)). The disk is separate from the boot disk, so rebuilding the VM keeps the data. The provisioner is restricted to the worker node and to that one path.
 
 This is node-local storage. It does not replicate, and a volume cannot move to another node. The [offsite backup](09-backup-and-restore.md) is the only copy outside the region.
 
