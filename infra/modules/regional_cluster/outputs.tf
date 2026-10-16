@@ -13,11 +13,6 @@ output "network_name" {
   value       = google_compute_network.cluster.name
 }
 
-output "service_account_ids" {
-  description = "Node service account resource IDs keyed by role."
-  value       = { for role, account in google_service_account.node : role => account.name }
-}
-
 output "public_web_address" {
   description = "Static external address of the load balancer in front of Traefik."
   value       = google_compute_address.public_web.address

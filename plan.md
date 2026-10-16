@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 9 are complete, and 10 to 14 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 9 are complete, 10 is in progress, and 11 to 14 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ Milestones 0 to 9 are complete, and 10 to 14 are planned. Milestone 8 rebuilt th
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
 | 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Complete |
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
-| 10. Automated recovery | Recovery runs without a person | Planned |
+| 10. Automated recovery | Recovery runs without a person | In progress |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
 | 12. Unattended drills | Measured recovery and cost with nobody present | Planned |
 | 13. Failback with data | Optional return that keeps the recovery writes | Planned |
@@ -147,7 +147,7 @@ Before milestone 9, every backup scaled Gitea to zero for the capture. At one ca
 
 ## 10. Automated recovery
 
-See [decision 0013](docs/decisions/0013-automated-recovery.md).
+See [decision 0013](docs/decisions/0013-automated-recovery.md) and the [worklog](docs/worklogs/10-automated-recovery.md).
 
 - [ ] Move the node service accounts and backup grants to the shared root.
 - [ ] Run every recovery stage from one command that stops at the first failed check and resumes from it.

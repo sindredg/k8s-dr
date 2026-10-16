@@ -50,7 +50,7 @@ The Job gets its token from the metadata server. No service account key exists.
 
 ### Fencing
 
-After a failover, the operator removes `primary` from `backup_clusters` in `infra/shared` and applies it. A primary that comes back can then no longer write backups, and a restore never has to choose between two clusters' sets under one prefix.
+After a failover, the operator disables the primary worker's service account. A primary that comes back can then no longer write backups, and a restore never has to choose between two clusters' sets under one prefix. `infra/shared` ignores the account's `disabled` flag, so a later apply does not lift the fence.
 
 ## Alerting
 

@@ -85,11 +85,13 @@ resource "google_compute_firewall" "node_internal" {
   }
 }
 
-resource "google_service_account" "node" {
-  for_each     = local.node_roles
-  project      = var.project_id
-  account_id   = "${var.name_prefix}-${each.key == "control-plane" ? "cp" : "worker"}"
-  display_name = "${var.name_prefix} ${each.key} node"
+# infra/shared owns the node service accounts and their grants, so apply it
+# first. The lookup fails the plan when an account is missing. See decision
+# 0013.
+data "google_service_account" "node" {
+  for_each   = local.node_roles
+  project    = var.project_id
+  account_id = "${var.name_prefix}-${each.key == "control-plane" ? "cp" : "worker"}"
 }
 
 resource "google_compute_instance" "node" {
@@ -121,7 +123,7 @@ resource "google_compute_instance" "node" {
   }
 
   service_account {
-    email  = google_service_account.node[each.key].email
+    email  = data.google_service_account.node[each.key].email
     scopes = local.node_scopes[each.key]
   }
 
