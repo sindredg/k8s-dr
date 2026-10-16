@@ -74,7 +74,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
 	restore-test-env-delete restore-test-forward check manifests pins surface preflight \
-	dns-show dns-set dns-delete
+	dns-show dns-set dns-delete dns-caa
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -174,3 +174,6 @@ dns-set: age-key ## Point the A record of DNS_NAME at DNS_ADDRESS, DNS only, TTL
 
 dns-delete: age-key ## Delete the A record of DNS_NAME (git-dr only)
 	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" scripts/dns_record.sh delete $(DNS_NAME)
+
+dns-caa: age-key ## Create the missing CAA records of the zone apex; never deletes one
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" scripts/dns_record.sh caa

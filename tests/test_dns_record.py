@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import subprocess
 import unittest
 
@@ -27,11 +28,32 @@ class DnsRecordTests(unittest.TestCase):
             ("set", "git", "not-an-address"),
             ("delete", "git"),
             ("purge", "git"),
+            ("caa", "git"),
         ):
             with self.subTest(args=args):
                 result = run(*args)
                 self.assertEqual(result.returncode, 2, result.stderr)
         self.assertLess(self.text.index('"$action" = delete ] && [ "$name" = git ]'), self.text.index("sops --decrypt"))
+
+    def test_caa_records_match_the_surface_check(self):
+        # The surface check fails on any CAA record outside CAA_EXPECTED, so
+        # the records this script creates must be exactly that set.
+        def array(text, name):
+            body = re.search(rf"^{name}=\(\n(.*?)^\)", text, re.M | re.S).group(1)
+            return re.findall(r"'([^']*)'", body)
+
+        surface = Path("scripts/check-public-surface.sh").read_text()
+        expected = sorted(array(surface, "CAA_EXPECTED"))
+        created = sorted(
+            '0 {} "{}"'.format(*entry.split(" ", 1)) for entry in array(self.text, "CAA_RECORDS")
+        )
+        self.assertTrue(expected)
+        self.assertEqual(created, expected)
+
+    def test_caa_never_deletes_a_record(self):
+        start = self.text.index('if [ "$action" = caa ]; then\n  existing=')
+        block = self.text[start : self.text.index("\nfi\n", start)]
+        self.assertNotIn("DELETE", block)
 
     def test_records_are_dns_only_with_the_cutover_ttl(self):
         self.assertIn("TTL=60", self.text)
