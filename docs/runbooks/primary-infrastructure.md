@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, on 2026-10-14 after a rebuild from empty state, on 2026-10-16 for the recovery reader check in step 9, and on 2026-10-16 for milestone 10, which applies the shared root first. The new order and plan counts are written, not run from empty state. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, on 2026-10-14 after a rebuild from empty state, on 2026-10-16 for the recovery reader check in step 9, which passed as the reader the same day (see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#migration-after-the-merge)), and on 2026-10-16 for milestone 10, which applies the shared root first. The new order and plan counts are written, not run from empty state. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 
