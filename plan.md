@@ -149,7 +149,7 @@ Before milestone 9, every backup scaled Gitea to zero for the capture. At one ca
 
 See [decision 0013](docs/decisions/0013-automated-recovery.md) and the [worklog](docs/worklogs/10-automated-recovery.md).
 
-- [ ] Move the node service accounts and backup grants to the shared root.
+- [x] Move the node service accounts and backup grants to the shared root.
 - [ ] Run every recovery stage from one command that stops at the first failed check and resumes from it.
 - [ ] Run that command from GitHub Actions with workload identity federation and no stored cloud key.
 - [ ] Fence the primary and resume recovery backups without a manual edit or a Git change.

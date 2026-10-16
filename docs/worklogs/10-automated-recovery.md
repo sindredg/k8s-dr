@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is built and planned against the live state, not applied. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Steps 2 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -61,18 +61,21 @@ import {
 
 ### Migration after the merge
 
-Not run yet. Apply after the change is on `main`, so `main` and the state never disagree.
+Live system, 2026-10-16, from `main` at `cbcaf03`. Each step was planned to a saved plan file, and that file was applied.
 
-1. Save the import file above as `infra/shared/m10_imports.tf`, then plan and apply the shared root. Expected: `4 to import, 6 to add, 0 to change, 0 to destroy`.
-2. Plan and apply the primary root. Expected: `0 to add, 0 to change, 0 to destroy`, with the four objects forgotten.
-3. Delete `infra/shared/m10_imports.tf`. Plan both roots with `-detailed-exitcode`. Expected: exit 0 for each.
-4. Plan the recovery root. Expected: `Plan: 16 to add, 0 to change, 0 to destroy`, with no service account or IAM member. The count is reasoned from the code, not observed.
-5. Confirm that the next scheduled backup on the primary completes, which shows the worker account still writes.
-6. Run the recovery reader check of [issue #90](https://github.com/sindredg/k8s-dr/issues/90), because the bucket grants changed owner.
+| Step | Command | Expected | Result |
+| --- | --- | --- | --- |
+| 1 | Shared root plan and apply, with the import file above saved as `infra/shared/m10_imports.tf` | `4 to import, 6 to add, 0 to change, 0 to destroy` | Plan as expected. `Apply complete! Resources: 4 imported, 6 added, 0 changed, 0 destroyed.` |
+| 2 | Primary root plan and apply | `0 to add, 0 to change, 0 to destroy`, with the four objects forgotten | Plan as expected, with the two node accounts and the two administrator grants listed as `will no longer be managed by Terraform, but will not be destroyed`. `Apply complete! Resources: 0 added, 0 changed, 0 destroyed.` |
+| 3 | Import file deleted, then `terraform plan -detailed-exitcode` in `infra/shared` and `infra/primary` | Exit 0 for each | `No changes. Your infrastructure matches the configuration.` in both |
+| 4 | `terraform plan` in `infra/recovery`, not applied | `16 to add`, no service account or IAM member | `Plan: 16 to add, 0 to change, 0 to destroy.` The 16 are the network, firewall, router, NAT, load balancer, data disk, and VM resources. None is a service account or IAM member |
+| 5 | Next scheduled primary backup Job | Completes, which shows the worker account still writes | `gitea-backup-29869702`, the 20:22Z run, `Complete` with `1/1` in 11 s, read with `kubectl -n gitea get jobs` over IAP. Set `20261016T202201Z` is listed under `primary/` in the bucket |
+| 6 | Bucket IAM policy read as the administrator after the migration | The recovery reader keeps `roles/storage.objectViewer` with no condition | As expected. The only other members outside the legacy project roles are the two worker accounts: an object viewer grant each, and an object creator grant limited to the `primary/` or `recovery/` prefix |
+
+The recovery reader check of [issue #90](https://github.com/sindredg/k8s-dr/issues/90) ran as the reader at 2026-10-16T19:59:59Z, before the migration, with the block in step 9 of the [primary infrastructure runbook](../runbooks/primary-infrastructure.md). Result: `account OK`, the listing succeeded, and the permission test returned `storage.objects.get storage.objects.list` only. The same test as the administrator returns `create` and `delete` as well, so it can fail. The migration did not change the reader's grant: `recovery_reader` only refreshed in both shared plans, and step 6 reads it unchanged.
 
 ### Not verified
 
-- No apply has run. The live accounts, grants, and backups are unchanged.
 - The first-build order and plan counts in the [primary infrastructure runbook](../runbooks/primary-infrastructure.md) are written from the code and the live plans, not run from empty state.
 - The fence by disabled account and the return by enabled account are written, not run. A drill or the milestone 10 gate runs them.
 - The recovery cluster has not run with the LVM layout of [milestone 9](09-backups-without-downtime.md). The milestone 10 gate runs a full recovery.
