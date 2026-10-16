@@ -19,6 +19,22 @@ locals {
   # Longer than the backup interval plus a drill window, and about two weeks
   # to notice tampering. See decision 0007.
   backup_retention_days = 14
+
+  # Node service accounts of every cluster, keyed "<cluster>/<role>". The
+  # regional module looks them up by the same account IDs.
+  node_account_suffixes = {
+    "control-plane" = "cp"
+    "worker"        = "worker"
+  }
+
+  node_accounts = merge([
+    for cluster, prefix in var.clusters : {
+      for role, suffix in local.node_account_suffixes : "${cluster}/${role}" => {
+        account_id   = "${prefix}-${suffix}"
+        display_name = "${prefix} ${role} node"
+      }
+    }
+  ]...)
 }
 
 resource "google_storage_bucket" "backups" {
@@ -74,14 +90,36 @@ resource "google_storage_bucket" "backups" {
   }
 }
 
+# The node accounts live here, not in the regional roots, so a recovery
+# changes no IAM and a first build has no apply order between roots. See
+# decision 0013.
+resource "google_service_account" "node" {
+  for_each     = local.node_accounts
+  project      = var.project_id
+  account_id   = each.value.account_id
+  display_name = each.value.display_name
+
+  # Fencing disables the primary worker account outside Terraform. An apply
+  # of this root must not enable it again.
+  lifecycle {
+    ignore_changes = [disabled]
+  }
+}
+
+resource "google_service_account_iam_member" "admin_can_use_node" {
+  for_each           = google_service_account.node
+  service_account_id = each.value.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = var.admin_member
+}
+
 # Each cluster creates objects only under its own prefix. Object creation
-# cannot overwrite, because overwriting needs storage.objects.delete. Remove a
-# cluster from backup_clusters to fence it after failover.
+# cannot overwrite, because overwriting needs storage.objects.delete.
 resource "google_storage_bucket_iam_member" "backup_writer" {
-  for_each = var.backup_clusters
+  for_each = var.clusters
   bucket   = google_storage_bucket.backups.name
   role     = "roles/storage.objectCreator"
-  member   = each.value
+  member   = google_service_account.node["${each.key}/worker"].member
 
   condition {
     title      = "${each.key}-prefix-only"
@@ -92,10 +130,10 @@ resource "google_storage_bucket_iam_member" "backup_writer" {
 # Clusters read every prefix so a recovery cluster can restore the primary's
 # sets. The cluster never holds the backup decryption key.
 resource "google_storage_bucket_iam_member" "backup_reader" {
-  for_each = var.backup_clusters
+  for_each = var.clusters
   bucket   = google_storage_bucket.backups.name
   role     = "roles/storage.objectViewer"
-  member   = each.value
+  member   = google_service_account.node["${each.key}/worker"].member
 }
 
 resource "google_storage_bucket_iam_member" "recovery_reader" {

@@ -35,19 +35,21 @@ resource "google_compute_disk" "worker_data" {
   }
 }
 
-resource "google_service_account_iam_member" "admin_can_use_node" {
-  for_each           = module.primary_cluster.service_account_ids
-  service_account_id = each.value
-  role               = "roles/iam.serviceAccountUser"
-  member             = var.admin_member
+# The node service accounts and the admin grants on them moved to
+# infra/shared, which imports them. These blocks drop them from this state
+# without deleting them. See decision 0013.
+removed {
+  from = module.primary_cluster.google_service_account.node
+
+  lifecycle {
+    destroy = false
+  }
 }
 
-moved {
-  from = google_service_account_iam_member.admin_can_use_control_plane
-  to   = google_service_account_iam_member.admin_can_use_node["control-plane"]
-}
+removed {
+  from = google_service_account_iam_member.admin_can_use_node
 
-moved {
-  from = google_service_account_iam_member.admin_can_use_worker
-  to   = google_service_account_iam_member.admin_can_use_node["worker"]
+  lifecycle {
+    destroy = false
+  }
 }

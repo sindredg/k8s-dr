@@ -57,8 +57,3 @@ variable "boot_image" {
   type        = string
   default     = null
 }
-
-variable "admin_member" {
-  description = "IAM user or group allowed to use the node service accounts. Must match admin_member in infra/shared."
-  type        = string
-}

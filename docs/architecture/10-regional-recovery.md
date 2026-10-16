@@ -32,7 +32,7 @@ Nothing on the list is in Finland. Drill 1 recovered with both primary VMs stopp
 
 ## The procedure
 
-![Swimlane diagram showing the nine recovery steps in order across Terraform, Ansible and Flux, Cloudflare DNS, and the operator's checks: build the infrastructure, grant bucket access, create the direct DNS name, bootstrap, restore, check, cut over, check again, and fence the primary.](../diagrams/recovery-procedure.svg)
+![Swimlane diagram showing the eight recovery steps in order across Terraform, Ansible and Flux, Cloudflare DNS, and the operator's checks: build the infrastructure, create the direct DNS name, bootstrap, restore, check, cut over, check again, and fence the primary.](../diagrams/recovery-procedure.svg)
 
 | Step | Reuses |
 | --- | --- |
@@ -52,7 +52,7 @@ The recovery cluster is tested through `git-dr.sindrg.com` before any user reach
 
 | Risk | Control |
 | --- | --- |
-| A returning primary writes backups that look newer than the recovery cluster's | Each cluster writes under its own prefix, and the primary's writer grant is removed after failover |
+| A returning primary writes backups that look newer than the recovery cluster's | Each cluster writes under its own prefix, and the primary worker's service account is disabled after failover |
 | A command meant for recovery runs against the primary | `CLUSTER` selects a separate inventory per cluster |
 | The recovery cluster serves stale or empty data to users | It is checked through `git-dr.sindrg.com` before the cutover |
 | Both clusters serve `git.sindrg.com` | DNS points to one address at a time |

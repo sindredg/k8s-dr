@@ -1,6 +1,6 @@
 # 0003: Regional infrastructure and offsite state
 
-Status: Accepted. Milestone 1 cloud validation passed on 2026-09-23. Amended on 2026-09-25 for a shared root and a root-owned data disk; see the [amendment](#amendment-shared-root-and-root-owned-data-disk).
+Status: Accepted. Milestone 1 cloud validation passed on 2026-09-23. Amended on 2026-09-25 for a shared root and a root-owned data disk; see the [amendment](#amendment-shared-root-and-root-owned-data-disk). Since 2026-10-16, [decision 0013](0013-automated-recovery.md#node-identities-and-backup-grants-move-to-the-shared-root) moves the node service accounts to the shared root, and `admin_member` is set only there.
 
 Date: 2026-09-23
 

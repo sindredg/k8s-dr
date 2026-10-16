@@ -33,10 +33,3 @@ resource "google_compute_disk" "worker_data" {
   size    = var.worker_data_disk_size_gb
   labels  = local.labels
 }
-
-resource "google_service_account_iam_member" "admin_can_use_node" {
-  for_each           = module.recovery_cluster.service_account_ids
-  service_account_id = each.value
-  role               = "roles/iam.serviceAccountUser"
-  member             = var.admin_member
-}

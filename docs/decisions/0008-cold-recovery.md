@@ -1,6 +1,6 @@
 # 0008: Cold recovery
 
-Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03. Amended on 2026-10-04 with the [return to the primary after a drill](#amendment-return-to-the-primary-after-a-drill).
+Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03. Amended on 2026-10-04 with the [return to the primary after a drill](#amendment-return-to-the-primary-after-a-drill). Since 2026-10-16, [decision 0013](0013-automated-recovery.md#node-identities-and-backup-grants-move-to-the-shared-root) creates the recovery node accounts and grants in `infra/shared` ahead of time, which removes the shared apply from the recovery order.
 
 Date: 2026-09-30
 

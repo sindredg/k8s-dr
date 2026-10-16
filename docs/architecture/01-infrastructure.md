@@ -11,7 +11,7 @@ A root is a directory with its own state. The split keeps resources that must ou
 | Root | Creates | Lifetime |
 | --- | --- | --- |
 | `infra/bootstrap` | The state bucket and the operator's access to it | Permanent. Starts with local state, then migrates into the bucket it created. |
-| `infra/shared` | The backup bucket, its IAM, the administrator's IAP, OS Login, and instance admin roles, and the uptime check | Permanent. Shared by every region. |
+| `infra/shared` | The backup bucket, its IAM, the node service accounts of every cluster, the administrator's IAP, OS Login, and instance admin roles, and the uptime check | Permanent. Shared by every region. |
 | `infra/primary` | The Finland cluster through the module, plus the worker data disk | Permanent. The data disk has `prevent_destroy`. |
 | `infra/recovery` | The Belgium cluster through the same module, plus its own data disk | Created for a drill or a disaster, destroyed afterwards. Its disk has no `prevent_destroy`. |
 
@@ -31,7 +31,7 @@ The recovery root mirrors the primary root: the same module, the same outputs, a
 | Outbound traffic | Cloud NAT, for package and image downloads |
 | Inbound SSH | Only from Google's IAP range. OS Login is on and project SSH keys are blocked. |
 | Public traffic | A regional passthrough load balancer sends ports 80 and 443 to the worker. TLS ends in the cluster, not at the load balancer. |
-| Node service accounts | One per node. The worker may read and create Cloud Storage objects; the control plane has no API scope. |
+| Node service accounts | One per node, created by `infra/shared` and looked up by the module. The worker may read and create Cloud Storage objects; the control plane has no API scope. |
 
 ## Firewall rules
 
@@ -47,7 +47,7 @@ Nothing else reaches the nodes. The Kubernetes API listens on the control plane'
 
 `make inventory` reads the selected root's outputs (instance names, private addresses, project, zone, subnet) and writes the Ansible inventory for that cluster. Terraform and Ansible share nothing else.
 
-The backup bucket's access list, `backup_clusters` in `infra/shared`, names each cluster's worker service account. A recovery worker is added after its root is applied, because the grant needs the account to exist.
+`infra/shared` creates the node service accounts of every cluster in `clusters` and grants each worker account its backup access. The regional roots only attach the accounts to their VMs, so the shared root applies first and a recovery changes no IAM. See [decision 0013](../decisions/0013-automated-recovery.md#node-identities-and-backup-grants-move-to-the-shared-root).
 
 ## Limits
 

@@ -1,6 +1,6 @@
 # 0007: Consistent backups
 
-Status: Accepted on 2026-09-29. Implemented; the [milestone 4 gate](../worklogs/04-consistent-backups.md#milestone-gate) passed on 2026-09-29. [Decision 0014](0014-snapshot-backups.md) replaces its scale-to-zero capture.
+Status: Accepted on 2026-09-29. Implemented; the [milestone 4 gate](../worklogs/04-consistent-backups.md#milestone-gate) passed on 2026-09-29. [Decision 0014](0014-snapshot-backups.md) replaces its scale-to-zero capture. [Decision 0013](0013-automated-recovery.md#fence-the-primary-before-the-cutover) replaces the fence by grant removal with a disabled worker account.
 
 Date: 2026-09-29
 

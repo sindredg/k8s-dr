@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -74,16 +74,9 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
    cd ../..
    ```
 
-   Expected: `Plan: 20 to add, 0 to change, 0 to destroy`. The plan contains one Belgium VPC and subnet, one NAT, two private VMs, the worker data disk, the load balancer, and two service accounts. It reads and changes nothing in Finland.
+   Expected: `Plan: 16 to add, 0 to change, 0 to destroy`. The plan contains one Belgium VPC and subnet, one NAT, two private VMs, the worker data disk, and the load balancer. It creates no service account or IAM member: the VMs attach the recovery node accounts that `infra/shared` keeps, with their backup grants, whether or not a recovery runs. It reads and changes nothing in Finland.
 
-4. Let the recovery worker read the backups. The grant fails before the account exists, so this follows step 3. Add the recovery line to `backup_clusters` in the local `infra/shared/terraform.tfvars`, as in `terraform.tfvars.example`, then apply.
-
-   ```bash
-   terraform -chdir=infra/shared plan -out=shared.tfplan
-   terraform -chdir=infra/shared apply shared.tfplan
-   ```
-
-   Expected: `Plan: 2 to add, 0 to change, 0 to destroy`: one object creator grant limited to `recovery/` and one object viewer grant. If the uptime check is not applied yet, the plan also adds it.
+4. This step is no longer needed. Since [milestone 10](../../plan.md#10-automated-recovery), the recovery worker holds its backup grants before the recovery starts. The step number stays so the drill worklogs still match.
 
 5. Create the `git-dr` DNS record for the recovery address. Leave `git.sindrg.com` unchanged. The command writes a DNS-only record with a 60-second TTL through the Cloudflare API; the dashboard is the fallback. See [decision 0002](../decisions/0002-recovery-contract.md#amendment-change-dns-records-through-the-cloudflare-api).
 
@@ -152,7 +145,15 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
    Expected: the wait ends within the 60-second TTL. Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
 
    1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml` and in the expected settings in `tests/test_services.py`, which pins the value. Do not use `kubectl patch`; Flux reverts it. The next scheduled run writes the first `recovery/` set.
-   2. Fence the primary: remove `primary` from `backup_clusters` in `infra/shared/terraform.tfvars` and apply `infra/shared`, so a primary that returns cannot write backups.
+   2. Fence the primary: disable the primary worker's service account, so a primary that returns cannot write backups. `infra/shared` ignores the account's `disabled` flag, so a later apply does not undo the fence.
+
+      ```bash
+      PRIMARY_WORKER="$(terraform -chdir=infra/shared output -json node_service_accounts | python3 -c 'import json, sys; print(json.load(sys.stdin)["primary/worker"])')"
+      gcloud iam service-accounts disable "$PRIMARY_WORKER"
+      gcloud iam service-accounts describe "$PRIMARY_WORKER" --format='value(disabled)'
+      ```
+
+      Expected: `True`.
 
 10. Compute the results and record them in the [drill worklog](../worklogs/06-disaster-drill.md).
 
@@ -193,14 +194,15 @@ A drill ends by returning to the stopped primary, which still holds its data as 
 
 3. Suspend recovery backups again: merge a change that sets `backup_suspend: "true"` in `deploy/clusters/recovery/cluster-settings.yaml` and in `tests/test_services.py`. The next recovery bootstrap must not write a set.
 
-4. Restore the primary's backup grant and remove the recovery grants in one apply: put `primary` back in `backup_clusters` and remove `recovery`, in `infra/shared/terraform.tfvars`.
+4. Lift the fence: enable the primary worker's service account again. The recovery grants stay; they belong to the recovery node account, not to the recovery VMs.
 
    ```bash
-   terraform -chdir=infra/shared plan -out=shared-return.tfplan
-   terraform -chdir=infra/shared apply shared-return.tfplan
+   PRIMARY_WORKER="$(terraform -chdir=infra/shared output -json node_service_accounts | python3 -c 'import json, sys; print(json.load(sys.stdin)["primary/worker"])')"
+   gcloud iam service-accounts enable "$PRIMARY_WORKER"
+   gcloud iam service-accounts describe "$PRIMARY_WORKER" --format='value(disabled)'
    ```
 
-   Expected: `Plan: 2 to add, 0 to change, 2 to destroy`: the two primary grants return and the two recovery grants go. Confirm that the next backup on the primary completes.
+   Expected: an empty line or `False`. Confirm that the next backup on the primary completes.
 
 5. Delete the `git-dr` record and destroy the recovery root, as in steps 2 and 3 of the next section.
 
@@ -210,9 +212,9 @@ A drill ends by returning to the stopped primary, which still holds its data as 
 
 ## Remove the recovery environment
 
-After a gate that left the primary in service, remove the recovery environment. The order matters: a grant for a deleted service account makes later `infra/shared` plans fail.
+After a gate that left the primary in service, remove the recovery environment. The recovery node accounts and their grants stay in `infra/shared`.
 
-1. Remove the `recovery` line from `backup_clusters` in `infra/shared/terraform.tfvars`, then plan and apply `infra/shared`. Expected: `2 to destroy`.
+1. Confirm that the primary worker's service account is enabled, as in step 4 of the previous section.
 2. Delete the `git-dr` DNS record with `make dns-delete DNS_NAME=git-dr`, so the name does not point at a released address.
 3. Destroy the recovery root.
 
@@ -221,7 +223,7 @@ After a gate that left the primary in service, remove the recovery environment. 
    terraform -chdir=infra/recovery apply recovery-destroy.tfplan
    ```
 
-   Expected: `20 to destroy`. The plan lists no primary or shared resource.
+   Expected: `16 to destroy`. The plan lists no primary or shared resource and no service account.
 
 ## Stop conditions and follow-up
 

@@ -19,18 +19,23 @@ variable "backup_bucket_location" {
   }
 }
 
-variable "backup_clusters" {
-  description = "Cluster name to the IAM member of its worker node service account. Each may create objects under <cluster>/ and read the whole bucket."
+variable "clusters" {
+  description = "Cluster name to the name_prefix of its regional root. Each cluster gets node service accounts; its worker may create objects under <cluster>/ and read the whole bucket."
   type        = map(string)
-
-  validation {
-    condition     = alltrue([for name in keys(var.backup_clusters) : can(regex("^[a-z][a-z0-9-]*$", name))])
-    error_message = "Cluster names must be lowercase letters, digits, and hyphens."
+  default = {
+    primary  = "k8sdr-primary"
+    recovery = "k8sdr-recovery"
   }
 
   validation {
-    condition     = alltrue([for member in values(var.backup_clusters) : startswith(member, "serviceAccount:")])
-    error_message = "Backup writers must be service accounts."
+    condition     = alltrue([for name in keys(var.clusters) : can(regex("^[a-z][a-z0-9-]*$", name))])
+    error_message = "Cluster names must be lowercase letters, digits, and hyphens."
+  }
+
+  # Service account IDs allow 30 characters, and "-worker" takes 7.
+  validation {
+    condition     = alltrue([for prefix in values(var.clusters) : length(prefix) <= 23 && can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", prefix))])
+    error_message = "Each name_prefix must match the validation of the regional roots."
   }
 }
 

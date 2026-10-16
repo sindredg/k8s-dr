@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Proposed on 2026-10-11. Not implemented. [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it.
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
 
 Date: 2026-10-11
 
@@ -63,6 +63,8 @@ Today `infra/shared` grants bucket access to service accounts that the regional 
 The node service accounts and their bucket grants move to `infra/shared`. Each cluster's worker account can always create objects under its own prefix and read every prefix. A regional root only attaches the accounts to its VMs.
 
 The pipeline account then needs no permission to change any IAM policy. It cannot grant itself access to the backups.
+
+The shared root ignores the `disabled` flag of the node accounts, so an apply of the shared root never lifts a fence. Until the run fences automatically, the [regional recovery runbook](../runbooks/regional-recovery.md) disables the account by hand.
 
 ### Recovery backups start without a Git change
 
