@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 7 and 9 are complete. Milestone 8 is in progress, and 10 to 14 are planned. Milestone 9 removed the backup downtime. The others rebuild the environment, which was removed after the drills, automate and shorten the recovery, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 9 are complete, and 10 to 14 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Milestones 0 to 7 and 9 are complete. Milestone 8 is in progress, and 10 to 14 a
 | 5. Cold recovery | Independent service in second region | Complete |
 | 6. Disaster drill | Measured RTO and RPO | Complete |
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
-| 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | In progress |
+| 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Complete |
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
 | 10. Automated recovery | Recovery runs without a person | Planned |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
@@ -125,13 +125,13 @@ Close the findings of a security review of the running service. See [decision 00
 
 ## 8. Rebuild from the runbooks
 
-The environment was removed after milestone 7. Only the Terraform state bucket remains.
+The environment was removed after milestone 7. Only the Terraform state bucket remained.
 
-- [ ] Build the primary from empty state by following the runbooks as written, and record every deviation.
-- [ ] Fix each deviation in the runbook or the code.
-- [ ] Recreate the fixtures, confirm a backup set, and restore it into the test namespaces.
+- [x] Build the primary from empty state by following the runbooks as written, and record every deviation.
+- [x] Fix each deviation in the runbook or the code.
+- [x] Recreate the fixtures, confirm a backup set, and restore it into the test namespaces.
 
-**Gate:** The primary serves the fixtures, a backup set restores in the test namespaces, and the worklog lists every step that did not work as documented.
+**Gate:** The primary serves the fixtures, a backup set restores in the test namespaces, and the worklog lists every step that did not work as documented. Passed on 2026-10-16. The restore evidence is the milestone 9 restore of 2026-10-14; see the [worklog](docs/worklogs/08-rebuild-from-runbooks.md#gate).
 
 ## 9. Backups without downtime
 

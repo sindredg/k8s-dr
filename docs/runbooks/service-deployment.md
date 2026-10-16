@@ -1,5 +1,7 @@
 # Service deployment: operator procedure
 
+Status: Validated. The milestone 3 gate passed on 2026-09-27. Revalidated on 2026-10-16 in the [milestone 8 rebuild](../worklogs/08-rebuild-from-runbooks.md#service-deployment-fixtures-and-restore), which amended steps 1, 6, and 7 of the first section and step 1 of the cert-manager section.
+
 Deploy the milestone 3 service in the order of [decision 0006](../decisions/0006-service-deployment-architecture.md). Each section ends with the checks that must pass before the next section starts. Record observed results in the [milestone 3 worklog](../worklogs/03-service-deployment.md).
 
 ## Prerequisites
@@ -13,6 +15,8 @@ Deploy the milestone 3 service in the order of [decision 0006](../decisions/0006
 Terraform adds a static external address and a regional external passthrough load balancer that forwards TCP 80 and 443 to the worker. Traefik binds host ports 80 and 443 on the worker, so the load balancer needs no port mapping. Its NodePort 30080 stays for the private validation.
 
 The load balancer bills a forwarding rule and a static address every hour while the primary runs. See [cost planning](primary-infrastructure.md#cost-planning).
+
+On a build from empty state, the primary root already created these resources in [primary infrastructure](primary-infrastructure.md) step 5. Skip steps 1 and 2 and read the address with `PUBLIC_WEB="$(terraform -chdir=infra/primary output -raw public_web_address)"`.
 
 1. Plan the change from `infra/primary`. The worker gains a network tag in place.
 
@@ -72,16 +76,18 @@ The load balancer bills a forwarding rule and a static address every hour while 
    | Proxy status | DNS only |
    | TTL | 1 min |
 
+   `make dns-set DNS_NAME=git DNS_ADDRESS="$PUBLIC_WEB"` sets the `git` or `git-dr` record with the same values through the Cloudflare API, using the token from the cert-manager section. It does not manage `git-primary`, which never moves; create that record in the dashboard.
+
    DNS only keeps TLS termination in the cluster. The 60-second TTL bounds the cutover delay that [decision 0002](../decisions/0002-recovery-contract.md) measures.
 
 7. Confirm the record resolves and reaches Traefik.
 
    ```bash
    dig +short git.sindrg.com @1.1.1.1
-   curl -sS -o /dev/null -w '%{http_code}\n' http://git.sindrg.com/
+   curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' http://git.sindrg.com/
    ```
 
-   Expected: the public address, then `404`. Repeat for the cluster's own name.
+   Expected: the public address, then `404`. Repeat for the cluster's own name. Once Gitea is deployed, the HTTP route redirects instead, so the same request returns `301 https://git.sindrg.com/`.
 
 ## Flux and SOPS
 
@@ -157,7 +163,7 @@ Each cluster names its hostname and issuer in `deploy/clusters/<cluster>/cluster
 
 The `certificates` Kustomization does not wait for its objects to become ready. A slow Let's Encrypt order therefore cannot fail `make bootstrap`; `make validate-services` checks the Certificate instead.
 
-1. Encrypt the Cloudflare token into the repository. The token is read without echo and piped to SOPS, so the plaintext is never written to a file.
+1. Encrypt the Cloudflare token into the repository. Skip this step on a rebuild if `deploy/certificates/cloudflare-api-token.sops.yaml` exists and the token has not expired. The token is read without echo and piped to SOPS, so the plaintext is never written to a file.
 
    ```bash
    read -rsp 'Cloudflare API token: ' CF_API_TOKEN; echo

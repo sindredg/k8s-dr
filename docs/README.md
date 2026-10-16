@@ -37,7 +37,7 @@ Each worklog records what was built and the commands and results that passed its
 | [Cold recovery](worklogs/05-cold-recovery.md) | 5 |
 | [Disaster drill](worklogs/06-disaster-drill.md) | 6: two drills, their timelines, and their comparison |
 | [Faster recovery](worklogs/07-faster-recovery.md) | 7: the 15-minute backup schedule, the third drill, and the cost |
-| [Rebuild from the runbooks](worklogs/08-rebuild-from-runbooks.md) | 8, in progress: the rebuild from empty state and every deviation |
+| [Rebuild from the runbooks](worklogs/08-rebuild-from-runbooks.md) | 8: the rebuild from empty state and every deviation |
 | [Backups without downtime](worklogs/09-backups-without-downtime.md) | 9: the LVM snapshot capture and its validation |
 
 ## Decisions

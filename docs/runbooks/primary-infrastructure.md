@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, and on 2026-10-14 after a rebuild from empty state. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, on 2026-10-14 after a rebuild from empty state, and on 2026-10-16 for the recovery reader check in step 9. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 
@@ -127,7 +127,7 @@ Apply the primary root before the shared root. The shared root grants backup acc
    gcloud compute disks describe "$(terraform output -raw worker_data_disk_name)" --project="$PROJECT_ID" --zone='REPLACE_WITH_THE_PRIMARY_ZONE' --format='yaml(name,zone,sizeGb,users)'
    ```
 
-   Expected: plan exits `0` with no changes; two running VMs appear in Finland with private addresses and an empty external address column. The worker disk reports one attached user, the worker VM. Exit `2` means drift or a pending change; exit `1` means an error. A successful apply followed by a no-change plan is the reproducibility evidence for this initial build. Do not mark a clean rebuild proven until it is actually performed.
+   Expected: plan exits `0` with no changes; two running VMs appear in Finland with private addresses and an empty external address column. The worker disk reports one attached user, the worker VM. Exit `2` means drift or a pending change; exit `1` means an error. A successful apply followed by a no-change plan is the reproducibility evidence for this build. The [milestone 8 rebuild](../worklogs/08-rebuild-from-runbooks.md) performed it from empty state on 2026-10-14.
 
 8. Confirm IAP administration, private node traffic, and outbound access. Run from `infra/primary` with the same operator identity. A failed SSH command may indicate IAM propagation, OS Login, firewall, or VM boot issues.
 
@@ -141,19 +141,32 @@ Apply the primary root before the shared root. The shared root grants backup acc
 
    Expected: IAP SSH succeeds without a public VM address, ping receives responses from the control plane, and the HTTPS request returns headers through outbound access. The data disk is attached but intentionally unformatted and unmounted until milestone 2.
 
-9. Confirm independent access to state, backup storage, and recovery credentials from this operator machine, not from a primary VM. Run the first commands as the infrastructure operator, who must also be able to access state. In a separate shell authenticated as a member of `recovery_reader_member`, run the final backup listing. Do not upload test data to the backup bucket. If you need conclusive evidence during a Finland outage, repeat these read-only checks while the primary VMs are stopped, then start them again.
+9. Confirm independent access to state, backup storage, and recovery credentials from this operator machine, not from a primary VM. Run the first commands as the infrastructure operator, who must also be able to access state. Do not upload test data to the backup bucket. If you need conclusive evidence during a Finland outage, repeat these read-only checks while the primary VMs are stopped, then start them again.
 
    ```bash
    terraform state list
    gcloud storage buckets describe gs://REPLACE_WITH_STATE_BUCKET --project="$PROJECT_ID"
    gcloud storage buckets describe "gs://$(terraform -chdir=../shared output -raw backup_bucket_name)" --project="$PROJECT_ID"
    gcloud storage ls "gs://REPLACE_WITH_STATE_BUCKET/primary/"
-   # In a separate shell: authenticate as the recovery reader identity.
-   gcloud auth login
-   gcloud storage ls gs://REPLACE_WITH_BACKUP_BUCKET/
    ```
 
-   Expected: state resources list through GCS, both Belgium buckets respond, and the configured recovery reader identity can authenticate without using either primary VM. An empty backup bucket is expected. It cannot prove restore readiness; milestone 4 supplies backups and a restore test. Do not record this gate as passed until you send sanitized evidence for all three checks.
+   Expected: state resources list through GCS and both Belgium buckets respond.
+
+   Then check the recovery reader in a temporary gcloud configuration. `gcloud auth login` in another shell changes the shared configuration and signs out the operator, and it does not show which account signed in. The account check catches a sign-in with the wrong account. The permission test asks Cloud Storage which of the listed permissions the caller holds, so it writes nothing.
+
+   ```bash
+   BACKUP_BUCKET=$(terraform -chdir=../shared output -raw backup_bucket_name)
+   READER=REPLACE_WITH_RECOVERY_READER_EMAIL
+   export CLOUDSDK_CONFIG=$(mktemp -d)
+   gcloud auth login "$READER" --no-launch-browser
+   test "$(gcloud config get account)" = "$READER" && echo "account OK"
+   gcloud storage ls "gs://$BACKUP_BUCKET/"
+   curl -sS -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+     "https://storage.googleapis.com/storage/v1/b/$BACKUP_BUCKET/iam/testPermissions?permissions=storage.objects.list&permissions=storage.objects.get&permissions=storage.objects.create&permissions=storage.objects.delete"
+   rm -rf "$CLOUDSDK_CONFIG"; unset CLOUDSDK_CONFIG
+   ```
+
+   Expected: `account OK`, the listing succeeds, and the permission test returns `storage.objects.get` and `storage.objects.list` only. If `account OK` is missing, the browser signed in another account: run the block again. The same test as the operator also returns `storage.objects.create` and `storage.objects.delete`. An empty backup bucket is expected on a new build. It cannot prove restore readiness; milestone 4 supplies backups and a restore test.
 
 10. Review this project's charges and remaining credits in Cloud Billing. No Terraform-managed alert or automatic spend cap exists. Repeat this review while the lab is running.
 
