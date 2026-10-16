@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Steps 2 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Steps 3 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -131,7 +131,7 @@ The live output confirmed two formats that the stubs assumed: the `matched no ob
 
 One fix followed: the runner printed captured output without a final newline, so `true` ran into the next command line. It now ends every captured output with one.
 
-Afterwards `make dns-delete DNS_NAME=git-dr` deleted the record at 21:06:38Z, and the destroy plan of `infra/recovery` showed `Plan: 0 to add, 0 to change, 16 to destroy.`, all in the recovery module or its data disk.
+Afterwards `make dns-delete DNS_NAME=git-dr` deleted the record at 21:06:38Z, and the destroy plan of `infra/recovery` showed `Plan: 0 to add, 0 to change, 16 to destroy.`, all in the recovery module or its data disk. Applying that plan file returned `Apply complete! Resources: 0 added, 0 changed, 16 destroyed.` A read afterwards listed only the primary VMs, the primary and default networks, and the primary addresses in the project. `terraform state list` in `infra/recovery` printed nothing, and `git-dr.sindrg.com` had no answer at 1.1.1.1.
 
 ### Not verified
 
