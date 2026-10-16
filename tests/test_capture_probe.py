@@ -35,15 +35,16 @@ class LsRemoteTests(unittest.TestCase):
     def test_sends_the_password_on_stdin_not_in_arguments(self):
         result = mock.Mock(returncode=0, stdout="abc\trefs/heads/main\n")
         with mock.patch.object(module.subprocess, "run", return_value=result) as run:
-            self.assertEqual(module.ls_remote("https://user@host/a/b.git", "secret"), "200")
+            self.assertEqual(module.ls_remote("https://host/a/b.git", "user", "secret"), "200")
         args, kwargs = run.call_args
         self.assertNotIn("secret", " ".join(args[0]))
         self.assertEqual(kwargs["input"], "secret\n")
+        self.assertEqual(kwargs["env"]["GIT_STDIN_USERNAME"], "user")
 
     def test_fails_on_an_empty_answer(self):
         result = mock.Mock(returncode=0, stdout="")
         with mock.patch.object(module.subprocess, "run", return_value=result):
-            self.assertEqual(module.ls_remote("https://user@host/a/b.git", "x"), "git-exit-0")
+            self.assertEqual(module.ls_remote("https://host/a/b.git", "user", "x"), "git-exit-0")
 
 
 if __name__ == "__main__":

@@ -10,6 +10,9 @@
   vars_files:
     - ../../recovery/fixtures.yaml
     - vars/fixtures.yml
+  # The user for the Git HTTPS sign-in; see scripts/git_with_password.sh.
+  environment:
+    GIT_STDIN_USERNAME: "{{ fixture_user }}"
   tasks:
     - name: Read the fixture password
       ansible.builtin.import_tasks: tasks/fixture_password.yml

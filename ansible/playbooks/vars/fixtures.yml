@@ -12,9 +12,8 @@ git_host: >-
   ~ fixture_cluster ~ '/cluster-settings.yaml') | from_yaml).data.git_host }}
 git_url: "https://{{ git_host }}"
 fixture_api: "{{ git_url }}/api/v1"
-fixture_clone_url: >-
-  {{ git_url | replace('://', '://' ~ fixture_user ~ '@', 1) }}/{{ fixture_user
-  }}/{{ fixture_repository }}.git
-# Reads the password from stdin; see the script.
+fixture_clone_url: "{{ git_url }}/{{ fixture_user }}/{{ fixture_repository }}.git"
+# Reads the password from stdin and the user from GIT_STDIN_USERNAME, which
+# each fixture play sets; see the script.
 fixture_git: "{{ fixture_repo_root }}/scripts/git_with_password.sh"
 ansible_python_interpreter: "{{ ansible_playbook_python }}"

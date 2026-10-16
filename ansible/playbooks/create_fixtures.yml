@@ -9,6 +9,9 @@
   vars_files:
     - ../../recovery/fixtures.yaml
     - vars/fixtures.yml
+  # The user for the Git HTTPS sign-in; see scripts/git_with_password.sh.
+  environment:
+    GIT_STDIN_USERNAME: "{{ fixture_user }}"
   # API calls sign in as the fixture user unless a task overrides it.
   module_defaults:
     ansible.builtin.uri:
