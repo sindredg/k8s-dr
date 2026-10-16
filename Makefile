@@ -73,7 +73,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .DEFAULT_GOAL := help
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
-	restore-test-env-delete restore-test-forward check manifests pins surface preflight \
+	restore-test-env-delete restore-test-forward check manifests pins surface preflight recover \
 	dns-show dns-set dns-delete dns-caa
 
 help: ## List targets
@@ -162,6 +162,16 @@ pins: ## Check that every pinned artifact still resolves upstream
 
 preflight: ## Check every recovery dependency from this machine (read-only)
 	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" BACKUP_AGE_KEY_FILE="$(BACKUP_AGE_KEY_FILE)" scripts/preflight.sh
+
+# Runs the regional recovery runbook from preflight to the checks through the
+# public name. A rerun resumes at the failed stage. RECOVER_ARGS takes
+# --through <stage>, such as --through verification for a rehearsal that
+# stops before the fence and the cutover. See scripts/recover.py.
+RECOVER_ARGS ?=
+recover: age-key ## Recover into the second region; a rerun resumes at the failed stage
+	@test -r "$(BACKUP_AGE_KEY_FILE)" || { echo "BACKUP_AGE_KEY_FILE not readable: $(BACKUP_AGE_KEY_FILE)" >&2; exit 1; }
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" BACKUP_AGE_KEY_FILE="$(BACKUP_AGE_KEY_FILE)" \
+		python3 scripts/recover.py --drill-dir $(DRILL_DIR) run $(RECOVER_ARGS)
 
 surface: ## Probe the public endpoint from outside (read-only)
 	scripts/check-public-surface.sh $(GIT_HOST)

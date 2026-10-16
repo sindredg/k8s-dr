@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage).
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -32,6 +32,43 @@ Expected: every line is `ok`, the summary reports `0 failed, 0 missing`, and the
 
 If any prerequisite is missing, record it as a blocked drill. Do not route users to an unverified restore.
 
+## Run the procedure with one command
+
+`make recover` runs steps 2 to 9 below in order, as the stages of [decision 0013](../decisions/0013-automated-recovery.md#one-entry-point-runs-every-stage). Each stage ends with the check that its step states. The first failed command or check stops the run. Run the same command again after fixing the cause: it skips the stages that passed and starts at the failed one.
+
+| Stage | Steps | What it checks |
+| --- | --- | --- |
+| `preflight` | Preconditions | `terraform init` of the shared, primary, and recovery roots, then `make preflight` with the `fixtures` line skipped, because a lost primary cannot pass it |
+| `provisioning` | 3, 5 | The recovery plan deletes nothing and creates no service account or IAM grant, then the apply. `git-dr` resolves to the recovery address at 1.1.1.1 |
+| `bootstrap` | 6 | `make inventory` and `make bootstrap` |
+| `flux-reconcile` | 6 | `make validate-cluster`, `make validate-services`, the CronJob reports `suspend` as `true`, and the `recovery/` prefix is empty |
+| `restore` | 2, 7 | Selects the newest set with a manifest once, then restores it |
+| `verification` | 8 | `/api/healthz` on `git-dr` returns 200, `make check-fixtures` and `make write-check` on `git-dr`, and backups are still suspended |
+| `fence` | 9.2 | Stops the primary VMs, and notes a failed stop without stopping the run. Disables the primary worker's account and requires `True`. Requires that the primary's own name stops returning 200 within five minutes |
+| `dns-cutover` | 9 | `git` resolves to the recovery address at 1.1.1.1 |
+| `probe-recovery` | 9 | `/api/healthz`, `make check-fixtures`, and `make write-check` through `git.sindrg.com` |
+
+The fence runs before the cutover, so a primary that still answers stops the run before `git.sindrg.com` moves. The manual procedure fences after the cutover, as the drills ran it.
+
+```bash
+make recover
+```
+
+Expected: every stage ends, and the run prints `Recovery complete` and the stage timeline. Then enable recovery backups as in step 9.1, and compute the results as in step 10.
+
+The run keeps its state in `DRILL_DIR`, by default `.drill/`:
+
+- `recover.json` lists the stages that passed, the bucket, the recovery address, the selected set, and the restored HEAD. A rerun restores the same set and keeps the restored HEAD of the first check, not a later recovery write.
+- `timeline.tsv` is the stage timeline of step 1. `python3 scripts/drill_report.py timeline` prints it.
+
+Other forms:
+
+- `make recover RECOVER_ARGS='--through verification'` stops after the checks on `git-dr`, before the fence. Use it to rehearse a recovery while the primary serves. Remove the recovery environment afterwards as in [Remove the recovery environment](#remove-the-recovery-environment).
+- `python3 scripts/recover.py status` lists the stages that passed and the recorded values.
+- `python3 scripts/recover.py reset` archives `recover.json` and `timeline.tsv`, so the next run starts from `preflight`.
+
+Only one run holds the lock in `DRILL_DIR` at a time. A second run exits with `another recovery run holds the lock`.
+
 ## Procedure
 
 1. Before isolation, start the write loop in a second terminal and leave it running. It pushes a write check every five minutes and appends each acknowledged write to `.drill/writes.tsv` on the operator machine.
@@ -48,7 +85,7 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
    python3 scripts/drill_report.py stage provisioning end
    ```
 
-   The stages are `detection`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `dns-cutover`, and `probe-recovery`. Check `.drill/writes.tsv` before the isolation: the newest line must be less than `WRITE_INTERVAL` old. If the loop stopped, start it again and isolate only after a new write. Stop the write loop once its pushes fail.
+   The stages are `detection`, `preflight`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `fence`, `dns-cutover`, and `probe-recovery`. `make recover` records every stage after `detection` itself. Check `.drill/writes.tsv` before the isolation: the newest line must be less than `WRITE_INTERVAL` old. If the loop stopped, start it again and isolate only after a new write. Stop the write loop once its pushes fail.
 
 2. Select the newest backup set that has a manifest, and record its name. The name is its recovery-point timestamp in UTC. Exclude sets without a manifest.
 
