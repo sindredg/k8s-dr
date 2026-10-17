@@ -57,6 +57,9 @@ HEALTH_TIMEOUT = 300
 # A stopped primary stops answering within the stop call; a primary that
 # cannot be reached never answers.
 FENCE_TIMEOUT = 300
+# IAM reads can return the old value of an account for a while after a
+# change: Return run 39056248685 read disabled=True right after an enable.
+ACCOUNT_TIMEOUT = 120
 # The gitea Kustomization timeout in deploy/sync/sync.yaml.
 RESUME_TIMEOUT = 600
 # Created by the resume-backups stage, read by the gitea Kustomization after
@@ -207,6 +210,10 @@ class Recovery:
         lines = answer.split()
         return lines[-1] if lines else ""
 
+    def account_disabled(self, account: str) -> str:
+        return self.run(["gcloud", "iam", "service-accounts", "describe", account,
+                         "--format=value(disabled)"], capture=True, echo=False).strip()
+
     def wait_for_record(self, host: str, address: str) -> None:
         self.wait(f"{host} does not resolve to the recovery address at {RESOLVER}",
                   lambda: self.resolve(host) == address, DNS_TIMEOUT)
@@ -356,10 +363,8 @@ class Recovery:
             self.event("fence", "note", f"stopping the primary VMs exited {stop.returncode}")
         worker = self.output_json("shared", "node_service_accounts")["primary/worker"]
         self.run(["gcloud", "iam", "service-accounts", "disable", worker])
-        disabled = self.run(["gcloud", "iam", "service-accounts", "describe", worker,
-                             "--format=value(disabled)"], capture=True, echo=False).strip()
-        if disabled != "True":
-            raise StageFailed(f"the primary worker account reports disabled={disabled or '<empty>'}")
+        self.wait("the primary worker account does not report disabled=True",
+                  lambda: self.account_disabled(worker) == "True", ACCOUNT_TIMEOUT)
         self.wait(f"https://{self.primary_host}/api/healthz still returns 200",
                   lambda: self.system.http_status(f"https://{self.primary_host}/api/healthz") != 200,
                   FENCE_TIMEOUT)

@@ -44,6 +44,14 @@ Nothing on the list is in Finland. Drill 1 recovered with both primary VMs stopp
 
 No step is written for recovery only. Each one is exercised on the primary first, so the recovery path is not untested code.
 
+## How the recovery runs
+
+Since [milestone 10](../../plan.md#10-automated-recovery), `make recover` runs the steps as stages: `preflight`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `fence`, `dns-cutover`, `probe-recovery`, and `resume-backups`. Each stage ends with a check, the run stops at the first failed check, and a new run resumes at that stage. The `Recover` GitHub Actions workflow runs the command as a pipeline account and keeps the run state in the state bucket, so the resume works on a new runner. The scheduled watchdog starts the workflow while the `AUTO_FAILOVER` variable is `true`, every uptime checker has reported failure for five minutes, the runner cannot reach the primary either, and no recovery is running. See [decision 0013](../decisions/0013-automated-recovery.md).
+
+The workflow fences the primary before the cutover, unlike the procedure in the diagram: a primary that still answers stops the run before `git.sindrg.com` moves. The [runbook](../runbooks/regional-recovery.md#run-the-procedure-from-github-actions) lists what each stage checks.
+
+After a drill, the `Return` workflow starts the primary, moves `git.sindrg.com` back after checks through the primary's own name, suspends recovery backups, lifts the fence, destroys the recovery environment, and waits for a primary backup. It discards every write the recovery cluster accepted.
+
 ## Why two hostnames
 
 The recovery cluster is tested through `git-dr.sindrg.com` before any user reaches it, through its own load balancer, certificate, and routes. If the checks fail there, nothing is cut over. Because the cluster already holds a `git.sindrg.com` certificate, the cutover itself is one DNS edit with a 60-second TTL. See [traffic and certificates](06-traffic-and-certificates.md#hostnames).
@@ -67,14 +75,15 @@ The gates that used it:
 | --- | --- |
 | 5. Cold recovery | The recovered service passes the fixture checks through `git-dr.sindrg.com` while the primary is stopped. Public DNS is not changed. |
 | 6 and 7. Disaster drills | The full procedure with the cutover, timed, with recovery time and data loss recorded. Run three times; see the [comparison](../worklogs/07-faster-recovery.md#comparison). |
+| 10. Automated recovery | The workflow runs every stage, including the fence and the cutover, with no other action, and the `Return` workflow restores the primary. The primary served until the `fence` stage stopped it, so the run measures no detection. See the [gate](../worklogs/10-automated-recovery.md#gate). |
 
-After a drill, `terraform destroy` removes the recovery environment and the primary is started again.
+After a drill, the `Return` workflow removes the recovery environment and returns to the primary.
 
 ## Limits
 
 - Recovery time is dominated by building a cluster from nothing. A faster design, such as a warm standby, costs more to keep running. Milestone 7 shortened the data loss instead ([decision 0012](../decisions/0012-backup-every-15-minutes.md)).
-- The cutover is a DNS command the operator runs, and clients may cache the old address for the TTL.
-- There is no failback procedure. Returning to Finland would be a second recovery in the other direction.
+- The cutover is a DNS change with no approval step, and clients may cache the old address for the TTL.
+- The return after a drill discards the writes that the recovery cluster accepted. A failback that keeps them is [milestone 13](../../plan.md#13-failback-with-data-optional).
 - The buckets, the state, and both clusters are in one Google Cloud project. Losing the project or the account is not covered.
 - Recovery depends on public package, chart, and image repositories being reachable.
 

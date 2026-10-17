@@ -141,10 +141,8 @@ class Return(recover.Recovery):
         """Runbook step 4: enable the primary worker account again."""
         worker = self.output_json("shared", "node_service_accounts")["primary/worker"]
         self.run(["gcloud", "iam", "service-accounts", "enable", worker])
-        disabled = self.run(["gcloud", "iam", "service-accounts", "describe", worker,
-                             "--format=value(disabled)"], capture=True, echo=False).strip()
-        if disabled not in ("", "False"):
-            raise StageFailed(f"the primary worker account reports disabled={disabled}")
+        self.wait("the primary worker account still reports disabled=True",
+                  lambda: self.account_disabled(worker) in ("", "False"), recover.ACCOUNT_TIMEOUT)
         # The next primary set must start after this point.
         self.values["fence_lifted"] = self.system.now().strftime(drill_report.SET_FORMAT)
         self.save()

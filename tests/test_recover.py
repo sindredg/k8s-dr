@@ -346,6 +346,13 @@ class FenceTests(RecoverTestCase):
         self.assertEqual(self.recover("run"), 1)
         self.assertNotIn("git.sindrg.com", self.system.dns)
 
+    def test_the_fence_waits_for_the_account_to_read_disabled(self):
+        # IAM reads can lag behind a write: the Return run 39056248685 read
+        # the old value right after a successful enable.
+        self.system.override("service-accounts describe", module.Result(0, "\n", ""),
+                             module.Result(0, "True\n", ""))
+        self.assertEqual(self.recover("run"), 0)
+
 
 class ResumeTests(RecoverTestCase):
     def commands(self):

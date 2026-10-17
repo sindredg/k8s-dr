@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04; drills 2 and 3 repeated them. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Since [milestone 10](../../plan.md#10-automated-recovery), `make recover` and the `Recover` workflow run steps 2 to 9.1, and `make return-to-primary` and the `Return` workflow run the return. On 2026-10-17 a full run of the `Recover` workflow, including the fence, the cutover, the checks through the public name, and the resumed backups, passed on the live system, and a run of the `Return` workflow then returned to the primary; see the [milestone 10 gate](../worklogs/10-automated-recovery.md#gate). The watchdog started nothing while its switch was off, or during a 99-second outage with the switch on; it has not started a run. The manual steps changed by milestone 10, a rerun after a failed stage on a new runner, and the changes after the milestone 10 review (the runner's own DNS wait and the return state guard) have not run live.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04; drills 2 and 3 repeated them. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Since [milestone 10](../../plan.md#10-automated-recovery), `make recover` and the `Recover` workflow run steps 2 to 9.1, and `make return-to-primary` and the `Return` workflow run the return. On 2026-10-17 a full run of the `Recover` workflow, including the fence, the cutover, the checks through the public name, and the resumed backups, passed on the live system, and a run of the `Return` workflow then returned to the primary; see the [milestone 10 gate](../worklogs/10-automated-recovery.md#gate). The watchdog started nothing while its switch was off, or during a 99-second outage with the switch on; it has not started a run. Later the same day, a rerun after a cancelled `Recover` run and after a failed `Return` stage, the runner's own DNS wait, the return state's record of its recovery run, and a return after a rehearsal passed live; see [After the merge: verification](../worklogs/10-automated-recovery.md#after-the-merge-verification). The return's refusal of another recovery's state, the manual steps changed by milestone 10, and the account polling of [troubleshooting 07](../troubleshooting/07-service-account-read-lags.md) have not run live.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -45,7 +45,7 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 | `flux-reconcile` | 6 | `make validate-cluster`, `make validate-services`, the CronJob reports `suspend` as `true`, and `recovery/` holds no set named after the start of the run |
 | `restore` | 2, 7 | Selects the newest set with a manifest once, then restores it |
 | `verification` | 8 | `/api/healthz` on `git-dr` returns 200, `make check-fixtures` and `make write-check` on `git-dr`, and backups are still suspended |
-| `fence` | 9.2 | Stops the primary VMs, and notes a failed stop without stopping the run. Disables the primary worker's account and requires `True`. Requires that the primary's own name stops returning 200 within five minutes |
+| `fence` | 9.2 | Stops the primary VMs, and notes a failed stop without stopping the run. Disables the primary worker's account and requires `True` within two minutes. Requires that the primary's own name stops returning 200 within five minutes |
 | `dns-cutover` | 9 | `git` resolves to the recovery address at 1.1.1.1 |
 | `probe-recovery` | 9 | `/api/healthz`, `make check-fixtures`, and `make write-check` through `git.sindrg.com` |
 | `resume-backups` | 9.1 | Creates the `run-settings` ConfigMap with `backup_suspend: "false"`, requests a reconcile of the `gitea` Kustomization, and requires that the CronJob reports `suspend` as `false` within ten minutes |
@@ -279,7 +279,7 @@ The `Watchdog` workflow runs every five minutes and starts `Recover` with `throu
       gcloud iam service-accounts describe "$PRIMARY_WORKER" --format='value(disabled)'
       ```
 
-      Expected: `True`.
+      Expected: `True`. A read right after the change can still return the old value; read again after a minute. See [troubleshooting 07](../troubleshooting/07-service-account-read-lags.md).
 
 10. Compute the results and record them in the [drill worklog](../worklogs/06-disaster-drill.md).
 
@@ -338,7 +338,7 @@ A drill ends by returning to the stopped primary, which still holds its data as 
    gcloud iam service-accounts describe "$PRIMARY_WORKER" --format='value(disabled)'
    ```
 
-   Expected: an empty line or `False`. Confirm that the next backup on the primary completes.
+   Expected: an empty line or `False`, possibly only on a second read a minute later, as in step 9.2. Confirm that the next backup on the primary completes.
 
 5. Delete the `git-dr` record and destroy the recovery root, as in steps 2 and 3 of the next section.
 
@@ -355,7 +355,7 @@ A drill ends by returning to the stopped primary, which still holds its data as 
 | `start-primary` | 1 | `/api/healthz` on `git-primary` returns 200 within ten minutes, and `make check-fixtures` passes there. It does not run `make validate-cluster` or `make validate-services` |
 | `dns-return` | 2 | `git` resolves to the primary address at 1.1.1.1 and at the runner's own resolver, then `/api/healthz`, `make check-fixtures`, and `make write-check` through `git.sindrg.com` |
 | `suspend-recovery-backups` | 3 | The CronJob reports `suspend` as `true` within ten minutes. Skipped when the recovery never ran `resume-backups` |
-| `lift-fence` | 4 | The primary worker account reports `disabled` as empty or `False` |
+| `lift-fence` | 4 | The primary worker account reports `disabled` as empty or `False` within two minutes |
 | `remove-recovery` | 5, and steps 2 and 3 of the next section | `git-dr` has no answer at 1.1.1.1, the destroy plan only deletes and touches no account or IAM grant, and `terraform state list` in `infra/recovery` is empty after the apply |
 | `primary-backup` | 4 | A set under `primary/` that started after the fence lifted has a manifest, within 20 minutes |
 
