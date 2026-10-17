@@ -18,7 +18,7 @@ The planned milestones run in the order 12, 11, 13, 14, 15, 16. Unattended drill
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
 | 10. Automated recovery | Recovery runs without a person | Complete |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
-| 12. Unattended drills | Measured recovery and cost with nobody present | Planned |
+| 12. Unattended drills | Measured recovery with nobody present | Planned |
 | 13. Failback with data | Optional return that keeps the recovery writes | Planned |
 | 14. Close the recovery gaps of the lab | Separate backup project, threat model, and an accurate production readiness page | Planned |
 | 15. Zonal resilience decision | A recorded choice on surviving the loss of one zone | Planned |
@@ -179,13 +179,11 @@ In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provi
 Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start by the watchdog has run against stubs only. Because GitHub starts scheduled runs late, detection can take up to about 25 minutes ([decision 0013](docs/decisions/0013-automated-recovery.md#schedule)). A decision record will define how a drill isolates the primary, how it ends, and where its results are kept, before this is built.
 
 - [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
-- [ ] Turn on the Cloud Billing export to BigQuery before the first drill, so each drill's cost can be read from billing.
 - [ ] Start a drill from a schedule: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
 - [ ] End each drill with the return workflow, with no person acting.
-- [ ] Keep the results of every drill, attended and unattended, in one table that the README links to, and record the cost of each drill from the billing export.
-- [ ] Keep the drill schedule on after the gate, so results accumulate over time.
+- [ ] Keep the results of every drill, attended and unattended, in one table that the README links to.
 
-**Gate:** Two consecutive drills started by the schedule meet both targets with no person acting, the watchdog started each recovery, the worklog compares them with drills 1 to 3, and the cost of each comes from billing data.
+**Gate:** Two consecutive drills started by the schedule meet both targets with no person acting, the watchdog started each recovery, and the worklog compares them with drills 1 to 3.
 
 ## 13. Failback with data (optional)
 
