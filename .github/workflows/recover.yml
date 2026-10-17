@@ -36,7 +36,8 @@ permissions:
   contents: read
   id-token: write
 
-# One recovery at a time. A second run waits instead of repeating stages.
+# One recovery at a time. GitHub keeps one pending run per group: a newer
+# dispatch replaces a pending one, which never starts.
 concurrency:
   group: recovery
   cancel-in-progress: false
@@ -64,10 +65,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        # No pip cache: this job holds both age keys, and a cache entry is
+        # written by other workflows.
         with:
           python-version: "3.13"
-          cache: pip
-          cache-dependency-path: ansible/requirements.txt
       - run: python -m pip install -r ansible/requirements.txt
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
         with:

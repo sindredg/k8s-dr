@@ -164,8 +164,11 @@ def push(system: System, environ: dict, drill_dir: Path) -> None:
         print("no run state to save")
         return
     exclude = "|".join(re.escape(name) + "$" for name in NOT_PUSHED)
-    run(system, ["gcloud", "storage", "rsync", "--recursive", f"--exclude={exclude}",
-                 str(drill_dir), state_url(environ)])
+    # The bucket mirrors the local directory, which holds everything pull
+    # copied. A reset therefore removes the old state from the bucket too.
+    # The state bucket keeps earlier object versions.
+    run(system, ["gcloud", "storage", "rsync", "--recursive", "--delete-unmatched-destination-objects",
+                 f"--exclude={exclude}", str(drill_dir), state_url(environ)])
 
 
 # Setup, on an operator machine.
@@ -207,10 +210,22 @@ def setup_values(system: System, root_dir: Path) -> tuple[dict, dict]:
 
 
 def setup_environment(system: System, repository: str) -> None:
-    """Create the environment, deployable from main only."""
-    policy = {"deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True}}
-    run(system, ["gh", "api", "--method", "PUT", f"repos/{repository}/environments/{ENVIRONMENT}",
-                 "--input", "-"], stdin=json.dumps(policy), capture=True)
+    """Create the environment, deployable from main only.
+
+    An existing environment is only checked. A PUT replaces its protection
+    rules, which would drop reviewers or a wait timer added later.
+    """
+    policy = {"protected_branches": False, "custom_branch_policies": True}
+    path = f"repos/{repository}/environments/{ENVIRONMENT}"
+    found = system.call(["gh", "api", path], capture=True)
+    if found.returncode == 0:
+        if json.loads(found.stdout).get("deployment_branch_policy") != policy:
+            raise Failed(f"the {ENVIRONMENT} environment does not limit deployments to selected branches")
+    elif "HTTP 404" in (found.stderr or ""):
+        run(system, ["gh", "api", "--method", "PUT", path, "--input", "-"],
+            stdin=json.dumps({"deployment_branch_policy": policy}), capture=True)
+    else:
+        raise Failed(f"cannot read the {ENVIRONMENT} environment")
     existing = json.loads(run(system, [
         "gh", "api", f"repos/{repository}/environments/{ENVIRONMENT}/deployment-branch-policies",
     ], capture=True))
@@ -230,13 +245,17 @@ def setup_keys(system: System, project: str, files: dict) -> None:
         local = files[name].read_text()
         if "AGE-SECRET-KEY-" not in local:
             raise Failed(f"{files[name]} is not an age private key")
+        # The newest enabled version, which latest is unless a newer one is
+        # disabled.
         versions = run(system, ["gcloud", "secrets", "versions", "list", secret, f"--project={project}",
-                                "--filter=state:enabled", "--format=value(name)"], capture=True)
+                                "--filter=state:enabled", "--sort-by=~createTime", "--limit=1",
+                                "--format=value(name)"], capture=True)
         if not versions.strip():
             run(system, ["gcloud", "secrets", "versions", "add", secret, f"--project={project}",
                          f"--data-file={files[name]}"], capture=True)
             continue
-        stored = run(system, ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret}",
+        version = versions.split()[0].rsplit("/", 1)[-1]
+        stored = run(system, ["gcloud", "secrets", "versions", "access", version, f"--secret={secret}",
                               f"--project={project}"], capture=True)
         if stored.strip() != local.strip():
             raise Failed(f"secret {secret} holds a different key than {files[name]}; "

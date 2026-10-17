@@ -169,8 +169,9 @@ class RunnerTests(PipelineTestCase):
         drill = self.root / ".drill"
         drill.mkdir()
         self.assertEqual(self.main("push", "--drill-dir", str(drill)), 0)
-        self.assertIn(["gcloud", "storage", "rsync", "--recursive", r"--exclude=recover\.lock$",
-                       str(drill), "gs://example-state/pipeline/drill"], self.system.calls)
+        self.assertIn(["gcloud", "storage", "rsync", "--recursive", "--delete-unmatched-destination-objects",
+                       r"--exclude=recover\.lock$", str(drill), "gs://example-state/pipeline/drill"],
+                      self.system.calls)
 
 
 class WorkflowTests(unittest.TestCase):
@@ -186,6 +187,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn(f"environment: {module.ENVIRONMENT}", text)
         self.assertIn("id-token: write", text)
         self.assertNotIn("credentials_json", text)
+        # Other workflows write the pip cache; this job holds the keys.
+        self.assertIsNone(re.search(r"(?m)^\s+cache:", text))
 
     def test_the_stage_choices_are_the_stages_of_the_run(self):
         from scripts import recover
@@ -212,6 +215,8 @@ class SetupTests(PipelineTestCase):
         self.system.answer("output -raw backup_bucket_name", completed(0, "example-backups"))
         self.system.answer("deployment-branch-policies", completed(0, json.dumps({"branch_policies": []})))
         self.system.answer("versions list", completed(0, ""))
+        self.system.answer(f"gh api repos/sindredg/k8s-dr/environments/{module.ENVIRONMENT}",
+                           completed(1, "", "gh: Not Found (HTTP 404)"))
 
     def setup(self):
         return self.main("setup", "--sops-key", str(self.keys["sops"]),
@@ -237,17 +242,33 @@ class SetupTests(PipelineTestCase):
         self.assertFalse(self.system.ran("gh secret set"))
 
     def test_a_stored_key_that_differs_fails(self):
-        self.system.answer("versions list", completed(0, "1\n"))
-        self.system.answer("versions access latest", completed(0, "AGE-SECRET-KEY-1OTHER\n"))
+        self.system.answer("versions list", completed(0, "3\n"))
+        self.system.answer("versions access 3", completed(0, "AGE-SECRET-KEY-1OTHER\n"))
         self.assertEqual(self.setup(), 1)
         self.assertIn("holds a different key", self.errors)
         self.assertFalse(self.system.ran("versions add"))
 
     def test_a_stored_key_that_matches_is_kept(self):
-        self.system.answer("versions list", completed(0, "1\n"))
-        self.system.answer("versions access latest", completed(0, KEY))
+        self.system.answer("versions list", completed(0, "3\n"))
+        self.system.answer("versions access 3", completed(0, KEY))
         self.assertEqual(self.setup(), 0, self.errors)
         self.assertFalse(self.system.ran("versions add"))
+
+    def test_an_existing_environment_is_checked_and_not_replaced(self):
+        policy = {"protected_branches": False, "custom_branch_policies": True}
+        self.system.answer(f"gh api repos/sindredg/k8s-dr/environments/{module.ENVIRONMENT}",
+                           completed(0, json.dumps({"deployment_branch_policy": policy})))
+        self.system.answer("deployment-branch-policies", completed(0, json.dumps(
+            {"branch_policies": [{"type": "branch", "name": "main"}]})))
+        self.assertEqual(self.setup(), 0, self.errors)
+        self.assertFalse(self.system.ran("--method PUT"))
+        self.assertFalse(self.system.ran("--method POST"))
+
+    def test_an_existing_environment_without_a_branch_limit_fails(self):
+        self.system.answer(f"gh api repos/sindredg/k8s-dr/environments/{module.ENVIRONMENT}",
+                           completed(0, json.dumps({"deployment_branch_policy": None})))
+        self.assertEqual(self.setup(), 1)
+        self.assertFalse(self.system.ran("gh secret set"))
 
     def test_a_placeholder_left_in_a_local_file_fails(self):
         (self.root / "infra/recovery/terraform.tfvars").write_text(

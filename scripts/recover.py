@@ -233,6 +233,16 @@ class Recovery:
         """Generate the recovery inventory, which a new runner does not have."""
         self.make("inventory", "CLUSTER=recovery")
 
+    def require_recorded_environment(self) -> None:
+        """A resumed run must find the recovery environment it recorded."""
+        try:
+            address = self.output("recovery", "public_web_address")
+        except StageFailed:
+            address = ""
+        if address != self.values.get("recovery_address"):
+            raise StageFailed("the recovery environment that this run recorded no longer exists; "
+                              "archive the run state with reset and start again")
+
     # Stages
 
     def preflight(self) -> None:
@@ -257,13 +267,11 @@ class Recovery:
         self.make("bootstrap", "CLUSTER=recovery")
 
     def flux_reconcile(self) -> None:
-        self.inventory()
         self.make("validate-cluster", "CLUSTER=recovery")
         self.make("validate-services", "CLUSTER=recovery")
         self.require_backups_suspended()
 
     def restore(self) -> None:
-        self.inventory()
         # The set is chosen once, so a retried restore reads the same set.
         if "backup_set" not in self.values:
             listing = self.run(["gcloud", "storage", "ls",
@@ -279,7 +287,6 @@ class Recovery:
                   f"RESTORE_SET={self.values['backup_set']}")
 
     def verification(self) -> None:
-        self.inventory()
         self.wait_for_health(self.recovery_host)
         report = self.make("check-fixtures", "CLUSTER=recovery", f"GIT_HOST={self.recovery_host}",
                            capture=True)
@@ -345,9 +352,17 @@ def run(recovery: Recovery, through: str | None = None) -> int:
     if recovery.state["started"] is None:
         recovery.state["started"] = recovery.system.now().strftime(drill_report.TIME_FORMAT)
         recovery.save()
+    pending = [name for name in STAGE_NAMES[: last + 1] if name not in recovery.state["passed"]]
     try:
         recovery.init_roots()
-    except StageFailed as error:
+        # A resumed run may start on a new runner, and the environment it
+        # recorded may have been removed since.
+        if pending and "provisioning" in recovery.state["passed"]:
+            recovery.require_recorded_environment()
+            recovery.inventory()
+    except (StageFailed, OSError) as error:
+        if pending:
+            recovery.event(pending[0], "note", f"failed before the stage: {error}")
         print(f"error: {error}", file=sys.stderr)
         return 1
     for name, stage in STAGES[: last + 1]:

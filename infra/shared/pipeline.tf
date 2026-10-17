@@ -137,7 +137,9 @@ resource "google_service_account_iam_member" "pipeline_can_fence_primary" {
 
 # The preflight lists and decrypts the newest set, and the restore selects
 # it. Reading the bucket itself lets the preflight plan this root. The
-# pipeline cannot create, delete, or overwrite a backup object.
+# pipeline cannot delete or overwrite a backup object. Through a VM that
+# runs as the recovery worker account, it can create objects under
+# recovery/.
 resource "google_storage_bucket_iam_member" "pipeline_backup_reader" {
   for_each = toset(["roles/storage.objectViewer", "roles/storage.legacyBucketReader"])
   bucket   = google_storage_bucket.backups.name
