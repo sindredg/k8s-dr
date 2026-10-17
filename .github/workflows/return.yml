@@ -1,0 +1,67 @@
+---
+name: Return
+
+# Runs make return-to-primary on a GitHub-hosted runner after a drill: starts
+# the primary, moves the public name back, suspends recovery backups, lifts
+# the fence, removes the recovery environment, and waits for a primary
+# backup. Every write that the recovery cluster accepted is discarded, so the
+# run needs the discard_recovery_writes input. It signs in as the pipeline
+# account, like the Recover workflow, and shares its run state and
+# concurrency group. See decision 0013 and docs/runbooks/regional-recovery.md.
+"on":
+  workflow_dispatch:
+    inputs:
+      discard_recovery_writes:
+        description: >-
+          Required. Every write that the recovery cluster accepted is lost.
+          Do not run after a real loss of the primary.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+# Shared with the Recover workflow: a return and a recovery never run at once.
+concurrency:
+  group: recovery
+  cancel-in-progress: false
+
+jobs:
+  return:
+    if: inputs.discard_recovery_writes
+    runs-on: ubuntu-24.04
+    environment: recovery
+    timeout-minutes: 90
+    env:
+      # The environment's secrets are masked in the public log.
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      CLOUDSDK_CORE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      STATE_BUCKET: ${{ secrets.STATE_BUCKET }}
+      BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      ADMIN_MEMBER: ${{ secrets.ADMIN_MEMBER }}
+      RECOVERY_READER_MEMBER: ${{ secrets.RECOVERY_READER_MEMBER }}
+      RECOVERY_SUBNET_CIDR: ${{ vars.RECOVERY_SUBNET_CIDR }}
+      DRILL_DIR: .drill
+      ANSIBLE_HOME: ansible/.cache
+      XDG_CACHE_HOME: ansible/.cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pipeline
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - id: pull
+        run: python3 scripts/pipeline.py pull --drill-dir "$DRILL_DIR"
+      - name: make return-to-primary
+        run: >-
+          make return-to-primary BIN= DRILL_DIR="$DRILL_DIR" RETURN_ARGS=--discard-recovery-writes
+          FLUX_AGE_KEY_FILE="$RUNNER_TEMP/keys/age.agekey"
+      # Saved whether the run passed or failed, so a rerun resumes. Never
+      # after a failed pull: the push mirrors the local directory and would
+      # delete the stored state.
+      - if: always() && steps.pull.outcome == 'success'
+        run: python3 scripts/pipeline.py push --drill-dir "$DRILL_DIR"

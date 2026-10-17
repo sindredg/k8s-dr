@@ -74,6 +74,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
 	restore-test-env-delete restore-test-forward check manifests pins surface preflight recover \
+	return-to-primary \
 	dns-show dns-set dns-delete dns-caa
 
 help: ## List targets
@@ -144,7 +145,7 @@ restore-test-forward: ## Forward localhost:3000 to the test restore Gitea throug
 
 check: ## Run the local unit tests, linters, and syntax checks
 	$(BIN)python -m unittest discover -s tests
-	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy recovery .sops.yaml .github/workflows
+	$(BIN)yamllint -c ansible/.yamllint.yml ansible deploy recovery .sops.yaml .github/workflows .github/actions
 	$(BIN)ansible-lint ansible
 	$(BIN)shellcheck $$(git ls-files '*.sh')
 	for playbook in $(PLAYBOOKS); do \
@@ -172,6 +173,15 @@ recover: age-key ## Recover into the second region; a rerun resumes at the faile
 	@test -r "$(BACKUP_AGE_KEY_FILE)" || { echo "BACKUP_AGE_KEY_FILE not readable: $(BACKUP_AGE_KEY_FILE)" >&2; exit 1; }
 	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" BACKUP_AGE_KEY_FILE="$(BACKUP_AGE_KEY_FILE)" \
 		python3 scripts/recover.py --drill-dir $(DRILL_DIR) run $(RECOVER_ARGS)
+
+# Returns to the primary after a drill and removes the recovery environment.
+# It discards every write that the recovery cluster accepted, so RETURN_ARGS
+# must hold --discard-recovery-writes. A rerun resumes at the failed stage.
+# See scripts/return_to_primary.py.
+RETURN_ARGS ?=
+return-to-primary: age-key ## Return to the primary after a drill; a rerun resumes at the failed stage
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" python3 scripts/return_to_primary.py --drill-dir $(DRILL_DIR) \
+		run $(RETURN_ARGS)
 
 surface: ## Probe the public endpoint from outside (read-only)
 	scripts/check-public-surface.sh $(GIT_HOST)

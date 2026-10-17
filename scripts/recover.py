@@ -436,6 +436,15 @@ def run(recovery: Recovery, through: str | None = None) -> int:
     return 0
 
 
+def archive(drill_dir: Path, names: tuple[str, ...], stamp: str) -> None:
+    """Rename each file with the stamp, so the next run starts over and the record stays."""
+    for name in names:
+        path = drill_dir / name
+        if path.exists():
+            path.replace(drill_dir / f"{path.stem}-{stamp}{path.suffix}")
+            print(f"archived {path.name} as {path.stem}-{stamp}{path.suffix}")
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--drill-dir", type=Path, default=DRILL_DIR)
@@ -459,12 +468,8 @@ def main(argv=None, system: System | None = None) -> int:
             print("error: another recovery run holds the lock", file=sys.stderr)
             return 1
         if args.command == "reset":
-            stamp = datetime.now(timezone.utc).strftime(drill_report.SET_FORMAT)
-            for name in (STATE_FILE, TIMELINE_FILE):
-                path = args.drill_dir / name
-                if path.exists():
-                    path.replace(args.drill_dir / f"{path.stem}-{stamp}{path.suffix}")
-                    print(f"archived {path.name} as {path.stem}-{stamp}{path.suffix}")
+            archive(args.drill_dir, (STATE_FILE, TIMELINE_FILE),
+                    datetime.now(timezone.utc).strftime(drill_report.SET_FORMAT))
             return 0
         recovery = Recovery(system or System(), args.drill_dir)
         if args.command == "status":
