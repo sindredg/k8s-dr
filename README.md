@@ -2,7 +2,7 @@
 
 Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
 
-Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 10 in [plan.md](plan.md) passed their gates. Milestone 8 rebuilt the environment from the runbooks, milestone 9 removed the backup downtime, and milestone 10 automated the recovery. Milestones 11 to 14 shorten the recovery, measure it unattended, and close the recovery gaps of the lab.
+Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 10 in [plan.md](plan.md) passed their gates. Milestone 8 rebuilt the environment from the runbooks, milestone 9 removed the backup downtime, and milestone 10 automated the recovery. The planned milestones measure the recovery unattended, shorten it, keep the recovery writes on the return, and close the recovery gaps of the lab; [plan.md](plan.md) gives their order.
 
 The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds. [Milestone 14](plan.md#14-close-the-recovery-gaps-of-the-lab) closes the gaps that weaken recovery.
 
@@ -22,7 +22,7 @@ What the numbers do not show:
 - **The drills were attended.** An operator ran the steps and checked the result between them. Since [milestone 10](plan.md#10-automated-recovery), one GitHub Actions workflow runs every step and its check, and a scheduled watchdog can start it ([decision 0013](docs/decisions/0013-automated-recovery.md)). A full run from the workflow took 17 min 07 s on 2026-10-17. Detection by the watchdog has not been measured; [milestone 12](plan.md#12-unattended-drills) measures it.
 - **Most of the time is the cluster build.** The restore Job takes under 30 seconds. [Milestone 11](plan.md#11-faster-cluster-build) builds nodes from a prepared image.
 - **Each backup in the drills paused the service.** A backup briefly scaled Gitea to zero, four times an hour. [Decision 0014](docs/decisions/0014-snapshot-backups.md) replaces this with a capture from an LVM snapshot while Gitea keeps running. [Milestone 9](plan.md#9-backups-without-downtime) verified it on the primary.
-- **Cost was not read from billing.** The recovery environment existed for 42, 28, and 23 minutes. [Milestone 12](plan.md#12-unattended-drills) reads drill cost from the billing export.
+- **Cost was not read from billing.** The recovery environment existed for 42, 28, and 23 minutes. No milestone measures drill cost.
 
 The external uptime check during the three drills, in UTC+2. The wide gaps are the outages and the narrow dips are backups:
 
