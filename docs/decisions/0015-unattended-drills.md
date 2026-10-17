@@ -8,7 +8,7 @@ Date: 2026-10-17
 
 Drills 1 to 3 on 2026-10-04 were attended. An operator stopped the primary VMs, ran the write loop on their own machine, and ran every recovery stage. Since [decision 0013](0013-automated-recovery.md), one workflow runs every stage and a scheduled watchdog can start it, but the automatic start has run against stubs only. Detection by the watchdog has not been measured, and GitHub starts scheduled runs late enough that it can take up to about 25 minutes ([decision 0013](0013-automated-recovery.md#schedule)).
 
-The drills also restored a small data set, so the restore stage says little about a service with real data, and their cost was estimated from run times, not read from billing.
+The drills also restored a small data set, so the restore stage says little about a service with real data.
 
 A drill with nobody present needs four things that a person did before: start the outage, keep the write log, end the drill, and keep the results.
 
@@ -60,21 +60,15 @@ The write loop moves from the operator machine to the drill job. The log goes to
 
 The state bucket holds one JSON file per drill and is the source of the results table. The issue is the notification: a failed or refused drill appears in the repository's issue list with nobody watching. A results page in `docs/`, linked from the README, is generated from the JSON files by a script and updated through a pull request.
 
-### Cost comes from the billing export
-
-Cloud Billing exports to a BigQuery dataset. The dataset is created by Terraform in the shared root, in the `EU` multi-region. The export itself can only be turned on in the Cloud Billing console, so it is a one-time step for the billing account owner. Billing data arrives hours after the usage, and the export fills in earlier data only for multi-region datasets.
-
-The cost of a drill is the sum of the exported cost of resources labelled `environment=recovery` during the drill's usage window. The `Drill` workflow reads it at the start of the next drill for every earlier drill older than two days, and adds it to that drill's JSON file and issue.
-
 ### A dataset of about 2 GB
 
 Before the gated drills, the primary gets a generated dataset of about 2 GB, mostly Git objects that do not compress, spread over several repositories, plus issues created through the Gitea API. Repositories carry most of the size of a typical Gitea instance.
 
-Every backup set is a full copy ([decision 0007](0007-consistent-backups.md)). At 96 sets a day and 14 days of retention, the bucket holds about 2.7 TB once the dataset is in place, and every set crosses from Finland to Belgium. The billing export measures that cost. Incremental backups would need a different set format and restore path; they are not part of this decision. Revisit if a capture takes longer than a third of the backup interval.
+Every backup set is a full copy ([decision 0007](0007-consistent-backups.md)). At 96 sets a day and 14 days of retention, the bucket holds about 2.7 TB once the dataset is in place, and every set crosses from Finland to Belgium. Incremental backups would need a different set format and restore path; they are not part of this decision. Revisit if a capture takes longer than a third of the backup interval.
 
-### The schedule runs twice a week
+### The schedule runs three times a week
 
-The schedule starts a drill on Tuesday and Friday mornings, UTC, outside the top of the hour. Each recovery issues one production certificate, which stays within the Let's Encrypt limit of five per week for the same name. The schedule stays on after the milestone gate, so results accumulate.
+The schedule starts a drill on Monday, Wednesday, and Friday mornings, UTC, outside the top of the hour. Each recovery issues one production certificate, so three drills a week stay under the Let's Encrypt limit of five certificates per week for the same name and leave room for a rerun. The schedule runs until the milestone gate passes and enough drills exist to compare; then `SCHEDULED_DRILLS` is turned off.
 
 ### Detection stays with the GitHub schedule for now
 
@@ -82,7 +76,7 @@ The watchdog remains a scheduled GitHub workflow. A faster start, such as a Clou
 
 ## Consequences
 
-- Each drill is a real outage of `git.sindrg.com`, twice a week, from the isolation until the recovery cluster serves. Up to about 25 minutes of detection plus the 17 min 07 s recovery of the milestone 10 run gives about 45 minutes; this is an estimate, not a measurement. Writes accepted by the recovery cluster are discarded by the return.
+- Each drill is a real outage of `git.sindrg.com`, three times a week while the schedule is on, from the isolation until the recovery cluster serves. Up to about 25 minutes of detection plus the 17 min 07 s recovery of the milestone 10 run gives about 45 minutes; this is an estimate, not a measurement. Writes accepted by the recovery cluster are discarded by the return.
 - Recovery time includes detection with nobody present, so it will be longer than in drills 1 to 3.
 - A failed drill leaves the service down on the recovery side or stopped until someone reads the issue. This is the state a real failure would leave.
 - `SCHEDULED_DRILLS` and `AUTO_FAILOVER` must both be on for drills to run. Turning off `AUTO_FAILOVER` also turns off the drills.
