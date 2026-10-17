@@ -35,6 +35,7 @@ class FakeSystem(module.System):
         self.dns = {"git.sindrg.com": [PRIMARY], "git-primary.sindrg.com": [PRIMARY]}
         self.runs = [{"id": 1, "status": "completed", "conclusion": "success",
                       "triggering_actor": {"login": "operator"}}]
+        self.returns: list[dict] = []
         self.series = {location: points(10) for location in LOCATIONS}
         self.checks = [{"name": "projects/example/uptimeCheckConfigs/git-healthz-abc",
                         "monitoredResource": {"labels": {"host": "git.sindrg.com"}}}]
@@ -54,6 +55,8 @@ class FakeSystem(module.System):
                 {"type": 1, "data": address} for address in self.dns[name]]}))
         if "/actions/workflows/recover.yml/runs" in url:
             return module.Response(200, json.dumps({"workflow_runs": self.runs}))
+        if "/actions/workflows/return.yml/runs" in url:
+            return module.Response(200, json.dumps({"workflow_runs": self.returns}))
         if url.endswith("/uptimeCheckConfigs"):
             return module.Response(self.monitoring_status, json.dumps({"uptimeCheckConfigs": self.checks}))
         if "/timeSeries?" in url:
@@ -135,6 +138,14 @@ class LocalTests(WatchdogTestCase):
                 self.output.clear()
                 self.assertFalse(self.candidate())
 
+    def test_a_running_return_is_no_candidate(self):
+        # A return past its DNS step moves the public name and removes the recovery cluster.
+        self.system.returns = [{"id": 3, "status": "in_progress", "conclusion": None}]
+        self.assertFalse(self.candidate())
+        self.system.returns = [{"id": 3, "status": "completed", "conclusion": "success"}]
+        self.output.clear()
+        self.assertTrue(self.candidate())
+
     def test_a_failed_automatic_start_waits_for_a_person(self):
         self.system.runs = [{"id": 2, "status": "completed", "conclusion": "failure",
                              "triggering_actor": {"login": module.BOT}}]
@@ -173,6 +184,12 @@ class ConfirmTests(WatchdogTestCase):
 
     def test_results_that_end_before_the_window_start_nothing(self):
         self.system.series["apac-singapore"] = [p for p in points(10) if p["value"]["boolValue"] is False][-3:]
+        self.assertFalse(self.started())
+
+    def test_a_checker_that_stopped_reporting_starts_nothing(self):
+        # Failed results reach back to the window start, then stop four minutes ago.
+        self.system.series["eur-belgium"] = [
+            p for p in points(10) if module.point_time(p) <= NOW - timedelta(minutes=4)]
         self.assertFalse(self.started())
 
     def test_fewer_checkers_than_regions_start_nothing(self):

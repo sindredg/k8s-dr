@@ -248,6 +248,15 @@ class RunTests(RecoverTestCase):
         self.assertEqual(len(list(self.drill.glob("recover-*.json"))), 1)
         self.assertEqual(len(list(self.drill.glob("timeline-*.tsv"))), 1)
 
+    def test_reset_archives_a_return_state_too(self):
+        # A later return must not resume against a new recovery environment.
+        self.drill.mkdir()
+        for name in (module.RETURN_STATE_FILE, module.RETURN_TIMELINE_FILE):
+            (self.drill / name).write_text("{}")
+        self.assertEqual(self.recover("reset"), 0)
+        self.assertFalse((self.drill / module.RETURN_STATE_FILE).exists())
+        self.assertFalse((self.drill / module.RETURN_TIMELINE_FILE).exists())
+
     def test_a_second_run_waits_for_no_lock(self):
         import fcntl
         self.drill.mkdir()
