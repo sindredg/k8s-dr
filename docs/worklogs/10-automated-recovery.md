@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Step 4 is built and checked against stubs on 2026-10-17; it has not run live. See [Step 4](#step-4-fence-and-resume-backups-without-a-git-change). Step 5 is built, checked against stubs, and read against the live system on 2026-10-17; it has not started a run. See [Step 5](#step-5-the-watchdog). Step 6 is planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Step 4 is built and checked against stubs on 2026-10-17; it has not run live. See [Step 4](#step-4-fence-and-resume-backups-without-a-git-change). Step 5 is built, checked against stubs, and read against the live system on 2026-10-17; it has not started a run. Its first runs from `main` started nothing, as expected; see [After the merge](#after-the-merge-1). See [Step 5](#step-5-the-watchdog). Step 6 is built and checked against stubs on 2026-10-17, and its grant is applied; it has not run live. See [Step 6](#step-6-the-return-after-a-drill). This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -328,3 +328,57 @@ Live system, read-only, 2026-10-17 about 12:40Z, from the operator machine with 
 - That GitHub records `github-actions[bot]` as the triggering actor of a dispatched run, and that a dispatch from `GITHUB_TOKEN` starts the run. Taken from the GitHub documentation; the gate run shows it.
 - The `confirm` job as the pipeline account. Its reads ran with the operator's credentials.
 - The gate's second half: no start during a probe failure shorter than the window, and none while the switch is off.
+
+### After the merge
+
+Live system, 2026-10-17, from `main` at `3a82ea4`, with `AUTO_FAILOVER` unset and the primary serving. Expected: the `local` job prints the switch as the reason, reports `candidate=false`, and the `confirm` job is skipped, so no run signs in as the pipeline account.
+
+| Run | Event | Result |
+| --- | --- | --- |
+| 39034260166 | `workflow_dispatch`, 12:52:29Z | `no start: the AUTO_FAILOVER variable is not true`, `candidate=false`. `local` success, `confirm` skipped |
+| 39034870755 | `schedule`, 13:01:36Z | The same two lines. `local` success, `confirm` skipped |
+
+The scheduled run started 10 minutes after the merge.
+
+## Step 6: the return after a drill
+
+[Decision 0013](../decisions/0013-automated-recovery.md#amendment-the-return-workflow) runs the return to the primary after a drill, and the removal of the recovery environment, as one resumable command and one workflow.
+
+### What was built
+
+| Area | Files | Change |
+| --- | --- | --- |
+| Script | `scripts/return_to_primary.py` | Six stages: `start-primary`, `dns-return`, `suspend-recovery-backups`, `lift-fence`, `remove-recovery`, and `primary-backup`. Reuses the helpers of `scripts/recover.py`, holds the same lock, and archives both run states after the last stage. `run` requires `--discard-recovery-writes` |
+| Command | `Makefile` | `make return-to-primary`, with `RETURN_ARGS` |
+| Workflow | `.github/workflows/return.yml` | Started by hand. The job runs only with `discard_recovery_writes=true`, in the `recovery` environment, in the `recovery` concurrency group of `Recover` |
+| Shared setup | `.github/actions/pipeline/action.yml`, `.github/workflows/recover.yml` | One local action installs the tools, signs in, and reads the keys for both workflows. Both save the run state only after a successful pull |
+| Archive | `scripts/recover.py` | `reset` and the return share one archive function |
+| Grant | `infra/shared/pipeline.tf` | The fence role gains `iam.serviceAccounts.enable` |
+| Tests | `tests/test_return_to_primary.py`, `tests/test_pipeline.py` | The stages, their order, and their guards against a stub; the workflow guards; the fence role permissions; no pip cache in the shared action |
+| Docs | Decision 0013, the regional recovery runbook, architecture page 12 | The amendment, [Return with one command or from the workflow](../runbooks/regional-recovery.md#return-with-one-command-or-from-the-workflow), and the pipeline account's access |
+
+### Local checks
+
+Local, against stubs, 2026-10-17. Expected before the run: the public name moves only after the primary passes its checks, the fence lifts only after recovery backups are suspended, the destroy plan applies only when it deletes nothing but recovery resources, the run starts nothing without the flag or a recovery environment, and a rerun resumes at the failed stage.
+
+| Check | Result | Can it fail |
+| --- | --- | --- |
+| `python -m unittest tests.test_return_to_primary` | 23 tests `OK` | Four edits to a copy of `scripts/return_to_primary.py` each failed at least one test: no account or IAM check in the destroy plan, no fixture check on the primary before the cutover, no discard flag, and no wait for a new primary set. Removing the pull condition from the push step of `return.yml` failed the workflow test |
+| `python -m unittest tests.test_pipeline` | 28 tests `OK` | A `cache: pip` line in the shared action failed the cache test |
+| `make check` | Exit 0, 342 tests `OK`, yamllint clean | |
+| `terraform validate` in `infra/shared` | `Success! The configuration is valid.` | |
+
+### Grant applied
+
+Live system, 2026-10-17, from this branch, because the return workflow cannot run before the grant exists. Expected before the run: one in-place update of the fence role and nothing else.
+
+| Step | Command | Result |
+| --- | --- | --- |
+| Plan | `terraform -chdir=infra/shared plan -input=false -out=shared.tfplan` | `Plan: 0 to add, 1 to change, 0 to destroy.` The change adds `iam.serviceAccounts.enable` to `google_project_iam_custom_role.fence` and updates its description |
+| Apply | `terraform -chdir=infra/shared apply -input=false shared.tfplan` | `Apply complete! Resources: 0 added, 1 changed, 0 destroyed.` |
+
+### Not verified
+
+- The return has not run live, from the workflow or the operator machine. The workflow signs in only from `main`, so it runs after the merge, in the milestone 10 gate.
+- That `gcloud compute instances start` exits 0 for VMs that already run, which a return after a rehearsal relies on. Taken from the Compute Engine behavior of a start request on a running instance, not observed.
+- That `Recover` still runs with the shared setup action. The gate run uses it.

@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), and with [the watchdog workflow](#amendment-the-watchdog-workflow). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), and with [the return workflow](#amendment-the-return-workflow). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
 
 Date: 2026-10-11
 
@@ -199,3 +199,46 @@ If the newest `Recover` run was started by the watchdog and did not succeed, the
 - The `GITHUB_TOKEN` of the second job can start and cancel any workflow of the repository during that job. The job runs only code from `main`.
 - A planned isolation of the primary starts a recovery while the switch is on. Turn it off first, as the runbook says.
 - The repository variable is the only switch. Anyone who can change repository variables can turn automatic recovery on or off.
+
+## Amendment: the return workflow
+
+Date: 2026-10-17. [Step 6](../../plan.md#10-automated-recovery) of milestone 10 builds [The drill return is a second workflow](#the-drill-return-is-a-second-workflow) as `scripts/return_to_primary.py`, `make return-to-primary`, and `.github/workflows/return.yml`.
+
+### Stages
+
+The script runs the steps of the [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill) as stages, records them in `.drill/return.json` and `.drill/return.tsv`, and resumes at a failed stage, as `make recover` does.
+
+| Stage | Ends with |
+| --- | --- |
+| `start-primary` | The primary VMs are started, `/api/healthz` on the primary's own name returns 200 within ten minutes, and `make check-fixtures` passes there |
+| `dns-return` | `git.sindrg.com` resolves to the primary address at 1.1.1.1, and `/api/healthz`, `make check-fixtures`, and `make write-check` pass through it |
+| `suspend-recovery-backups` | `run-settings` is deleted, and the recovery CronJob reports `suspend` as `true` within ten minutes. Skipped when the recovery never resumed its backups |
+| `lift-fence` | The primary worker account reports `disabled` as empty or `False` |
+| `remove-recovery` | `git-dr` is deleted and has no answer at 1.1.1.1. The destroy plan of `infra/recovery` only deletes, and deletes no account or IAM grant. After the apply, the root's state is empty |
+| `primary-backup` | A set under `primary/` that started after the fence lifted has a manifest, within 20 minutes |
+
+After the last stage, the run archives its own files and the recovery run state, so the next recovery starts at `preflight`.
+
+The public name moves only after the primary passes its checks on its own name. A primary that does not come back leaves the service on the recovery cluster. The fence lifts only after the recovery cluster stops backing up. The recovery environment is removed only after the fence lifts, so a failed enable leaves a cluster that still serves.
+
+The last stage is the only end-to-end check that the primary writes backups again. A backup Job that fails for another reason fails the return too, which is the intended result.
+
+### Guards
+
+| Guard | Why |
+| --- | --- |
+| The run requires `--discard-recovery-writes`, and the workflow's `discard_recovery_writes` input, which defaults to `false` | Every write that the recovery cluster accepted is lost. After a real loss, a return without those writes is the wrong action; that is [milestone 13](../../plan.md#13-failback-with-data-optional) |
+| The run requires a recovery run state with `provisioning` passed, and `infra/recovery` reporting the address that the recovery recorded | Without a recovery environment there is nothing to return from, and an unrelated environment must not be destroyed |
+| The workflow shares the `recovery` concurrency group and the lock file with `Recover` | A return and a recovery never run at once |
+
+The run does not require the `AUTO_FAILOVER` switch to be off. While the public name points at the recovery cluster, the names differ, so the watchdog starts nothing. The public name moves back only after the primary answers 200, so the watchdog's own requests then succeed.
+
+### Grant
+
+The fence role gains `iam.serviceAccounts.enable`, still granted on the primary worker account only. The pipeline account can therefore lift the fence it set. It still cannot change any IAM policy.
+
+The return reads the primary through HTTP only. It does not run `make validate-cluster` or `make validate-services` on the primary, because the pipeline account cannot sign in to a primary node, and granting that would give it root on the primary. The fixture checks, the write check, and the new primary set check the service end to end instead.
+
+### Shared setup
+
+Both workflows install their tools and sign in through one local action, `.github/actions/pipeline`, so their pins cannot drift apart. Each workflow saves the run state only when its pull from the state bucket succeeded. Before this change, a failed pull followed by the save would have mirrored an empty directory to the bucket and deleted the stored state; the bucket keeps earlier object versions.
