@@ -525,7 +525,7 @@ Live system, 2026-10-17, from `main` at `609aedd`, with `AUTO_FAILOVER` unset. T
 
 Expected before the run: the cancelled run pushes its state, and a new dispatch without `reset` skips the stages that passed and starts `bootstrap` again on a new runner.
 
-`gh workflow run recover.yml --ref main -f through=all`, run 39054564769, started `bootstrap` at 17:41:37Z and was cancelled with `gh run cancel` at 17:43:25Z. Its push step ran after the cancel and reported success.
+`gh workflow run recover.yml --ref main -f through=all`, run 39054564769, started `bootstrap` at 17:41:37Z. `gh run cancel` was requested at 17:43:25Z, and the job reported `The operation was canceled.` at 17:43:50Z. Its push step ran after the cancel and reported success.
 
 The next dispatch, run 39055060613, printed at 17:45:12Z:
 
@@ -535,7 +535,7 @@ The next dispatch, run 39055060613, printed at 17:45:12Z:
 == bootstrap
 ```
 
-`bootstrap` ended at 17:53:28Z with both hosts `failed=0`, and every later stage passed: restore set `20261017T175201Z`, fence, `dns-cutover` (`was: git.sindrg.com A <primary address>`), `probe-recovery`, and `resume-backups`. The timeline keeps the start of a stage from its first attempt, so it reports `bootstrap` as 11 min 51 s, which includes the cancelled attempt and the gap between the runs. The `fence` stage took 2 min 33 s, of which the stop call took 2 min 20 s.
+`bootstrap` ended at 17:53:28Z with both hosts `failed=0`, and every later stage passed: restore set `20261017T175201Z`, fence, `dns-cutover` (`was: git.sindrg.com A <primary address>`), `probe-recovery`, and `resume-backups`. The timeline keeps the start of a stage from its first attempt, so it reports `bootstrap` as 11 min 51 s, which includes the cancelled attempt and the gap between the runs. The `fence` stage took 2 min 33 s, of which the stop call took 2 min 21 s.
 
 ### The return after the drill
 
