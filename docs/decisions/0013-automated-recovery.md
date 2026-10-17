@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) and with [run settings in the cluster](#amendment-run-settings-in-the-cluster). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
 
 Date: 2026-10-11
 
@@ -129,3 +129,35 @@ The workflow's concurrency group allows one run at a time. GitHub keeps one pend
 
 The workflow builds only the recovery cluster. Building the primary from the same workflow, which the decision above names, is [issue #101](https://github.com/sindredg/k8s-dr/issues/101). Until then the primary is built from an operator machine.
 
+
+## Amendment: run settings in the cluster
+
+Date: 2026-10-17. [Step 4](../../plan.md#10-automated-recovery) of milestone 10 builds it. It specifies [Recovery backups start without a Git change](#recovery-backups-start-without-a-git-change) and replaces two sentences above, as listed under [Replaced text](#replaced-text).
+
+### Resume backups through an optional ConfigMap
+
+The `gitea` Kustomization reads a second source after `cluster-settings`: the ConfigMap `run-settings` in `flux-system`, marked optional. Flux lets later sources override earlier ones and treats a missing optional source as empty. Git never defines `run-settings`, so a cluster that the run has not touched keeps `backup_suspend` from `cluster-settings`.
+
+A new `resume-backups` stage runs after `probe-recovery`. It creates `run-settings` with `backup_suspend: "false"`, requests a reconcile of the `gitea` Kustomization, and requires that the CronJob reports `suspend` as `false` within ten minutes, the timeout of that Kustomization. The stage runs after the checks through the public name, so the recovery time ends before it.
+
+| Option | Trade-off |
+| --- | --- |
+| Optional ConfigMap that the run creates (selected) | No Git push and no new credential. The value lives only in the cluster, so a rebuilt recovery cluster starts suspended again. A person who reads `cluster-settings` alone sees `"true"` on a cluster that backs up; the CronJob and the runbook show the actual state. |
+| Push a commit to `main` from the workflow | The value stays in Git. The pipeline would need write access to `main`, which also controls the pipeline account. |
+| `kubectl patch` on the CronJob | Flux reverts it at the next reconcile. |
+| A Flux `Kustomization` patch held only in the cluster | Flux owns the `gitea` Kustomization through `flux-system`, which reverts the patch. |
+
+Only the `gitea` Kustomization reads `run-settings`. Any principal that can create a ConfigMap in `flux-system` can change `backup_suspend` on that cluster; on the primary that is the cluster administrator, who could already change the CronJob.
+
+The return after a drill deletes `run-settings` before the primary's backups resume, so the two clusters do not ping the shared heartbeat check at once. Destroying the recovery environment removes it with the cluster.
+
+### Sets from an earlier drill
+
+Sets that the recovery cluster wrote stay under `recovery/` for the 14-day retention period of [decision 0007](0007-consistent-backups.md). The check that `recovery/` is empty would then stop every run for 14 days after a full drill, which the repeated drills of [milestone 12](../../plan.md#12-unattended-drills) cannot accept.
+
+The check therefore fails only on a set named after the start of the run, or on an object whose name is not a set name. A set named in the future, such as one planted with a forged name, also fails. A set planted with an older name passes, and nothing restores it, because a recovery reads `primary/`.
+
+### Replaced text
+
+- "Until the run fences automatically, the regional recovery runbook disables the account by hand" no longer holds: the `fence` stage disables it.
+- "it fails the check that the `recovery/` prefix is empty and so stops a run" holds only for a planted set named after the start of the run.

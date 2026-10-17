@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Steps 4 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Step 4 is built and checked against stubs on 2026-10-17; it has not run live. See [Step 4](#step-4-fence-and-resume-backups-without-a-git-change). Steps 5 and 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -243,3 +243,33 @@ Afterwards `make dns-delete DNS_NAME=git-dr` deleted the record at 09:09:38Z. Th
 - A rerun after a failed stage on a new runner. Run 2 resumed after a passed stage, which uses the same pull of the run state.
 - That the roles cover the fence and the cutover. The runs above cover every call through `verification`.
 
+## Step 4: fence and resume backups without a Git change
+
+[Decision 0013](../decisions/0013-automated-recovery.md#amendment-run-settings-in-the-cluster) resumes recovery backups through a ConfigMap that the run creates in the cluster. The `fence` stage from step 2 already stops the primary VMs and disables the primary worker's account, so this step adds no fence code.
+
+### What was built
+
+| Area | Files | Change |
+| --- | --- | --- |
+| Flux | `deploy/sync/sync.yaml` | The `gitea` Kustomization reads the optional ConfigMap `run-settings` after `cluster-settings` |
+| Runner | `scripts/recover.py`, `scripts/drill_report.py`, `.github/workflows/recover.yml` | A `resume-backups` stage after `probe-recovery`: creates `run-settings` with `backup_suspend: "false"` through `kubectl apply`, so a retry applies it again, requests a reconcile of `gitea`, and waits up to 600 seconds for `suspend` to read `false`. The workflow offers the stage as a `through` choice |
+| Suspension check | `scripts/recover.py` | `recovery/` may hold sets named before the start of the run. A set named at or after the start, an object that is not a set name, or a failed listing stops the run |
+| Docs | Regional recovery runbook, decisions 0008 and 0013, architecture pages 04 and 09 | Step 9.1 and return step 3 use `run-settings` instead of a merged change. Step 6 accepts sets from earlier drills |
+
+### Local checks
+
+Local, against stubs, 2026-10-17. Expected before the run: the stage runs after the checks through the public name, creates the ConfigMap with `false`, fails when the CronJob stays suspended, and the suspension check rejects only sets from the current run.
+
+| Check | Result | Can it fail |
+| --- | --- | --- |
+| `python -m unittest tests.test_recover` | 30 tests `OK` | Five edits to a copy of `scripts/recover.py` each failed at least one test: a set from this run accepted, an object that is not a set name accepted, the stage removed, no wait for `suspend`, and `backup_suspend=true` in the ConfigMap |
+| `python -m unittest tests.test_flux` | 17 tests `OK` | `optional: false` on `run-settings` failed the new test |
+| `make check` | Exit 0, 294 tests `OK` | |
+| `make pins` | Exit 0 | |
+| `make manifests` with kubeconform 0.8.0 | `Valid: 146, Invalid: 0` | A misspelled `optionl` field failed the `gitea` Kustomization of both clusters |
+
+### Not verified
+
+- That Flux on the live clusters substitutes `run-settings` over `cluster-settings`. The order and the optional behavior are taken from the Flux Kustomization reference, not observed. Flux reads `sync.yaml` from `main`, so the live check runs after the merge.
+- The `fence`, `dns-cutover`, `probe-recovery`, and `resume-backups` stages have not run live. They run in the full recovery of the milestone 10 gate, which also checks that the first `recovery/` set appears.
+- Return step 3 of the runbook is written, not run.

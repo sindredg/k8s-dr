@@ -102,6 +102,8 @@ The recovery cluster keeps the prefix `recovery/` and the shared ping URL in bot
 
 The milestone 5 gate checks that a bootstrap and a restore leave the CronJob suspended and write no `recovery/` object. The milestone 6 drill exercises the change that enables it.
 
+Since 2026-10-17, the recovery run enables backups through a ConfigMap in the cluster instead of a change in Git; see [decision 0013](0013-automated-recovery.md#amendment-run-settings-in-the-cluster).
+
 ## Amendment: return to the primary after a drill
 
 Date: 2026-10-04

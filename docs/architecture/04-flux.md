@@ -43,6 +43,8 @@ Each cluster directory has a `cluster-settings.yaml` ConfigMap with the only val
 | `backup_suspend` | `false` | `true` until a restore is verified | Whether the backup CronJob is suspended |
 | `cluster_name` | `primary` | `recovery` | The label on its metrics |
 
+The `gitea` Kustomization also reads the optional ConfigMap `run-settings`, after `cluster-settings`, so its values win. Git does not define it. A recovery run creates it with `backup_suspend: "false"` after the cutover. See [decision 0013](../decisions/0013-automated-recovery.md#amendment-run-settings-in-the-cluster).
+
 ## Secrets
 
 Secrets are committed to the public repository, encrypted with SOPS and age. Only the `data` and `stringData` fields are encrypted, so the files still diff and review.
