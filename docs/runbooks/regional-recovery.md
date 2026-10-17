@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage). Amended on 2026-10-17 with [Run the procedure from GitHub Actions](#run-the-procedure-from-github-actions). Its setup and runs through `verification` passed on 2026-10-17, as two runs split at `preflight`; see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#workflow-runs). Step 5 and a rerun after a failed stage have not run. Amended on 2026-10-17 for step 4 of milestone 10: the run resumes recovery backups through a ConfigMap in the cluster, not a change in Git, and a `recovery/` set from an earlier drill no longer stops a run. Built and checked against stubs; not run live. Amended on 2026-10-17 for step 5 of milestone 10 with [Start automatically with the watchdog](#start-automatically-with-the-watchdog), which is built and checked against stubs and read-only against the live system; it has not started a run. Amended on 2026-10-17 for step 6 of milestone 10 with [Return with one command or from the workflow](#return-with-one-command-or-from-the-workflow), which is built and checked against stubs; it has not run live.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04; drills 2 and 3 repeated them. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Since [milestone 10](../../plan.md#10-automated-recovery), `make recover` and the `Recover` workflow run steps 2 to 9.1, and `make return-to-primary` and the `Return` workflow run the return. On 2026-10-17 a full run of the `Recover` workflow, including the fence, the cutover, the checks through the public name, and the resumed backups, passed on the live system, and a run of the `Return` workflow then returned to the primary; see the [milestone 10 gate](../worklogs/10-automated-recovery.md#gate). The watchdog started nothing while its switch was off, or during a 99-second outage with the switch on; it has not started a run. The manual steps changed by milestone 10, a rerun after a failed stage on a new runner, and the changes after the milestone 10 review (the runner's own DNS wait and the return state guard) have not run live.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -56,7 +56,7 @@ The fence runs before the cutover, so a primary that still answers stops the run
 make recover
 ```
 
-Expected: every stage ends, and the run prints `Recovery complete` and the stage timeline. The first `recovery/` set follows at the next scheduled backup. Compute the results as in step 10.
+Expected: every stage ends, and the run prints `Recovery complete` and the stage timeline. The first `recovery/` set starts at once if a scheduled slot passed in the last ten minutes, because of `startingDeadlineSeconds: 600`, and otherwise at the next slot. Compute the results as in step 10.
 
 The run keeps its state in `DRILL_DIR`, by default `.drill/`:
 
@@ -162,7 +162,7 @@ The `Watchdog` workflow runs every five minutes and starts `Recover` with `throu
    python3 scripts/drill_report.py stage provisioning end
    ```
 
-   The stages are `detection`, `preflight`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `fence`, `dns-cutover`, and `probe-recovery`. `make recover` records every stage after `detection` itself. Check `.drill/writes.tsv` before the isolation: the newest line must be less than `WRITE_INTERVAL` old. If the loop stopped, start it again and isolate only after a new write. Stop the write loop once its pushes fail.
+   The stages are `detection`, `preflight`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `fence`, `dns-cutover`, `probe-recovery`, and `resume-backups`. `make recover` records every stage after `detection` itself. Check `.drill/writes.tsv` before the isolation: the newest line must be less than `WRITE_INTERVAL` old. If the loop stopped, start it again and isolate only after a new write. Stop the write loop once its pushes fail.
 
 2. Select the newest backup set that has a manifest, and record its name. The name is its recovery-point timestamp in UTC. Exclude sets without a manifest.
 
@@ -270,7 +270,7 @@ The `Watchdog` workflow runs every five minutes and starts `Recover` with `throu
         --namespace gitea --output=jsonpath='{.spec.suspend}'; echo
       ```
 
-      Expected: `false`, within the ten-minute timeout of the `gitea` Kustomization. The next scheduled run writes the first `recovery/` set.
+      Expected: `false`, within the ten-minute timeout of the `gitea` Kustomization. The first `recovery/` set starts at once if a scheduled slot passed in the last ten minutes, and otherwise at the next slot.
    2. Fence the primary: disable the primary worker's service account, so a primary that returns cannot write backups. `infra/shared` ignores the account's `disabled` flag, so a later apply does not undo the fence.
 
       ```bash
@@ -348,12 +348,12 @@ A drill ends by returning to the stopped primary, which still holds its data as 
 
 ### Return with one command or from the workflow
 
-`make return-to-primary` runs steps 1 to 5 as the stages of [decision 0013](../decisions/0013-automated-recovery.md#amendment-the-return-workflow), then waits for a primary backup. It reads the recovery run state in `DRILL_DIR`, resumes at a failed stage like `make recover`, and archives both run states after the last stage. It also removes the environment of a rehearsal that stopped before the fence: the primary then still serves, and the stages that change nothing pass.
+`make return-to-primary` runs steps 1 to 5 as the stages of [decision 0013](../decisions/0013-automated-recovery.md#amendment-the-return-workflow), then waits for a primary backup. It reads the recovery run state in `DRILL_DIR`, resumes at a failed stage like `make recover`, and archives both run states after the last stage. `python3 scripts/recover.py reset` archives the return state too, and the return refuses to resume against another recovery run. It also removes the environment of a rehearsal that stopped before the fence: the primary then still serves, and the stages that change nothing pass.
 
 | Stage | Steps | What it checks |
 | --- | --- | --- |
 | `start-primary` | 1 | `/api/healthz` on `git-primary` returns 200 within ten minutes, and `make check-fixtures` passes there. It does not run `make validate-cluster` or `make validate-services` |
-| `dns-return` | 2 | `git` resolves to the primary address at 1.1.1.1, then `/api/healthz`, `make check-fixtures`, and `make write-check` through `git.sindrg.com` |
+| `dns-return` | 2 | `git` resolves to the primary address at 1.1.1.1 and at the runner's own resolver, then `/api/healthz`, `make check-fixtures`, and `make write-check` through `git.sindrg.com` |
 | `suspend-recovery-backups` | 3 | The CronJob reports `suspend` as `true` within ten minutes. Skipped when the recovery never ran `resume-backups` |
 | `lift-fence` | 4 | The primary worker account reports `disabled` as empty or `False` |
 | `remove-recovery` | 5, and steps 2 and 3 of the next section | `git-dr` has no answer at 1.1.1.1, the destroy plan only deletes and touches no account or IAM grant, and `terraform state list` in `infra/recovery` is empty after the apply |

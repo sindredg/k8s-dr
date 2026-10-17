@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Step 4 is built and checked against stubs on 2026-10-17; it has not run live. See [Step 4](#step-4-fence-and-resume-backups-without-a-git-change). Step 5 is built, checked against stubs, and read against the live system on 2026-10-17; it has not started a run. Its first runs from `main` started nothing, as expected; see [After the merge](#after-the-merge-1). See [Step 5](#step-5-the-watchdog). Step 6 is built and checked against stubs on 2026-10-17, and its grant is applied; it has not run live. See [Step 6](#step-6-the-return-after-a-drill). This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: Complete. The milestone gate passed on the live system on 2026-10-17, and the independent review's findings are fixed or tracked; see [Gate](#gate) and [Review](#review). Steps 1 to 6 are recorded below in order. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -403,3 +403,116 @@ Live system, 2026-10-17, from this branch, because the return workflow cannot ru
 - The return has not run live, from the workflow or the operator machine. The workflow signs in only from `main`, so it runs after the merge, in the milestone 10 gate.
 - That `gcloud compute instances start` exits 0 for VMs that already run, which a return after a rehearsal relies on. Taken from the Compute Engine behavior of a start request on a running instance, not observed.
 - That `Recover` still runs with the shared setup action. The gate run uses it.
+
+## Gate
+
+Live system, 2026-10-17, from `main` at `ffa76af`, with `AUTO_FAILOVER` unset. The gate has two halves: a recovery started by hand from the workflow completes with no other action, and the watchdog starts nothing during a probe failure shorter than its window or while its switch is off.
+
+### Recovery from the workflow
+
+`gh workflow run recover.yml --ref main -f through=all -f reset=true`, run 39036386233, started at 13:23:53Z. Expected before the run: every stage ends with no action outside the workflow; the fence stops both primary VMs and disables the primary worker account; `git.sindrg.com` moves to the recovery address; the public checks and the backup resume pass.
+
+The stage timeline, from the run summary:
+
+| Stage | Start (UTC) | Duration | Result |
+| --- | --- | --- | --- |
+| `preflight` | 13:25:00 | 1 min 19 s | Passed |
+| `provisioning` | 13:26:19 | 2 min 41 s | Plan check: `plan creates 16 and updates 0` |
+| `bootstrap` | 13:29:00 | 7 min 47 s | Both hosts `failed=0` |
+| `flux-reconcile` | 13:36:47 | 1 min 13 s | Both validations `failed=0` |
+| `restore` | 13:38:00 | 1 min 56 s | Set `20261017T133701Z` |
+| `verification` | 13:39:56 | 22 s | Fixtures and write check `failed=0`; restored HEAD `909d15f` |
+| `fence` | 13:40:18 | 1 min 12 s | `gcloud compute instances stop` for both primary VMs, 13:40:25 to 13:41:21, exit 0. The primary worker account was disabled, and the primary's own name stopped answering |
+| `dns-cutover` | 13:41:30 | 5 s | `was: git.sindrg.com A <primary address>`, then the recovery address |
+| `probe-recovery` | 13:41:35 | 15 s | Fixtures and write check through `git.sindrg.com`, `failed=0` |
+| `resume-backups` | 13:41:50 | 17 s | `configmap/run-settings created`; the CronJob reported `suspend` as `false` |
+
+The ten stages took 17 min 07 s, from 13:25:00 to 13:42:07. This is not a recovery time in the sense of [decision 0002](../decisions/0002-recovery-contract.md#measurement): nothing failed before the run, so detection is not included. The run used the shared setup action of step 6 for the first time.
+
+After the run, read from the operator machine:
+
+| Read | Result |
+| --- | --- |
+| `dig +short` at 1.1.1.1 | `git` and `git-dr` returned the recovery address, `git-primary` the primary address |
+| `curl --resolve git.sindrg.com:443:<recovery address> https://git.sindrg.com/api/healthz` | `200` |
+| `gcloud storage ls gs://<backup bucket>/recovery/*/manifest.json` | Set `20261017T134203Z` with a manifest, listed at 13:44:40Z |
+
+The first `recovery/` set started at 13:42:03, seconds after `resume-backups`, not at the 13:52 slot. The 13:37 slot passed while the CronJob was suspended, and `startingDeadlineSeconds: 600` in `deploy/apps/gitea/backup.yaml` lets Kubernetes start a missed slot of the last ten minutes when the CronJob resumes. The runbook and the run's final message now say so.
+
+A plain `curl` from the operator machine failed for some minutes, because the local resolver still returned the primary address. The workflow's checks ran on the runner, whose answers matched 1.1.1.1.
+
+### Return from the workflow
+
+`gh workflow run return.yml --ref main -f discard_recovery_writes=true`, run 39038933622, started at 14:00:49Z. Expected before the run: the primary passes its checks before the public name moves, recovery backups stop before the fence lifts, the destroy plan deletes the 16 recovery resources, and a new primary set appears.
+
+| Stage | Start (UTC) | Duration | Result |
+| --- | --- | --- | --- |
+| `start-primary` | 14:01:43 | 2 min 39 s | `gcloud compute instances start` exit 0; healthz on `git-primary` returned 200; fixtures `failed=0` |
+| `dns-return` | 14:04:22 | 31 s | `git.sindrg.com` back to the primary address at 14:04:25; healthz, fixtures, and write check `failed=0` |
+| `suspend-recovery-backups` | 14:04:53 | 18 s | `configmap "run-settings" deleted`; the CronJob reported `suspend` as `true` |
+| `lift-fence` | 14:05:11 | 3 s | The primary worker account enabled |
+| `remove-recovery` | 14:05:14 | 3 min 14 s | `git-dr` deleted at 14:05:15Z; `plan destroys 16`; `Apply complete! Resources: 0 added, 0 changed, 16 destroyed.`; empty state |
+| `primary-backup` | 14:08:28 | 1 min 57 s | Set `20261017T140701Z`, started after the fence lifted |
+
+The return took 8 min 42 s. It archived both run states as `recover-20261017T141025Z.json`, `timeline-20261017T141025Z.tsv`, `return-20261017T141025Z.json`, and `return-20261017T141025Z.tsv`, which the bucket lists under `pipeline/drill/`.
+
+After the run: `git` and `git-primary` returned the primary address at 1.1.1.1, `git-dr` had no answer, healthz through the primary address returned `200`, `terraform state list` in `infra/recovery` printed nothing, and the project listed only the two primary VMs, both `RUNNING`.
+
+The `dns-return` checks ran with the runner's resolver. 1.1.1.1 returned the primary address 15 seconds after the change, and healthz passed one second later. Which cluster answered those checks was not recorded, so this run does not prove that they reached the primary. The review fix below makes the stage wait for the runner's own resolver.
+
+### Watchdog
+
+| Condition | Evidence |
+| --- | --- |
+| No start during a failure shorter than the window | [A probe failure shorter than the window](#a-probe-failure-shorter-than-the-window): run 39035847549 reported `candidate=true`, then `no start: checker usa-virginia passed within the window` |
+| No start while the switch is off | Every run of the day reported `no start: the AUTO_FAILOVER variable is not true` first, including 39036836718 at 13:30:24Z, while the primary served, and 39037566805 at 13:40:58Z, while the fence was stopping the primary. The `local` job checks the switch before any other condition, so these runs show the order, not the behavior during a full outage; `test_the_switch_off_stops_before_any_request` covers the rest |
+
+GitHub started the seven scheduled runs from 13:01:36Z to 14:18:22Z between 9 and 18 minutes apart. Decision 0013 now records this.
+
+### Public logs
+
+Both run logs were searched for the project ID, the project number, the suffixes of both bucket names, `@gmail.com`, `AGE-SECRET-KEY`, and the repository ID: no match. The same search found `k8sdr-primary-worker` 6 times in the recovery log and `***` 358 times in the return log, so it matches strings that are present.
+
+### Not verified
+
+- The watchdog's automatic start of a recovery. It ran against stubs only. [Milestone 12](../../plan.md#12-unattended-drills) isolates the primary with the switch on.
+- A rerun after a failed stage on a new runner.
+- That no action outside the workflow logs happened during run 39036386233. None was taken; the logs show none.
+
+## Review
+
+An independent review on 2026-10-17 checked the claims of this milestone against the code, the run logs, and the live system. It ran the four test modules (106 tests `OK`), and read the pipeline's project roles, the provider condition, and the environment's branch policy, which matched the code.
+
+### Fixed in this change
+
+| Finding | Fix |
+| --- | --- |
+| `reset` archived only the recovery state. A failed return's state survived it, so a later return could skip its environment check and destroy a new recovery environment | `reset` archives `return.json` and `return.tsv`. The return records the start of its recovery run and refuses another |
+| The `dns-return` checks could reach the recovery cluster through the runner's resolver | The stage waits until the runner resolves `git.sindrg.com` to the primary address |
+| Decision 0013 said a later start never archives a run of the current incident; it does when a person started that run | An amendment corrects the statement and states the trade-off |
+| The README said the recovery is six commands and not automated | The README describes the workflow and its measured run |
+| The runbook status said the fence, cutover, and return had not run live | The status line names the gate runs |
+| The runbook and the run said the first `recovery/` set comes at the next scheduled backup; the stage list lacked `resume-backups` | Both corrected |
+| The watchdog ignored `Return` runs | No start while a `Return` run is queued or in progress |
+| A checker that stopped reporting after one failed result at the window start counted as failed | Each checker's newest result must be at most three minutes old |
+| The schedule claimed every five minutes and detection of 5 to 15 minutes | Decision 0013 and architecture page 11 record the observed 9 to 18 minutes |
+| The access page omitted project-wide read and compute object IAM for the pipeline account | Architecture page 12 lists both |
+| The switch-off runs were described as running during an outage | The gate section states what they show |
+
+### Local checks of the fixes
+
+Local, against stubs, 2026-10-17. Expected before the run: each new test fails when its fix is removed.
+
+| Check | Result | Can it fail |
+| --- | --- | --- |
+| `python -m unittest tests.test_return_to_primary tests.test_recover tests.test_watchdog` | 84 tests `OK` | Five edits each failed the matching test: `reset` without the return files, no recovery binding, no wait for the runner's resolver, no freshness check, and `Return` runs ignored |
+| `make check` | Exit 0, 348 tests `OK` | |
+
+These fixes have not run live. They change only guards and waits, not the stages that the gate runs exercised.
+
+### Tracked as issues
+
+- [#109](https://github.com/sindredg/k8s-dr/issues/109): the identity provider does not restrict the triggering event or workflow.
+- [#110](https://github.com/sindredg/k8s-dr/issues/110): the recovery job installs Python dependencies without hashes.
+- [#111](https://github.com/sindredg/k8s-dr/issues/111): whether instance metadata lets the pipeline account reach a primary node.
+- [#112](https://github.com/sindredg/k8s-dr/issues/112): the access and monitoring diagrams do not show the watchdog or the return workflow. Found in the staleness pass, not by the review.

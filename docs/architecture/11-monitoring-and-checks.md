@@ -13,7 +13,7 @@ What watches the system, from inside and from outside, and what does not.
 | Uptime probe | An external service, every minute | When the service stopped answering and when it came back | No |
 | Public surface scan | GitHub Actions, daily | Whether the outside view has regressed | Yes, by workflow failure mail |
 | Pin check | GitHub Actions, weekly | Whether a pinned download has disappeared upstream | Yes, by workflow failure mail |
-| Watchdog | GitHub Actions, every five minutes | Whether the primary is down from every uptime checker and from GitHub's runner | It starts the recovery workflow while the `AUTO_FAILOVER` variable is `true`. See [decision 0013](../decisions/0013-automated-recovery.md#amendment-the-watchdog-workflow) |
+| Watchdog | GitHub Actions, scheduled every five minutes. GitHub started the first seven scheduled runs 9 to 18 minutes apart | Whether the primary is down from every uptime checker and from GitHub's runner | It starts the recovery workflow while the `AUTO_FAILOVER` variable is `true`. See [decision 0013](../decisions/0013-automated-recovery.md#amendment-the-watchdog-workflow) |
 | Validation playbooks | Operator machine, on demand | Whether the cluster and service are healthy now | No |
 
 ## Metrics
