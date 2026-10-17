@@ -79,6 +79,8 @@ The gates that used it:
 
 After a drill, the `Return` workflow removes the recovery environment and returns to the primary.
 
+Since milestone 12, the `Drill` workflow runs a drill with nobody present, on a schedule that the `SCHEDULED_DRILLS` variable switches on. It checks that a drill is safe, keeps a write log for 25 minutes, stops both primary VMs, and then only reads run status until the `Recover` run that the watchdog started has ended. It measures recovery time from the first failed uptime result and data loss from its write log, runs the `Return` workflow, stores the result in the state bucket, and opens an issue labelled `drill`. A 2 GiB dataset on the primary gives the restore a realistic size. The workflow is built and has not run; [the results page](../drills.md) lists every drill, and [decision 0015](../decisions/0015-unattended-drills.md) gives the design.
+
 ## Limits
 
 - Recovery time is dominated by building a cluster from nothing. A faster design, such as a warm standby, costs more to keep running. Milestone 7 shortened the data loss instead ([decision 0012](../decisions/0012-backup-every-15-minutes.md)).

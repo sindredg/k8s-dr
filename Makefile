@@ -74,7 +74,7 @@ PLAYBOOKS := bootstrap validate_cluster validate_services create_fixtures check_
 .PHONY: help venv inventory age-key bootstrap validate-cluster validate-services \
 	create-fixtures check-fixtures write-check write-loop restore restore-test-env \
 	restore-test-env-delete restore-test-forward check manifests pins surface preflight recover \
-	return-to-primary \
+	return-to-primary load-dataset check-dataset drill-results \
 	dns-show dns-set dns-delete dns-caa
 
 help: ## List targets
@@ -182,6 +182,19 @@ RETURN_ARGS ?=
 return-to-primary: age-key ## Return to the primary after a drill; a rerun resumes at the failed stage
 	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" python3 scripts/return_to_primary.py --drill-dir $(DRILL_DIR) \
 		run $(RETURN_ARGS)
+
+# The drill dataset of decision 0015 on the public name, or on GIT_HOST.
+# A rerun pushes only what the endpoint lacks. See scripts/dataset.py.
+load-dataset: age-key ## Load the 2 GiB drill dataset as the fixture user
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)python scripts/dataset.py load $(if $(GIT_HOST),--host $(GIT_HOST))
+
+check-dataset: age-key ## Check that the endpoint holds the drill dataset (read-only)
+	FLUX_AGE_KEY_FILE="$(FLUX_AGE_KEY_FILE)" $(BIN)python scripts/dataset.py check $(if $(GIT_HOST),--host $(GIT_HOST))
+
+# Rewrites the table in docs/drills.md from every drill result in the state
+# bucket. See scripts/drill.py.
+drill-results: ## Update the table of unattended drill results from the state bucket
+	$(BIN)python scripts/drill.py results --page docs/drills.md
 
 surface: ## Probe the public endpoint from outside (read-only)
 	scripts/check-public-surface.sh $(GIT_HOST)

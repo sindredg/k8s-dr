@@ -1,6 +1,6 @@
 # 0015: Unattended drills
 
-Status: Proposed on 2026-10-17. [Milestone 12](../../plan.md#12-unattended-drills) builds and measures it.
+Status: Accepted on 2026-10-17. [Milestone 12](../../plan.md#12-unattended-drills) builds and measures it.
 
 Date: 2026-10-17
 
@@ -16,25 +16,25 @@ A drill with nobody present needs four things that a person did before: start th
 
 ### A drill workflow starts and ends each drill
 
-A new `Drill` workflow runs on a schedule and on manual dispatch. One job runs these steps in order:
+A new `Drill` workflow runs on a schedule and on manual dispatch. The job runs only while the `SCHEDULED_DRILLS` repository variable is `true`; anything else skips it without an issue. The variable switches the drills off without a Git change, as `AUTO_FAILOVER` does for the watchdog. The job runs these steps in order:
 
 1. **Guards.** The drill starts only when all of these hold. If one fails, the job opens an issue and stops before it changes anything.
-   - The `SCHEDULED_DRILLS` repository variable is `true`. It switches the schedule off without a Git change, as `AUTO_FAILOVER` does for the watchdog.
    - `AUTO_FAILOVER` is `true`. Without it, isolating the primary causes an outage that nothing recovers.
-   - No `Recover` or `Return` run is queued or in progress, and the recovery Terraform state holds no resources.
+   - No `Recover` or `Return` run is queued or in progress, the newest automatic `Recover` run did not fail, and the recovery Terraform state holds no resources. The watchdog starts nothing after a failed automatic run, so the drill would cause an outage that nothing recovers.
    - The public name points at the primary, and the fixture checks pass through it.
    - The newest primary backup set is younger than two backup intervals.
    - `make preflight` passes. It already fails when the Cloudflare token has less than a week left.
-2. **Write log.** The job pushes a write check every five minutes for 20 minutes from the runner, and copies each acknowledged write to the drill's folder in the Terraform state bucket.
+   - The public name serves the [dataset](#a-dataset-of-about-2-gb).
+2. **Write log.** The job pushes a write check every five minutes for 25 minutes from the runner, and copies each acknowledged write to the drill's folder in the Terraform state bucket. A set that starts in the first 15 minutes has finished before the isolation if its capture takes less than ten minutes, so the restored commit is a write in the log.
 3. **Isolation.** The job records the time and stops both primary VMs, as drills 1 to 3 did.
 4. **No action.** The job waits until a `Recover` run that the watchdog started after the isolation succeeds, or until four hours after the isolation, the recovery time target of [decision 0002](0002-recovery-contract.md). It only reads run status.
-5. **Report.** The job reads the first failed probe from the uptime check, the stage timeline and restored commit from the recovery run state, and the write log, and computes recovery time and data loss with `scripts/drill_report.py`.
+5. **Report.** The job reads the first failed probe from the uptime check, the stage timeline and restored commit from the recovery run state, and the write log, and computes recovery time and data loss with `scripts/drill_report.py`. It then checks that the recovered service holds the dataset.
 6. **Return.** The job dispatches the `Return` workflow with `discard_recovery_writes` and waits for it to succeed.
-7. **Record.** The job writes the results to the state bucket and opens an issue labelled `drill` with the report.
+7. **Record.** The job writes the results to the state bucket and opens an issue labelled `drill` with the report. This step runs whatever the outcome: passed, missed a target, failed, or refused by a guard.
 
 If the recovery fails or misses the target, the job skips the return, opens the issue, and leaves the run state for diagnosis. The guards then refuse further drills until the state is cleared, because the recovery state holds resources.
 
-The waiting step keeps a runner busy for up to four hours. The whole job stays under the six-hour limit of a GitHub-hosted job.
+The waiting step keeps a runner busy for up to four hours. The guard, the write log, that wait, and a return fit the six-hour limit of a GitHub-hosted job: the `Return` runs on 2026-10-17 took 10 to 17 minutes. A recovery near the four-hour target leaves the return less time, and a return cut off by the limit leaves the drill reported as failed.
 
 ### Isolation stops the primary VMs
 

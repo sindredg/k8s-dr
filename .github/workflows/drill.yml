@@ -1,0 +1,85 @@
+---
+name: Drill
+
+# Runs one unattended drill: checks that a drill is safe, keeps a write log,
+# stops both primary VMs, and then takes no action until the Recover run
+# that the watchdog starts has passed. It measures recovery time and data
+# loss, returns to the primary with the Return workflow, stores the result in
+# the Terraform state bucket, and opens an issue labelled drill. The
+# SCHEDULED_DRILLS repository variable is the switch: anything but "true"
+# skips the job. See decision 0015 and docs/runbooks/unattended-drills.md.
+"on":
+  # Monday, Wednesday, and Friday, outside the top of the hour. Each drill
+  # issues one production certificate; Let's Encrypt allows five a week for
+  # the same name.
+  schedule:
+    - cron: "17 6 * * 1,3,5"
+  workflow_dispatch:
+
+permissions: {}
+
+# Not the recovery group: the drill waits for a Recover run in that group.
+concurrency:
+  group: drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    if: vars.SCHEDULED_DRILLS == 'true'
+    runs-on: ubuntu-26.04
+    environment: recovery
+    # Under the six-hour limit of a hosted job: the guard, 25 minutes of
+    # writes, at most four hours of waiting, and a return, which took 10 to
+    # 17 minutes on 2026-10-17.
+    timeout-minutes: 355
+    permissions:
+      contents: read
+      id-token: write
+      actions: write
+      issues: write
+    env:
+      SCHEDULED_DRILLS: ${{ vars.SCHEDULED_DRILLS }}
+      AUTO_FAILOVER: ${{ vars.AUTO_FAILOVER }}
+      GITHUB_TOKEN: ${{ github.token }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      # The environment's secrets are masked in the public log. The issue
+      # body masks them separately; see scripts/drill.py.
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      CLOUDSDK_CORE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      STATE_BUCKET: ${{ secrets.STATE_BUCKET }}
+      BACKUP_BUCKET: ${{ secrets.BACKUP_BUCKET }}
+      ADMIN_MEMBER: ${{ secrets.ADMIN_MEMBER }}
+      RECOVERY_READER_MEMBER: ${{ secrets.RECOVERY_READER_MEMBER }}
+      RECOVERY_SUBNET_CIDR: ${{ vars.RECOVERY_SUBNET_CIDR }}
+      WORK_DIR: .drill/drill
+      ANSIBLE_HOME: ansible/.cache
+      XDG_CACHE_HOME: ansible/.cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pipeline
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Key paths
+        run: |
+          echo "FLUX_AGE_KEY_FILE=$RUNNER_TEMP/keys/age.agekey" >> "$GITHUB_ENV"
+          echo "BACKUP_AGE_KEY_FILE=$RUNNER_TEMP/keys/backup.agekey" >> "$GITHUB_ENV"
+      - name: Guard
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" guard
+      - name: Write log
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" writes
+      - name: Isolate the primary
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" isolate
+      - name: Wait for the recovery
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" wait
+      - name: Report
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" report
+      - name: Return to the primary
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" return
+      - name: Store the result and open an issue
+        if: always()
+        run: python3 scripts/drill.py --work-dir "$WORK_DIR" finish

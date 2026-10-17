@@ -167,8 +167,8 @@ class Watchdog:
         if active:
             raise NoStart(f"return run {active[0]['id']} is {active[0]['status']}")
 
-    def require_every_checker_failed(self) -> None:
-        """Condition 1: every checker of the uptime check failed for the whole window."""
+    def uptime_series(self, start: datetime, end: datetime) -> list[dict]:
+        """The results of the uptime check of the public name, one series per checker."""
         project = self.environ["GCP_PROJECT_ID"]
         headers = {"Authorization": f"Bearer {self.system.access_token()}"}
         base = f"https://monitoring.googleapis.com/v3/projects/{project}"
@@ -181,8 +181,6 @@ class Watchdog:
             raise NoStart(f"found {len(configs)} uptime checks for {self.public_host}, expected 1")
         check_id = configs[0]["name"].rsplit("/", 1)[-1]
 
-        end = self.system.now()
-        start = end - timedelta(minutes=WINDOW_MINUTES + LAG_MINUTES)
         query = urllib.parse.urlencode({
             "filter": f'metric.type="{METRIC}" AND metric.labels.check_id="{check_id}"',
             "interval.startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -191,7 +189,16 @@ class Watchdog:
         response = self.system.get(f"{base}/timeSeries?{query}", headers)
         if response.status != 200:
             raise NoStart(f"reading the uptime results returned {response.status}")
-        series = json.loads(response.body).get("timeSeries", [])
+        body = json.loads(response.body)
+        # The default page holds far more points than these windows produce.
+        if body.get("nextPageToken"):
+            raise NoStart("the uptime results span more than one page")
+        return body.get("timeSeries", [])
+
+    def require_every_checker_failed(self) -> None:
+        """Condition 1: every checker of the uptime check failed for the whole window."""
+        end = self.system.now()
+        series = self.uptime_series(end - timedelta(minutes=WINDOW_MINUTES + LAG_MINUTES), end)
         if len(series) < MIN_CHECKERS:
             raise NoStart(f"{len(series)} checkers reported, expected at least {MIN_CHECKERS}")
         since = end - timedelta(minutes=WINDOW_MINUTES)

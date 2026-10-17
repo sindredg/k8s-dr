@@ -146,6 +146,8 @@ The `Watchdog` workflow runs every five minutes and starts `Recover` with `throu
 
 3. If an automatic run fails, the watchdog starts nothing more until a newer `Recover` run succeeds. Fix the cause and resume the run as in step 4 of [Start a run](#start-a-run), without `reset`.
 
+The `Drill` workflow tests this path with nobody present; see the [unattended drills runbook](unattended-drills.md).
+
 ## Procedure
 
 1. Before isolation, start the write loop in a second terminal and leave it running. It pushes a write check every five minutes and appends each acknowledged write to `.drill/writes.tsv` on the operator machine.

@@ -13,7 +13,7 @@ Gitea and PostgreSQL run on a kubeadm-built Kubernetes cluster on Google Cloud V
 
 ## Results
 
-Only automated runs count. [Milestone 12](plan.md#12-unattended-drills) runs unattended drills: the primary is stopped, the watchdog starts the recovery, and nobody acts. Their recovery time and data loss go here, against targets of at most 4 hours and at most 2 hours ([decision 0002](docs/decisions/0002-recovery-contract.md#measurement)).
+Only automated runs count. [Milestone 12](plan.md#12-unattended-drills) runs unattended drills: the primary is stopped, the watchdog starts the recovery, and nobody acts. The [drill results](docs/drills.md) give their recovery time and data loss, against targets of at most 4 hours and at most 2 hours ([decision 0002](docs/decisions/0002-recovery-contract.md#measurement)).
 
 The first full run of the `Recover` workflow, started by hand on 2026-10-17, took 17 min 07 s with no other action. It does not include detection, because the primary was still serving when the run started.
 
@@ -48,7 +48,7 @@ The recovery region runs no VMs until a recovery starts. Terraform state, the de
 | Flux and Helm | The application layer, reconciled from this repository |
 | Traefik and cert-manager | HTTPS through the Gateway API, with Let's Encrypt certificates |
 | SOPS and age | Encrypted secrets in the public repository and encrypted backups |
-| GitHub Actions | Tests and linters, pin and public-surface checks, the watchdog, and the recovery and return workflows |
+| GitHub Actions | Tests and linters, pin and public-surface checks, the watchdog, and the recovery, return, and drill workflows |
 | Cloud Monitoring, Healthchecks.io, Grafana Cloud | Uptime checks from outside, a backup heartbeat, and cluster metrics that outlive the primary region |
 
 ## Status

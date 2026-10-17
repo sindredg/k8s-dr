@@ -51,12 +51,13 @@ The key names in each file are readable; only the values are encrypted. Keep the
 3. [Service deployment](runbooks/service-deployment.md): the public endpoint, DNS records, Flux with the SOPS key, certificates, PostgreSQL, Gitea, and `make create-fixtures`.
 4. [Backup and restore](runbooks/backup-restore.md): confirm that a set appears, then restore one into the test namespaces.
 5. [Regional recovery](runbooks/regional-recovery.md): `make preflight`, then the drill and the return to the primary.
+6. [Unattended drills](runbooks/unattended-drills.md): `make load-dataset`, then the switches that start scheduled drills.
 
 Each runbook states its expected output. The [worklogs](worklogs/) show what the same steps printed here, including the failures.
 
 ## Remove it
 
-1. Remove the recovery environment if one exists, as the [regional recovery runbook](runbooks/regional-recovery.md#remove-the-recovery-environment) describes.
+1. Delete the `SCHEDULED_DRILLS` and `AUTO_FAILOVER` repository variables, so no drill or recovery starts. Remove the recovery environment if one exists, as the [regional recovery runbook](runbooks/regional-recovery.md#remove-the-recovery-environment) describes.
 2. Destroy `infra/primary`. The worker data disk has `prevent_destroy`; remove that setting first.
 3. Destroy `infra/shared`. The backup bucket has `prevent_destroy` and a 14-day retention policy: remove the setting, then remove the policy and empty the bucket, or wait until the sets expire.
 4. Destroy `infra/bootstrap` last: it holds the state of the other roots, and its bucket also has `prevent_destroy`.

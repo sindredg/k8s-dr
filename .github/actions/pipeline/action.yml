@@ -3,8 +3,8 @@ name: Pipeline setup
 description: >-
   Install the recovery toolchain, sign in as the pipeline account through
   workload identity federation, and read both age keys from Secret Manager.
-  The Recover and Return workflows share it, so both pin the same tools. See
-  decision 0013.
+  The Recover, Return, and Drill workflows share it, so all pin the same
+  tools. See decision 0013.
 
 inputs:
   workload_identity_provider:
@@ -35,8 +35,8 @@ runs:
     - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db  # v3.0.1
       with:
         version: "589.0.0"
-    # The preflight and the fixture playbooks need sops, age, and dig.
-    - name: Install sops, age, and dig
+    # The preflight and the fixture playbooks need sops, age, dig, and jq.
+    - name: Install sops, age, dig, and jq
       shell: bash
       env:
         SOPS_VERSION: "3.13.3"
@@ -45,7 +45,7 @@ runs:
         AGE_SHA256: cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
       run: |
         sudo apt-get update
-        sudo apt-get install --yes --no-install-recommends bind9-dnsutils
+        sudo apt-get install --yes --no-install-recommends bind9-dnsutils jq
         mkdir -p "$RUNNER_TEMP/bin"
         curl -sSLo "$RUNNER_TEMP/bin/sops" \
           "https://github.com/getsops/sops/releases/download/v$SOPS_VERSION/sops-v$SOPS_VERSION.linux.amd64"

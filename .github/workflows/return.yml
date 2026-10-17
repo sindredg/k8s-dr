@@ -30,7 +30,7 @@ concurrency:
 jobs:
   return:
     if: inputs.discard_recovery_writes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment: recovery
     timeout-minutes: 90
     env:
