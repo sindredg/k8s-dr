@@ -18,7 +18,7 @@ The planned milestones run in the order 12, 11, 13, 14, 15, 16. Unattended drill
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
 | 10. Automated recovery | Recovery runs without a person | Complete |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
-| 12. Unattended drills | Measured recovery with nobody present | Planned |
+| 12. Unattended drills | Measured recovery with nobody present | In progress |
 | 13. Failback with data | Optional return that keeps the recovery writes | Planned |
 | 14. Close the recovery gaps of the lab | Separate backup project, threat model, and an accurate production readiness page | Planned |
 | 15. Zonal resilience decision | A recorded choice on surviving the loss of one zone | Planned |
@@ -176,7 +176,7 @@ In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provi
 
 ## 12. Unattended drills
 
-Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start by the watchdog has run against stubs only. Because GitHub starts scheduled runs late, detection can take up to about 25 minutes ([decision 0013](docs/decisions/0013-automated-recovery.md#schedule)). A decision record will define how a drill isolates the primary, how it ends, and where its results are kept, before this is built.
+Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start by the watchdog has run against stubs only. Because GitHub starts scheduled runs late, detection can take up to about 25 minutes ([decision 0013](docs/decisions/0013-automated-recovery.md#schedule)). [Decision 0015](docs/decisions/0015-unattended-drills.md) defines how a drill isolates the primary, how it ends, and where its results are kept. Progress is in the [worklog](docs/worklogs/12-unattended-drills.md), and the results are on the [results page](docs/drills.md).
 
 - [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
 - [ ] Start a drill from a schedule: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.

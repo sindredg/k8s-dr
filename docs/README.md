@@ -9,6 +9,7 @@ The [project plan](../plan.md) defines each milestone and its validation gate. T
 | [Architecture](architecture/README.md) | How each part of the design works and connects, with diagrams. |
 | [Reproduce the project](reproduce.md) | What to prepare and change to build it in your own accounts, and the order of the runbooks. |
 | [Production readiness](production-readiness.md) | What a production deployment adds to this lab. |
+| [Unattended drill results](drills.md) | Recovery time and data loss of every scheduled drill. |
 
 ## Runbooks
 
@@ -20,6 +21,7 @@ The [project plan](../plan.md) defines each milestone and its validation gate. T
 | [Backup and restore](runbooks/backup-restore.md) | Check the backup sets and restore one with the restore Job. |
 | [Regional recovery](runbooks/regional-recovery.md) | Recover the service in the second region, measure it, and return to the primary. |
 | [Snapshot backups](runbooks/snapshot-backups.md) | Convert the worker data disk to LVM, check captures, and remove a leftover snapshot. |
+| [Unattended drills](runbooks/unattended-drills.md) | Load the dataset, switch the scheduled drills on and off, and read their results. |
 
 ## Worklogs
 
@@ -40,6 +42,7 @@ Each worklog records what was built and the commands and results that passed its
 | [Rebuild from the runbooks](worklogs/08-rebuild-from-runbooks.md) | 8: the rebuild from empty state and every deviation |
 | [Backups without downtime](worklogs/09-backups-without-downtime.md) | 9: the LVM snapshot capture and its validation |
 | [Automated recovery](worklogs/10-automated-recovery.md) | 10: shared node identities, then the recovery pipeline |
+| [Unattended drills](worklogs/12-unattended-drills.md) | 12: the drill workflow, the dataset, and the scheduled drills |
 
 ## Decisions
 
@@ -59,7 +62,7 @@ Each worklog records what was built and the commands and results that passed its
 | [0012 Back up every 15 minutes](decisions/0012-backup-every-15-minutes.md) | The shorter data-loss window and what it costs. |
 | [0013 Automated recovery](decisions/0013-automated-recovery.md) | Accepted: a pipeline and a watchdog recover the service with nobody present. |
 | [0014 Capture backups from an LVM snapshot](decisions/0014-snapshot-backups.md) | Accepted: back up from one snapshot while Gitea keeps running. |
-| [0015 Unattended drills](decisions/0015-unattended-drills.md) | Proposed: a scheduled drill that isolates the primary, waits for the watchdog's recovery, and returns. |
+| [0015 Unattended drills](decisions/0015-unattended-drills.md) | Accepted: a scheduled drill that isolates the primary, waits for the watchdog's recovery, and returns. |
 
 ## Troubleshooting
 

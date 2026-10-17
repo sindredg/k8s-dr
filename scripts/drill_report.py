@@ -103,8 +103,8 @@ def read_events(path: Path) -> list[tuple[datetime, str, str, str]]:
     return events
 
 
-def timeline_table(events: list[tuple[datetime, str, str, str]]) -> str:
-    """One row per stage in the order the stages started."""
+def stage_rows(events: list[tuple[datetime, str, str, str]]) -> dict[str, dict]:
+    """The start, end, and notes of each stage, in the order the stages started."""
     rows: dict[str, dict] = {}
     for time, stage, event, note in events:
         row = rows.setdefault(stage, {"start": None, "end": None, "notes": []})
@@ -116,6 +116,12 @@ def timeline_table(events: list[tuple[datetime, str, str, str]]) -> str:
                 row["end"] = time
         if note:
             row["notes"].append(f"{time.strftime('%H:%M:%S')} {note}")
+    return rows
+
+
+def timeline_table(events: list[tuple[datetime, str, str, str]]) -> str:
+    """One row per stage in the order the stages started."""
+    rows = stage_rows(events)
     lines = ["| Stage | Start (UTC) | End (UTC) | Duration | Notes |", "| --- | --- | --- | --- | --- |"]
     for stage, row in rows.items():
         start = row["start"].strftime(TIME_FORMAT) if row["start"] else "not recorded"
