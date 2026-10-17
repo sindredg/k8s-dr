@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) and with [run settings in the cluster](#amendment-run-settings-in-the-cluster). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), and with [the watchdog workflow](#amendment-the-watchdog-workflow). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
 
 Date: 2026-10-11
 
@@ -161,3 +161,41 @@ The check therefore fails only on a set named after the start of the run, or on 
 
 - "Until the run fences automatically, the regional recovery runbook disables the account by hand" no longer holds: the `fence` stage disables it.
 - "it fails the check that the `recovery/` prefix is empty and so stops a run" holds only for a planted set named after the start of the run.
+
+## Amendment: the watchdog workflow
+
+Date: 2026-10-17. [Step 5](../../plan.md#10-automated-recovery) of milestone 10 builds [A watchdog starts the recovery](#a-watchdog-starts-the-recovery) as `.github/workflows/watchdog.yml` and `scripts/watchdog.py`.
+
+### Two jobs
+
+The workflow runs every five minutes. A first job needs no cloud access and checks conditions 2, 3, and 4. Only when they hold does a second job run in the `recovery` environment, sign in as the pipeline account, repeat them, and check condition 1. A healthy primary therefore causes no sign-in and no deployment record, and the public log shows only the reason that the run started nothing.
+
+| Condition | How the script checks it |
+| --- | --- |
+| 1. Every checker failed for five minutes | Reads `uptime_check/check_passed` of the one uptime check whose host is the public name. At least three checker regions must report, no result in the window may pass, and each region's oldest result in the window must be at or before its start. A missing or failed read starts nothing |
+| 2. The runner's own requests fail | `https://<name>/api/healthz` on the public name and on the primary's own name returns anything but 200, or nothing |
+| 3. No recovery runs, and the public name points at the primary | No run of the `Recover` workflow is queued, waiting, or in progress. The public name and the primary's own name resolve to the same addresses at Cloudflare's DNS over HTTPS. After a cutover they differ |
+| 4. The switch is on | The repository variable `AUTO_FAILOVER` is exactly `true`. Unset is off |
+
+Every check fails closed: an error, a missing answer, or an unexpected count starts nothing.
+
+### What it starts
+
+The second job dispatches `Recover` on `main` with `through=all` and `reset=true`, through the job's `GITHUB_TOKEN` with `actions: write`. GitHub starts a workflow from a `GITHUB_TOKEN` dispatch, and records `github-actions[bot]` as the run's triggering actor.
+
+`reset=true` archives the run state of an earlier rehearsal or drill, which would otherwise stop the run before the fence. A run of the current incident is never archived by a later start, because of the next rule.
+
+If the newest `Recover` run was started by the watchdog and did not succeed, the watchdog starts nothing more. A retry every five minutes of a run that fails the same way helps nobody, and a run that fails before the cutover leaves the primary fenced but the public name unchanged. A person fixes the cause and resumes the run without `reset`. Once a newer run succeeds, the rule no longer applies, and after a cutover condition 3 holds the watchdog back anyway.
+
+| Option | Trade-off |
+| --- | --- |
+| Two jobs, cloud sign-in only when needed (selected) | One more job definition. A healthy primary costs one short job with no credential |
+| One job in the `recovery` environment | Simpler, but signs in as the pipeline account and records a deployment every five minutes |
+| Retry a failed automatic start | Recovers from a transient failure without a person. A failure that repeats would rerun stages with side effects every five minutes |
+
+### Limits
+
+- Detection takes at least five minutes of failures, plus up to five minutes until the next scheduled run, plus GitHub's schedule delay, plus a minute or two before uptime results reach Cloud Monitoring.
+- The `GITHUB_TOKEN` of the second job can start and cancel any workflow of the repository during that job. The job runs only code from `main`.
+- A planned isolation of the primary starts a recovery while the switch is on. Turn it off first, as the runbook says.
+- The repository variable is the only switch. Anyone who can change repository variables can turn automatic recovery on or off.

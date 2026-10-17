@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Step 4 is built and checked against stubs on 2026-10-17; it has not run live. See [Step 4](#step-4-fence-and-resume-backups-without-a-git-change). Steps 5 and 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Step 4 is built and checked against stubs on 2026-10-17; it has not run live. See [Step 4](#step-4-fence-and-resume-backups-without-a-git-change). Step 5 is built, checked against stubs, and read against the live system on 2026-10-17; it has not started a run. See [Step 5](#step-5-the-watchdog). Step 6 is planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -273,3 +273,58 @@ Local, against stubs, 2026-10-17. Expected before the run: the stage runs after 
 - That Flux on the live clusters substitutes `run-settings` over `cluster-settings`. The order and the optional behavior are taken from the Flux Kustomization reference, not observed. Flux reads `sync.yaml` from `main`, so the live check runs after the merge.
 - The `fence`, `dns-cutover`, `probe-recovery`, and `resume-backups` stages have not run live. They run in the full recovery of the milestone 10 gate, which also checks that the first `recovery/` set appears.
 - Return step 3 of the runbook is written, not run.
+
+### After the merge
+
+Live system, read-only, 2026-10-17 12:33Z, on the primary through IAP. Expected: Flux applied the merge commit, the `gitea` Kustomization is Ready with the optional source, and the absent ConfigMap changes nothing.
+
+| Read | Result |
+| --- | --- |
+| `kubectl get kustomization gitea --namespace flux-system --output yaml` | `lastAppliedRevision` `main@sha1:f0e4780...`, `Ready` `True` `ReconciliationSucceeded`. `substituteFrom` lists `cluster-settings`, then `run-settings` with `optional: true` |
+| `kubectl get configmap run-settings --namespace flux-system` | `NotFound` |
+| `kubectl get cronjob gitea-backup --namespace gitea --output yaml` | `suspend: false`, last successful run at 12:22:11Z |
+
+This shows that a missing `run-settings` defines nothing on the primary. The override itself shows only on a recovery cluster, in the gate run.
+
+## Step 5: the watchdog
+
+[Decision 0013](../decisions/0013-automated-recovery.md#amendment-the-watchdog-workflow) starts the recovery from a scheduled workflow with a switch.
+
+### What was built
+
+| Area | Files | Change |
+| --- | --- | --- |
+| Script | `scripts/watchdog.py` | `local` checks the switch, the runner's requests to both names, the DNS answers for both names, and the `Recover` runs. `confirm` repeats them, reads the uptime results, and with `--start` dispatches `Recover` with `through=all` and `reset=true` |
+| Workflow | `.github/workflows/watchdog.yml` | Every five minutes. The `local` job has `contents: read` and `actions: read` and no environment. The `confirm` job runs only when `local` reports `candidate=true`, in the `recovery` environment, with `id-token: write` and `actions: write` |
+| Docs | Decision 0013, the regional recovery runbook, architecture pages 11 and 12 | The amendment, the switch and its check, a drill precondition, and the watchdog's access |
+
+No Terraform change: the identity provider accepts any workflow of this repository in the `recovery` environment on `main`, and `roles/viewer` already lets the pipeline account read the uptime check and its results.
+
+### Local checks
+
+Local, against stubs, 2026-10-17. Expected before the run: every condition that does not hold starts nothing, the first job never signs in, and only a five-minute failure of every checker dispatches one full run.
+
+| Check | Result | Can it fail |
+| --- | --- | --- |
+| `python -m unittest tests.test_watchdog` | 25 tests `OK` | Fourteen edits to a copy of `scripts/watchdog.py` each failed at least one test: the switch ignored, an answering name ignored, the cutover ignored, a running recovery ignored, a failed automatic start ignored, a passing checker ignored, a failure shorter than the window accepted, a missing checker accepted, a checker with no results accepted, two matching uptime checks accepted, `through=verification` dispatched, a failed dispatch ignored, and `confirm` without the local checks. The window edit passed the first version of the tests; a test for failures that do not reach back to the window start was added |
+| `make check` | Exit 0, 319 tests `OK`, yamllint clean | |
+| `make pins` | Exit 0 | |
+
+### Reads against the live system
+
+Live system, read-only, 2026-10-17 about 12:40Z, from the operator machine with the operator's credentials. The primary served. Expected: each condition that reads the live system reports why it starts nothing, or holds where it should.
+
+| Read | Result |
+| --- | --- |
+| `python3 scripts/watchdog.py local`, switch unset | `no start: the AUTO_FAILOVER variable is not true`, `candidate=false` |
+| The same with `AUTO_FAILOVER=true` in the local environment | `no start: https://git.sindrg.com/api/healthz returned 200` |
+| Public name on the primary | Holds: both names resolve to the same address |
+| No recovery running | Holds: the newest `Recover` runs were started by hand and succeeded |
+| Every checker failed | `no start: checker usa-virginia passed within the window`. A direct read of the same API returned three series, `usa-virginia`, `eur-belgium`, and `apac-singapore`, each with about 45 results in eight minutes |
+
+### Not verified
+
+- The workflow has not run. Scheduled runs start after the merge. The first runs are read for `candidate=false` and a skipped `confirm` job.
+- That GitHub records `github-actions[bot]` as the triggering actor of a dispatched run, and that a dispatch from `GITHUB_TOKEN` starts the run. Taken from the GitHub documentation; the gate run shows it.
+- The `confirm` job as the pipeline account. Its reads ran with the operator's credentials.
+- The gate's second half: no start during a probe failure shorter than the window, and none while the switch is off.

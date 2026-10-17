@@ -1,12 +1,13 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage). Amended on 2026-10-17 with [Run the procedure from GitHub Actions](#run-the-procedure-from-github-actions). Its setup and runs through `verification` passed on 2026-10-17, as two runs split at `preflight`; see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#workflow-runs). Step 5 and a rerun after a failed stage have not run. Amended on 2026-10-17 for step 4 of milestone 10: the run resumes recovery backups through a ConfigMap in the cluster, not a change in Git, and a `recovery/` set from an earlier drill no longer stops a run. Built and checked against stubs; not run live.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage). Amended on 2026-10-17 with [Run the procedure from GitHub Actions](#run-the-procedure-from-github-actions). Its setup and runs through `verification` passed on 2026-10-17, as two runs split at `preflight`; see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#workflow-runs). Step 5 and a rerun after a failed stage have not run. Amended on 2026-10-17 for step 4 of milestone 10: the run resumes recovery backups through a ConfigMap in the cluster, not a change in Git, and a `recovery/` set from an earlier drill no longer stops a run. Built and checked against stubs; not run live. Amended on 2026-10-17 for step 5 of milestone 10 with [Start automatically with the watchdog](#start-automatically-with-the-watchdog), which is built and checked against stubs and read-only against the live system; it has not started a run.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
 ## Preconditions
 
 - The primary service is isolated for the drill, and the external uptime check from [decision 0011](../decisions/0011-external-uptime-probe.md) is applied and passing.
+- The `AUTO_FAILOVER` repository variable is unset, unless the drill tests the [watchdog](#start-automatically-with-the-watchdog). While it is `true`, isolating the primary starts a recovery.
 - The operator can access the external source repository, remote Terraform state, recovery-region credentials, offsite backup storage, and DNS or endpoint controls without using the primary region.
 - The SOPS age key and the backup age key are on the operator machine, restored from the credential store if needed. The defaults are `~/.config/k8s-dr/age.agekey` and `~/.config/k8s-dr/backup.agekey`.
 - A verified backup set contains PostgreSQL data and Gitea repositories and configuration from one consistent recovery point. Its timestamp and integrity check are recorded.
@@ -121,6 +122,29 @@ Inputs: the applied shared root from the [primary infrastructure runbook](primar
    Expected: the log shows `passed earlier, skipped` for each stage that passed, and the run continues at the failed one.
 
 5. For a full recovery, start the workflow with `through=all`. After a rehearsal or a drill, remove the recovery environment as in [Remove the recovery environment](#remove-the-recovery-environment).
+
+### Start automatically with the watchdog
+
+The `Watchdog` workflow runs every five minutes and starts `Recover` with `through=all` and `reset=true` when the conditions of [decision 0013](../decisions/0013-automated-recovery.md#amendment-the-watchdog-workflow) hold: every uptime checker failed for five minutes, the runner cannot reach the public name or the primary's own name, the public name still points at the primary, no recovery runs, and the switch is on.
+
+1. Turn the switch on, or off before planned work that stops the primary. Unset is off.
+
+   ```bash
+   gh variable set AUTO_FAILOVER --body true
+   gh variable delete AUTO_FAILOVER
+   ```
+
+   Expected: `gh variable list` shows `AUTO_FAILOVER` with `true`, or does not list it.
+
+2. Check what the last scheduled run decided.
+
+   ```bash
+   gh run view "$(gh run list --workflow watchdog.yml --limit 1 --json databaseId --jq '.[0].databaseId')" --log | grep -E 'no start|candidate=|started'
+   ```
+
+   Expected while the primary serves: `no start:` with the first condition that does not hold, and `candidate=false`. The `confirm` job is skipped.
+
+3. If an automatic run fails, the watchdog starts nothing more until a newer `Recover` run succeeds. Fix the cause and resume the run as in step 4 of [Start a run](#start-a-run), without `reset`.
 
 ## Procedure
 
