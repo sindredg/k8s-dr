@@ -1,62 +1,71 @@
 # Self-Managed Kubernetes Disaster Recovery
 
-Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
+[![Ansible](https://github.com/sindredg/k8s-dr/actions/workflows/ansible.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/ansible.yml)
+[![Docs](https://github.com/sindredg/k8s-dr/actions/workflows/docs.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/docs.yml)
+[![Pins](https://github.com/sindredg/k8s-dr/actions/workflows/pins.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/pins.yml)
+[![Public surface](https://github.com/sindredg/k8s-dr/actions/workflows/surface.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/surface.yml)
 
-Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 10 in [plan.md](plan.md) passed their gates. Milestone 8 rebuilt the environment from the runbooks, milestone 9 removed the backup downtime, and milestone 10 automated the recovery. The planned milestones measure the recovery unattended, shorten it, keep the recovery writes on the return, and close the recovery gaps of the lab; [plan.md](plan.md) gives their order.
+Recover a stateful service after losing a cloud region, from code and offsite backups.
 
-The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds. [Milestone 14](plan.md#14-close-the-recovery-gaps-of-the-lab) closes the gaps that weaken recovery.
+Gitea and PostgreSQL run on a kubeadm-built Kubernetes cluster on Google Cloud VMs in Finland. When the primary region fails, one GitHub Actions workflow builds a new cluster in Belgium, restores the newest backup, and moves the public name `git.sindrg.com` to it. A scheduled watchdog can start that workflow on its own. The lab models organizations that must run Kubernetes on VMs they control.
+
+[Results](#results) · [How recovery works](#how-recovery-works) · [Stack](#stack) · [Status](#status) · [Documentation](#documentation)
 
 ## Results
+
+Three drills on 2026-10-04 stopped the primary VMs and recovered the service in Belgium.
 
 | Measure | Drill 1 | Drill 2 | Drill 3 | Target |
 | --- | --- | --- | --- | --- |
 | Recovery time | 19 min 17 s | 17 min 36 s | 16 min 46 s | At most 4 hours |
 | Data loss | 25 min 28 s | 15 min 16 s | 10 min 10 s | At most 2 hours |
 | Backup interval | 60 min | 60 min | 15 min | |
-| Failed steps | One check rerun | None | None | |
 
 Recovery time runs from the first failed external probe until sign-in, a known commit and issue, and a new push work through `git.sindrg.com`. Data loss runs from the last acknowledged write to the newest restored write. [Decision 0002](docs/decisions/0002-recovery-contract.md#measurement) defines both.
 
 What the numbers do not show:
 
-- **The drills were attended.** An operator ran the steps and checked the result between them. Since [milestone 10](plan.md#10-automated-recovery), one GitHub Actions workflow runs every step and its check, and a scheduled watchdog can start it ([decision 0013](docs/decisions/0013-automated-recovery.md)). A full run from the workflow took 17 min 07 s on 2026-10-17. Detection by the watchdog has not been measured; [milestone 12](plan.md#12-unattended-drills) measures it.
-- **Most of the time is the cluster build.** The restore Job takes under 30 seconds. [Milestone 11](plan.md#11-faster-cluster-build) builds nodes from a prepared image.
-- **Each backup in the drills paused the service.** A backup briefly scaled Gitea to zero, four times an hour. [Decision 0014](docs/decisions/0014-snapshot-backups.md) replaces this with a capture from an LVM snapshot while Gitea keeps running. [Milestone 9](plan.md#9-backups-without-downtime) verified it on the primary.
-- **Cost was not read from billing.** The recovery environment existed for 42, 28, and 23 minutes. No milestone measures drill cost.
+- **The drills were attended.** An operator ran each step. Since [milestone 10](plan.md#10-automated-recovery), one workflow runs every step; a full run took 17 min 07 s on 2026-10-17, without detection. [Milestone 12](plan.md#12-unattended-drills) measures recovery with nobody present, detection included.
+- **Most of the time is the cluster build.** In drill 3 it took 10 min 42 s of the 16 min 46 s. [Milestone 11](plan.md#11-faster-cluster-build) shortens it.
+- **Backups paused the service during the drills.** Since [milestone 9](plan.md#9-backups-without-downtime), backups are captured from an LVM snapshot while Gitea keeps running ([decision 0014](docs/decisions/0014-snapshot-backups.md)).
 
-The external uptime check during the three drills, in UTC+2. The wide gaps are the outages and the narrow dips are backups:
+## How recovery works
 
-![Passed checks of the uptime check, with three outages of about 20 minutes each](docs/images/drills-uptime-passed-checks.png)
+![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a GitHub Actions watchdog that reads the probe results and starts a workflow, which builds a recovery cluster in Belgium from the same Git repository, restores it from the bucket, and moves the DNS name.](docs/diagrams/readme-overview.svg)
 
-## Architecture
+1. **Back up.** Every 15 minutes the primary captures PostgreSQL and the Gitea repositories from one snapshot, encrypts them with age, and uploads them to a bucket in Belgium. The writer cannot delete or overwrite a backup.
+2. **Detect.** An uptime check probes `git.sindrg.com` from three continents. A scheduled watchdog starts a recovery only when every checker has failed for five minutes, the runner cannot reach the primary either, and the `AUTO_FAILOVER` switch is on. The automatic start has run against test stubs only; [milestone 12](plan.md#12-unattended-drills) runs it live.
+3. **Recover.** The `Recover` workflow signs in to Google Cloud without a stored key and runs these stages in order: preflight, provisioning, bootstrap, Flux reconcile, restore, verification, fence, DNS cutover, checks through the public name, and resuming backups. Each stage ends with a check. A failure stops the run before the cutover, and a rerun resumes at the failed stage.
+4. **Return.** After a drill, the `Return` workflow starts the primary, moves the name back, and removes the recovery environment. It discards the writes that the recovery cluster accepted.
 
-![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a recovery cluster in Belgium that is built from the same Git repository and restored from the bucket.](docs/diagrams/readme-overview.svg)
+The recovery region runs no VMs until a recovery starts. Terraform state, the deployment source, the backups, and the recovery credentials all stay reachable without the primary region. The [architecture pages](docs/architecture/README.md) explain each part.
 
-The recovery region has no running VMs until a drill. Terraform state, deployment source, backup storage, and recovery credentials remain available if the primary region is unavailable. The backup includes PostgreSQL data and Gitea repositories and configuration as one consistent recovery point.
+## Stack
 
-## Tools and responsibilities
-
-| Tool | Responsibility |
+| Tool | Role |
 | --- | --- |
-| Terraform | VM, network, load balancer, and backup infrastructure |
-| Ansible and kubeadm | VM configuration, Kubernetes bootstrap, and the add-ons Flux depends on |
-| Flux and Helm | Deploy and reconcile the application layer from GitHub: cert-manager, PostgreSQL, Gitea, backups, monitoring, and network policies |
-| Traefik and cert-manager | Route HTTPS through the Gateway API with Let's Encrypt certificates |
-| SOPS and age | Keep secrets encrypted in the public repository; encrypt backups to keys the cluster does not hold |
-| PostgreSQL and Gitea | Stateful service used to prove recovery |
-| Offsite object storage | Encrypted application backups every 15 minutes, with a Healthchecks.io heartbeat that alerts when they stop |
-| Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
-| GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, a daily scan of the public surface, the recovery and return workflows, which sign in to Google Cloud without a stored key, and the watchdog that starts a recovery |
-| External health probe | Measure outage and restored service from outside the cluster |
+| Terraform | VMs, network, load balancer, buckets, and the pipeline identity |
+| Ansible and kubeadm | Node configuration and the Kubernetes bootstrap |
+| Flux and Helm | The application layer, reconciled from this repository |
+| Traefik and cert-manager | HTTPS through the Gateway API, with Let's Encrypt certificates |
+| SOPS and age | Encrypted secrets in the public repository and encrypted backups |
+| GitHub Actions | Tests and linters, pin and public-surface checks, the watchdog, and the recovery and return workflows |
+| Cloud Monitoring, Healthchecks.io, Grafana Cloud | Uptime checks from outside, a backup heartbeat, and cluster metrics that outlive the primary region |
+
+## Status
+
+Milestones 0 to 10 are complete, from the recovery contract to automated recovery. Next are unattended drills and a faster cluster build. The [roadmap](plan.md) gives every milestone, its gate, and the order.
+
+[Production readiness](docs/production-readiness.md) lists what a production deployment adds to this lab.
 
 ## Documentation
 
 | To find | Read |
 | --- | --- |
-| Drill results, timelines, and failures | Worklogs [6](docs/worklogs/06-disaster-drill.md) and [7](docs/worklogs/07-faster-recovery.md) |
-| The recovery procedure | [Regional recovery runbook](docs/runbooks/regional-recovery.md) |
-| How each part works, with diagrams | [Architecture pages](docs/architecture/README.md) |
+| How each part works, with diagrams | [Architecture](docs/architecture/README.md) |
 | Why it is built this way | [Decision records](docs/decisions/) |
+| The recovery procedure | [Regional recovery runbook](docs/runbooks/regional-recovery.md) |
+| Drill timelines and failures | Worklogs [6](docs/worklogs/06-disaster-drill.md), [7](docs/worklogs/07-faster-recovery.md), and [10](docs/worklogs/10-automated-recovery.md) |
 | How to build it yourself | [Reproduce the project](docs/reproduce.md) |
 | Everything else | [Documentation index](docs/README.md) |
 
