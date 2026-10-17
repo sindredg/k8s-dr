@@ -32,7 +32,7 @@ Nothing on the list is in Finland. Drill 1 recovered with both primary VMs stopp
 
 ## The procedure
 
-![Swimlane diagram showing the eight recovery steps in order across Terraform, Ansible and Flux, Cloudflare DNS, and the operator's checks: build the infrastructure, create the direct DNS name, bootstrap, restore, check, cut over, check again, and fence the primary.](../diagrams/recovery-procedure.svg)
+![Swimlane diagram showing the stages of the Recover workflow in order across Google Cloud, Kubernetes, Cloudflare DNS, and the checks: preflight, build the infrastructure, bootstrap, restore, check through the direct name, fence the primary, cut over, check the public name, and resume backups.](../diagrams/recovery-procedure.svg)
 
 | Step | Reuses |
 | --- | --- |
@@ -48,7 +48,7 @@ No step is written for recovery only. Each one is exercised on the primary first
 
 Since [milestone 10](../../plan.md#10-automated-recovery), `make recover` runs the steps as stages: `preflight`, `provisioning`, `bootstrap`, `flux-reconcile`, `restore`, `verification`, `fence`, `dns-cutover`, `probe-recovery`, and `resume-backups`. Each stage ends with a check, the run stops at the first failed check, and a new run resumes at that stage. The `Recover` GitHub Actions workflow runs the command as a pipeline account and keeps the run state in the state bucket, so the resume works on a new runner. The scheduled watchdog starts the workflow while the `AUTO_FAILOVER` variable is `true`, every uptime checker has reported failure for five minutes, the runner cannot reach the primary either, and no recovery is running. See [decision 0013](../decisions/0013-automated-recovery.md).
 
-The workflow fences the primary before the cutover, unlike the procedure in the diagram: a primary that still answers stops the run before `git.sindrg.com` moves. The [runbook](../runbooks/regional-recovery.md#run-the-procedure-from-github-actions) lists what each stage checks.
+The workflow fences the primary before the cutover: a primary that still answers stops the run before `git.sindrg.com` moves. The [runbook](../runbooks/regional-recovery.md#run-the-procedure-from-github-actions) lists what each stage checks.
 
 After a drill, the `Return` workflow starts the primary, moves `git.sindrg.com` back after checks through the primary's own name, suspends recovery backups, lifts the fence, destroys the recovery environment, and waits for a primary backup. It discards every write the recovery cluster accepted.
 

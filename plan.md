@@ -181,7 +181,7 @@ Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start b
 - [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
 - [ ] Start a drill from a schedule: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
 - [ ] End each drill with the return workflow, with no person acting.
-- [ ] Keep the results of every drill, attended and unattended, in one table that the README links to.
+- [ ] Keep the results of every unattended drill in one table that the README links to.
 
 **Gate:** Two consecutive drills started by the schedule meet both targets with no person acting, the watchdog started each recovery, and the worklog compares them with drills 1 to 3.
 

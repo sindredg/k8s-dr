@@ -4,7 +4,7 @@ What watches the system, from inside and from outside, and what does not.
 
 ## Overview
 
-![Architecture diagram showing the monitoring signals: metric sources scraped by the Alloy collector and written to Grafana Cloud, the backup Job pinging Healthchecks.io, a Cloud Monitoring uptime check requesting the health endpoint every minute, and a daily GitHub Actions scan of the public surface.](../diagrams/monitoring-signals.svg)
+![Architecture diagram showing the monitoring signals: metric sources scraped by the Alloy collector and written to Grafana Cloud, the backup Job pinging Healthchecks.io, a Cloud Monitoring uptime check requesting the health endpoint every minute, and GitHub Actions, which scans the public surface daily and runs a watchdog every five minutes that reads the uptime results and requests the health endpoint.](../diagrams/monitoring-signals.svg)
 
 | Signal | Where it runs | Tells you | Alerts |
 | --- | --- | --- | --- |

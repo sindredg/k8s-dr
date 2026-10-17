@@ -66,7 +66,7 @@
     <div class="diagram-container">
       <svg viewBox="0 0 960 584" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="monitoring-signals-title monitoring-signals-desc">
         <title id="monitoring-signals-title">What watches the system</title>
-        <desc id="monitoring-signals-desc">Architecture diagram showing the monitoring signals: metric sources scraped by the Alloy collector and written to Grafana Cloud, the backup Job pinging Healthchecks.io, a Cloud Monitoring uptime check requesting the health endpoint every minute, and a daily GitHub Actions scan of the public surface.</desc>
+        <desc id="monitoring-signals-desc">Architecture diagram showing the monitoring signals: metric sources scraped by the Alloy collector and written to Grafana Cloud, the backup Job pinging Healthchecks.io, a Cloud Monitoring uptime check requesting the health endpoint every minute, and GitHub Actions, which scans the public surface daily and runs a watchdog every five minutes that reads the uptime results and requests the health endpoint.</desc>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
           <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
@@ -91,6 +91,8 @@
         <path d="M 680,360 L 576,360 Q 568,360 568,368 L 568,372 Q 568,380 560,380 L 456,380" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
         <path d="M 680,456 L 576,456 Q 568,456 568,448 L 568,412 Q 568,404 560,404 L 456,404" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
 
+        <path d="M 768,392 L 768,424" fill="none" stroke="#739fdf" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+
         <!-- connector labels -->
         <rect x="242" y="116" width="44" height="12" rx="2" fill="#2d3142"/>
         <text x="264" y="125" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SCRAPE</text>
@@ -100,8 +102,10 @@
         <text x="568" y="253" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HEARTBEAT</text>
         <rect x="586" y="340" width="76" height="12" rx="2" fill="#2d3142"/>
         <text x="624" y="349" fill="#f08a59" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">/API/HEALTHZ</text>
-        <rect x="592" y="436" width="64" height="12" rx="2" fill="#2d3142"/>
-        <text x="624" y="445" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">DAILY SCAN</text>
+        <rect x="586" y="436" width="76" height="12" rx="2" fill="#2d3142"/>
+        <text x="624" y="445" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SCAN, HEALTHZ</text>
+        <rect x="776" y="402" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="798" y="411" fill="#739fdf" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">RESULTS</text>
 
         <!-- nodes -->
         <!-- node: Metric sources -->
@@ -149,8 +153,8 @@
         <rect x="680" y="424" width="176" height="64" rx="6" fill="#2d3142"/>
         <rect x="680" y="424" width="176" height="64" rx="6" fill="rgba(245,245,245,0.03)" stroke="rgba(245,245,245,0.30)" stroke-width="1"/>
         <text x="768" y="447" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">GitHub Actions</text>
-        <text x="768" y="462" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">public surface scan</text>
-        <text x="768" y="475" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no credential</text>
+        <text x="768" y="462" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">surface scan, daily</text>
+        <text x="768" y="475" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">watchdog, every 5 min</text>
 
         <!-- legend strip -->
         <line x1="40" y1="516" x2="920" y2="516" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>

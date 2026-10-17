@@ -64,9 +64,9 @@
     <h1>The recovery procedure</h1>
 
     <div class="diagram-container">
-      <svg viewBox="0 0 960 784" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="recovery-procedure-title recovery-procedure-desc">
+      <svg viewBox="0 0 960 860" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="recovery-procedure-title recovery-procedure-desc">
         <title id="recovery-procedure-title">The recovery procedure</title>
-        <desc id="recovery-procedure-desc">Swimlane diagram showing the eight recovery steps in order across Terraform, Ansible and Flux, Cloudflare DNS, and the operator&#x27;s checks: build the infrastructure, create the direct DNS name, bootstrap, restore, check, cut over, check again, and fence the primary.</desc>
+        <desc id="recovery-procedure-desc">Swimlane diagram showing the stages of the Recover workflow in order across Google Cloud, Kubernetes, Cloudflare DNS, and the checks: preflight, build the infrastructure, bootstrap, restore, check through the direct name, fence the primary, cut over, check the public name, and resume backups.</desc>
         <defs>
           <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker>
           <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker>
@@ -81,82 +81,88 @@
 
         <!-- rules, lifelines and callouts -->
         <line x1="40" y1="72" x2="920" y2="72" stroke="rgba(245,245,245,0.22)" stroke-width="1"/>
-        <line x1="40" y1="688" x2="920" y2="688" stroke="rgba(245,245,245,0.22)" stroke-width="1"/>
-        <text x="60" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">TERRAFORM</text>
-        <text x="280" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">ANSIBLE AND FLUX</text>
-        <line x1="260" y1="72" x2="260" y2="688" stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
+        <line x1="40" y1="764" x2="920" y2="764" stroke="rgba(245,245,245,0.22)" stroke-width="1"/>
+        <text x="60" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">GOOGLE CLOUD</text>
+        <text x="280" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">KUBERNETES</text>
+        <line x1="260" y1="72" x2="260" y2="764" stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
         <text x="500" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">CLOUDFLARE DNS</text>
-        <line x1="480" y1="72" x2="480" y2="688" stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
-        <text x="720" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">OPERATOR CHECKS</text>
-        <line x1="700" y1="72" x2="700" y2="688" stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
-        <text x="280" y="112" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="start"><tspan x="280" dy="0">The uptime probe fails.</tspan><tspan x="280" dy="17">The clock starts.</tspan></text>
-        <text x="280" y="640" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="start"><tspan x="280" dy="0">All checks pass. The clock stops,</tspan><tspan x="280" dy="17">then the primary is fenced.</tspan></text>
+        <line x1="480" y1="72" x2="480" y2="764" stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
+        <text x="720" y="62" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">CHECKS</text>
+        <line x1="700" y1="72" x2="700" y2="764" stroke="rgba(245,245,245,0.1)" stroke-width="1"/>
+        <text x="60" y="112" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="start"><tspan x="60" dy="0">The watchdog or a dispatch</tspan><tspan x="60" dy="17">starts the Recover workflow.</tspan></text>
+        <text x="60" y="576" fill="#bfc0c0" font-size="14" font-style="italic" font-family="'Instrument Serif', 'Noto Serif', serif" text-anchor="start"><tspan x="60" dy="0">The public name passes its checks.</tspan><tspan x="60" dy="17">The clock stops; backups resume.</tspan></text>
 
         <!-- connectors (behind nodes) -->
-        <path d="M 150,140 L 150,156 Q 150,164 158,164 L 582,164 Q 590,164 590,172 L 590,188" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <path d="M 500,212 L 378,212 Q 370,212 370,220 L 370,260" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 810,140 L 810,156 Q 810,164 802,164 L 158,164 Q 150,164 150,172 L 150,188" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 240,212 L 362,212 Q 370,212 370,220 L 370,260" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
         <path d="M 370,308 L 370,332" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
         <path d="M 460,356 L 802,356 Q 810,356 810,364 L 810,404" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <path d="M 720,428 L 598,428 Q 590,428 590,436 L 590,476" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-        <path d="M 680,500 L 802,500 Q 810,500 810,508 L 810,548" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <path d="M 720,572 L 158,572 Q 150,572 150,580 L 150,620" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 720,428 L 158,428 Q 150,428 150,436 L 150,476" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 240,500 L 582,500 Q 590,500 590,508 L 590,548" fill="none" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <path d="M 680,572 L 802,572 Q 810,572 810,580 L 810,620" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 720,644 L 378,644 Q 370,644 370,652 L 370,692" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
 
         <!-- connector labels -->
 
 
         <!-- nodes -->
-        <!-- node: Apply infra/recovery -->
-        <rect x="60" y="92" width="180" height="48" rx="6" fill="#2d3142"/>
-        <rect x="60" y="92" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="150" y="113.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Apply infra/recovery</text>
-        <text x="150" y="128.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">network · VMs · load balancer</text>
-        <!-- node: Create git-dr record -->
-        <rect x="500" y="188" width="180" height="48" rx="6" fill="#2d3142"/>
-        <rect x="500" y="188" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="590" y="209.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Create git-dr record</text>
-        <text x="590" y="224.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">make dns-set · TTL 60 s</text>
-        <!-- node: make bootstrap -->
+        <!-- node: Preflight -->
+        <rect x="720" y="92" width="180" height="48" rx="6" fill="#2d3142"/>
+        <rect x="720" y="92" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="810" y="113.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Preflight</text>
+        <text x="810" y="128.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">keys · token · newest set</text>
+        <!-- node: Provision -->
+        <rect x="60" y="188" width="180" height="48" rx="6" fill="#2d3142"/>
+        <rect x="60" y="188" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="150" y="209.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Provision</text>
+        <text x="150" y="224.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">infra/recovery · git-dr record</text>
+        <!-- node: Bootstrap and reconcile -->
         <rect x="280" y="260" width="180" height="48" rx="6" fill="#2d3142"/>
         <rect x="280" y="260" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="370" y="281.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">make bootstrap</text>
-        <text x="370" y="296.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">cluster, then Flux deploys</text>
-        <!-- node: make restore -->
+        <text x="370" y="281.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Bootstrap and reconcile</text>
+        <text x="370" y="296.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">make bootstrap · Flux deploys</text>
+        <!-- node: Restore the newest set -->
         <rect x="280" y="332" width="180" height="48" rx="6" fill="#2d3142"/>
         <rect x="280" y="332" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="370" y="353.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">make restore</text>
-        <text x="370" y="368.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">newest set under primary/</text>
+        <text x="370" y="353.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Restore the newest set</text>
+        <text x="370" y="368.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">restore Job · primary/</text>
         <!-- node: Check through git-dr -->
         <rect x="720" y="404" width="180" height="48" rx="6" fill="#2d3142"/>
         <rect x="720" y="404" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
         <text x="810" y="425.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Check through git-dr</text>
         <text x="810" y="440.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">fixtures and a write check</text>
-        <!-- node: Move git.sindrg.com -->
-        <rect x="500" y="476" width="180" height="48" rx="6" fill="#2d3142"/>
-        <rect x="500" y="476" width="180" height="48" rx="6" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
-        <text x="590" y="497.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Move git.sindrg.com</text>
-        <text x="590" y="512.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">to the recovery address</text>
-        <!-- node: Check the public name -->
-        <rect x="720" y="548" width="180" height="48" rx="6" fill="#2d3142"/>
-        <rect x="720" y="548" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="810" y="569.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Check the public name</text>
-        <text x="810" y="584.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">fixtures and a write check</text>
         <!-- node: Fence the primary -->
-        <rect x="60" y="620" width="180" height="48" rx="6" fill="#2d3142"/>
-        <rect x="60" y="620" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="150" y="641.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Fence the primary</text>
-        <text x="150" y="656.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">disable its worker account</text>
+        <rect x="60" y="476" width="180" height="48" rx="6" fill="#2d3142"/>
+        <rect x="60" y="476" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="150" y="497.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Fence the primary</text>
+        <text x="150" y="512.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">stop VMs · disable account</text>
+        <!-- node: Move git.sindrg.com -->
+        <rect x="500" y="548" width="180" height="48" rx="6" fill="#2d3142"/>
+        <rect x="500" y="548" width="180" height="48" rx="6" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
+        <text x="590" y="569.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Move git.sindrg.com</text>
+        <text x="590" y="584.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">to the recovery address</text>
+        <!-- node: Check the public name -->
+        <rect x="720" y="620" width="180" height="48" rx="6" fill="#2d3142"/>
+        <rect x="720" y="620" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="810" y="641.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Check the public name</text>
+        <text x="810" y="656.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">fixtures and a write check</text>
+        <!-- node: Resume backups -->
+        <rect x="280" y="692" width="180" height="48" rx="6" fill="#2d3142"/>
+        <rect x="280" y="692" width="180" height="48" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="370" y="713.5" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Resume backups</text>
+        <text x="370" y="728.5" fill="#bfc0c0" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">new sets under recovery/</text>
 
         <!-- legend strip -->
-        <line x1="40" y1="716" x2="920" y2="716" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
-        <text x="40" y="732" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
-        <rect x="40" y="748" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
-        <text x="60" y="756" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Step</text>
-        <rect x="104" y="748" width="14" height="10" rx="2" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
-        <text x="124" y="756" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The cutover</text>
-        <line x1="204" y1="753" x2="232" y2="753" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <text x="240" y="756" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Then</text>
-        <line x1="284" y1="753" x2="312" y2="753" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-        <text x="320" y="756" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Only after the checks pass</text>
+        <line x1="40" y1="792" x2="920" y2="792" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
+        <text x="40" y="808" fill="#bfc0c0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="824" width="14" height="10" rx="2" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+        <text x="60" y="832" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Stage</text>
+        <rect x="104" y="824" width="14" height="10" rx="2" fill="rgba(240,138,89,0.10)" stroke="#f08a59" stroke-width="1"/>
+        <text x="124" y="832" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">The cutover</text>
+        <line x1="204" y1="829" x2="232" y2="829" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="240" y="832" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Then, if its check passed</text>
+        <line x1="368" y1="829" x2="396" y2="829" stroke="#f08a59" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="404" y="832" fill="#bfc0c0" font-size="8.5" font-family="'Geist', system-ui, sans-serif">Only after the primary is fenced</text>
       </svg>
     </div>
   </div>

@@ -59,6 +59,7 @@ Each worklog records what was built and the commands and results that passed its
 | [0012 Back up every 15 minutes](decisions/0012-backup-every-15-minutes.md) | The shorter data-loss window and what it costs. |
 | [0013 Automated recovery](decisions/0013-automated-recovery.md) | Accepted: a pipeline and a watchdog recover the service with nobody present. |
 | [0014 Capture backups from an LVM snapshot](decisions/0014-snapshot-backups.md) | Accepted: back up from one snapshot while Gitea keeps running. |
+| [0015 Unattended drills](decisions/0015-unattended-drills.md) | Proposed: a scheduled drill that isolates the primary, waits for the watchdog's recovery, and returns. |
 
 ## Troubleshooting
 

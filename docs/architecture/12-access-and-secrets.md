@@ -4,7 +4,7 @@ Who can do what, which keys exist, and what each one unlocks.
 
 ## Ways in
 
-![Architecture diagram showing the ways into the system: anyone reaches only Gitea's sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies and from which the recovery workflow signs in to Google Cloud.](../diagrams/access-paths.svg)
+![Architecture diagram showing the ways into the system: anyone reaches only Gitea's sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies and from which the recovery, return, and watchdog workflows sign in to Google Cloud.](../diagrams/access-paths.svg)
 
 There are three ways to change the system, and each is one account:
 
@@ -14,7 +14,7 @@ There are three ways to change the system, and each is one account:
 | GitHub account | GitHub sign-in; `main` requires a pull request | Everything Flux deploys, which is the whole application layer. Starting the recovery workflow on `main`, which acts in the project as the pipeline account |
 | Gitea admin account | A random password in a SOPS file | The Gitea instance |
 
-Nothing else has administrative access. The recovery workflow signs in as the pipeline account through workload identity federation, with no key. There are no service account keys, no SSH keys in project metadata, and no kubeconfig outside the control-plane node.
+Nothing else has administrative access. The recovery, return, and watchdog workflows sign in as the pipeline account through workload identity federation, with no key. There are no service account keys, no SSH keys in project metadata, and no kubeconfig outside the control-plane node.
 
 ## Machine identities
 
