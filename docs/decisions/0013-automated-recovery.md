@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), and with [the return workflow](#amendment-the-return-workflow). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), with [the return workflow](#amendment-the-return-workflow), and with [changes after the milestone 10 review](#amendment-changes-after-the-milestone-10-review). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
 
 Date: 2026-10-11
 
@@ -242,3 +242,30 @@ The return reads the primary through HTTP only. It does not run `make validate-c
 ### Shared setup
 
 Both workflows install their tools and sign in through one local action, `.github/actions/pipeline`, so their pins cannot drift apart. Each workflow saves the run state only when its pull from the state bucket succeeded. Before this change, a failed pull followed by the save would have mirrored an empty directory to the bucket and deleted the stored state; the bucket keeps earlier object versions.
+
+## Amendment: changes after the milestone 10 review
+
+Date: 2026-10-17. The independent review of milestone 10 checked the decision against the code and the gate runs. This amendment corrects one statement, adds two watchdog conditions and two return guards, and records the observed schedule.
+
+### Corrected statement
+
+[What it starts](#what-it-starts) says that a run of the current incident is never archived by a later start. That holds only for a run that the watchdog started. If a person starts `Recover` and the run fails after `fence`, the primary is stopped and the public name is unchanged, so the watchdog can start a new run with `reset=true`. That run archives the failed one and starts again from `preflight`. It is expected to plan no new resources, bootstrap the existing recovery cluster again, and restore the newest primary set, so the result is a slower recovery, not a wrong one. This path has not run. Blocking on every failed run would instead disarm the watchdog after any failed rehearsal, without a signal.
+
+### Watchdog
+
+| Change | Why |
+| --- | --- |
+| No start while a `Return` run is queued or in progress | A return moves the public name and destroys the recovery environment. A recovery queued behind it would start against a half-removed environment |
+| Each checker's newest result must be at most three minutes old, the query's lag allowance | A checker whose results stopped after one failure at the window start counted as failed for the whole window |
+
+### Return
+
+| Change | Why |
+| --- | --- |
+| `scripts/recover.py reset`, and so every automatic start, also archives `return.json` and `return.tsv` | A failed return's state survived a reset. A later return would skip the stages that check the recorded environment and destroy a new recovery environment while the public name pointed at it |
+| The return records the start time of the recovery run it began with, and refuses to resume against another | The same case, for a run state that changed by other means |
+| `dns-return` waits until the runner's own resolver returns the primary address before its checks through the public name | The recovery cluster still serves during the stage. Until the runner's resolver updates, the checks could reach the recovery cluster and pass |
+
+### Schedule
+
+GitHub started the first seven scheduled runs 9 to 18 minutes apart, not every five minutes. Detection can therefore take up to about 25 minutes: the five-minute window, up to 18 minutes until the next run, and the delay before uptime results reach Cloud Monitoring. The 5 to 15 minutes in the [options table](#a-watchdog-starts-the-recovery) is too low. [Milestone 12](../../plan.md#12-unattended-drills) measures detection.

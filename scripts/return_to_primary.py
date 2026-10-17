@@ -34,8 +34,8 @@ import drill_report  # noqa: E402
 import recover  # noqa: E402
 from recover import StageFailed, System  # noqa: E402
 
-STATE_FILE = "return.json"
-TIMELINE_FILE = "return.tsv"
+STATE_FILE = recover.RETURN_STATE_FILE
+TIMELINE_FILE = recover.RETURN_TIMELINE_FILE
 DESTROY_PLAN = "recovery-destroy.tfplan"
 # Drill 1 saw the primary answer about three minutes after the start.
 START_TIMEOUT = 600
@@ -116,6 +116,10 @@ class Return(recover.Recovery):
         self.make("dns-set", f"DNS_NAME={self.public_host.split('.')[0]}", f"DNS_ADDRESS={address}")
         self.wait(f"{self.public_host} does not resolve to the primary address at {recover.RESOLVER}",
                   lambda: self.resolve(self.public_host) == address, recover.DNS_TIMEOUT)
+        # The recovery cluster still serves. The checks below use this
+        # machine's resolver, which may still return the recovery address.
+        self.wait(f"this machine does not resolve {self.public_host} to the primary address",
+                  lambda: self.system.local_addresses(self.public_host) == [address], recover.DNS_TIMEOUT)
         self.wait_for_health(self.public_host)
         self.make("check-fixtures", "CLUSTER=primary", f"GIT_HOST={self.public_host}")
         self.make("write-check", "CLUSTER=primary", f"GIT_HOST={self.public_host}")
@@ -188,6 +192,16 @@ def run(returning: Return) -> int:
         returning.state["started"] = returning.system.now().strftime(drill_report.TIME_FORMAT)
         returning.save()
     pending = [name for name in STAGE_NAMES if name not in returning.state["passed"]]
+    # A return resumes only against the recovery run it started with.
+    if returning.recovered["started"] is not None:
+        returning.values.setdefault("recovery_started", returning.recovered["started"])
+        returning.save()
+    recovery_started = returning.values.get("recovery_started")
+    if recovery_started is not None and recovery_started != returning.recovered["started"]:
+        print(f"error: the return state belongs to the recovery started at {recovery_started}, "
+              f"not {returning.recovered['started']}; archive it with scripts/recover.py reset",
+              file=sys.stderr)
+        return 1
     try:
         returning.init_roots()
         if any(name in NEEDS_RECOVERY for name in pending):

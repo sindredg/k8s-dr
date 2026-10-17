@@ -2,7 +2,7 @@
 
 Recover a stateful service after losing a region. This lab runs Gitea and PostgreSQL on a kubeadm-built Kubernetes cluster on VMs. Recovery rebuilds the cluster from code, restores application data from an offsite backup, and measures downtime and data loss.
 
-Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 9 in [plan.md](plan.md) passed their gates. Milestone 8 rebuilt the environment from the runbooks, and milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. Milestone 10 is in progress; the others are planned.
+Three drills on 2026-10-04 stopped the primary region (Finland) and recovered the service in Belgium in under 20 minutes, against a target of four hours. Milestones 0 to 10 in [plan.md](plan.md) passed their gates. Milestone 8 rebuilt the environment from the runbooks, milestone 9 removed the backup downtime, and milestone 10 automated the recovery. Milestones 11 to 14 shorten the recovery, measure it unattended, and close the recovery gaps of the lab.
 
 The lab models organizations that must run Kubernetes on VMs they control. [Production readiness](docs/production-readiness.md) lists what a production deployment adds. [Milestone 14](plan.md#14-close-the-recovery-gaps-of-the-lab) closes the gaps that weaken recovery.
 
@@ -19,7 +19,7 @@ Recovery time runs from the first failed external probe until sign-in, a known c
 
 What the numbers do not show:
 
-- **The recovery is staged, not one command.** An operator runs six commands and checks the result between them: two Terraform applies, one Ansible playbook that builds the cluster and installs Flux, one restore, and two DNS changes. Flux deploys the service from Git. [Decision 0013](docs/decisions/0013-automated-recovery.md) replaces these steps with one pipeline started by a watchdog; it is not implemented yet.
+- **The drills were attended.** An operator ran the steps and checked the result between them. Since [milestone 10](plan.md#10-automated-recovery), one GitHub Actions workflow runs every step and its check, and a scheduled watchdog can start it ([decision 0013](docs/decisions/0013-automated-recovery.md)). A full run from the workflow took 17 min 07 s on 2026-10-17. Detection by the watchdog has not been measured; [milestone 12](plan.md#12-unattended-drills) measures it.
 - **Most of the time is the cluster build.** The restore Job takes under 30 seconds. [Milestone 11](plan.md#11-faster-cluster-build) builds nodes from a prepared image.
 - **Each backup in the drills paused the service.** A backup briefly scaled Gitea to zero, four times an hour. [Decision 0014](docs/decisions/0014-snapshot-backups.md) replaces this with a capture from an LVM snapshot while Gitea keeps running. [Milestone 9](plan.md#9-backups-without-downtime) verified it on the primary.
 - **Cost was not read from billing.** The recovery environment existed for 42, 28, and 23 minutes. [Milestone 12](plan.md#12-unattended-drills) reads drill cost from the billing export.
@@ -46,7 +46,7 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
 | Offsite object storage | Encrypted application backups every 15 minutes, with a Healthchecks.io heartbeat that alerts when they stop |
 | Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
-| GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, a daily scan of the public surface, and the recovery workflow, which signs in to Google Cloud without a stored key |
+| GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, a daily scan of the public surface, the recovery and return workflows, which sign in to Google Cloud without a stored key, and the watchdog that starts a recovery |
 | External health probe | Measure outage and restored service from outside the cluster |
 
 ## Documentation

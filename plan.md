@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 9 are complete, 10 is in progress, and 11 to 14 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 10 are complete, and 11 to 14 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ Milestones 0 to 9 are complete, 10 is in progress, and 11 to 14 are planned. Mil
 | 7. Faster recovery | Optional improvement backed by measurements | Complete |
 | 8. Rebuild from the runbooks | The documented procedure builds the environment from nothing | Complete |
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
-| 10. Automated recovery | Recovery runs without a person | In progress |
+| 10. Automated recovery | Recovery runs without a person | Complete |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
 | 12. Unattended drills | Measured recovery and cost with nobody present | Planned |
 | 13. Failback with data | Optional return that keeps the recovery writes | Planned |
@@ -150,13 +150,13 @@ Before milestone 9, every backup scaled Gitea to zero for the capture. At one ca
 See [decision 0013](docs/decisions/0013-automated-recovery.md) and the [worklog](docs/worklogs/10-automated-recovery.md).
 
 - [x] Move the node service accounts and backup grants to the shared root.
-- [ ] Run every recovery stage from one command that stops at the first failed check and resumes from it.
-- [ ] Run that command from GitHub Actions with workload identity federation and no stored cloud key.
-- [ ] Fence the primary and resume recovery backups without a manual edit or a Git change.
-- [ ] Start the recovery from a scheduled watchdog, with a switch that disables it.
-- [ ] Automate the return to the primary after a drill.
+- [x] Run every recovery stage from one command that stops at the first failed check and resumes from it.
+- [x] Run that command from GitHub Actions with workload identity federation and no stored cloud key.
+- [x] Fence the primary and resume recovery backups without a manual edit or a Git change.
+- [x] Start the recovery from a scheduled watchdog, with a switch that disables it.
+- [x] Automate the return to the primary after a drill.
 
-**Gate:** A recovery started by hand from the workflow completes with no other action, and the watchdog does not start one during a probe failure shorter than its window or while its switch is off.
+**Gate:** A recovery started by hand from the workflow completes with no other action, and the watchdog does not start one during a probe failure shorter than its window or while its switch is off. Passed on 2026-10-17: a full recovery from the workflow took 17 min 07 s, the return workflow then restored the primary, and the watchdog started nothing during a 99-second outage with its switch on. The automatic start itself has run against stubs only; [milestone 12](#12-unattended-drills) runs it. See the [worklog](docs/worklogs/10-automated-recovery.md#gate).
 
 ## 11. Faster cluster build
 

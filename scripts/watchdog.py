@@ -30,6 +30,8 @@ import urllib.request
 
 SETTINGS = "deploy/clusters/{}/cluster-settings.yaml"
 RECOVERY_WORKFLOW = "recover.yml"
+# A return after a drill also moves the public name and removes clusters.
+RETURN_WORKFLOW = "return.yml"
 # A GITHUB_TOKEN dispatch runs as this actor, which marks an automatic start.
 BOT = "github-actions[bot]"
 ACTIVE = ("queued", "in_progress", "waiting", "pending", "requested")
@@ -160,6 +162,10 @@ class Watchdog:
         if newest and (newest.get("triggering_actor") or {}).get("login") == BOT \
                 and newest["conclusion"] != "success":
             raise NoStart(f"automatic recovery run {newest['id']} ended with {newest['conclusion']}")
+        returns = self.github(f"actions/workflows/{RETURN_WORKFLOW}/runs?per_page=20")["workflow_runs"]
+        active = [run for run in returns if run["status"] in ACTIVE]
+        if active:
+            raise NoStart(f"return run {active[0]['id']} is {active[0]['status']}")
 
     def require_every_checker_failed(self) -> None:
         """Condition 1: every checker of the uptime check failed for the whole window."""
@@ -201,6 +207,9 @@ class Watchdog:
                 raise NoStart(f"checker {location} passed within the window")
             if points[0][0] > since:
                 raise NoStart(f"checker {location} has failed only since {points[0][0]:%H:%M:%S}Z")
+            # A checker that stopped reporting has not failed for the window.
+            if points[-1][0] < end - timedelta(minutes=LAG_MINUTES):
+                raise NoStart(f"checker {location} has reported nothing since {points[-1][0]:%H:%M:%S}Z")
         print(f"all {len(series)} checkers failed since at least {since:%H:%M:%S}Z")
 
     def local(self) -> None:

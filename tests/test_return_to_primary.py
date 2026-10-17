@@ -39,6 +39,13 @@ class FakeSystem(RecoveryFakeSystem):
         self.disabled = "True"
         # Set names that appear under primary/, newest last, one per listing.
         self.primary_sets = ["20261016T115201Z"]
+        # Answers of this machine's resolver that lag behind 1.1.1.1, used in order.
+        self.local_lag: list[str] = []
+
+    def local_addresses(self, host):
+        if self.local_lag:
+            return [self.local_lag.pop(0)]
+        return [self.dns[host]] if host in self.dns else []
 
     def answer(self, argv, line):
         ok = lambda out="": module.recover.Result(0, out, "")  # noqa: E731
@@ -184,6 +191,27 @@ class RunTests(ReturnTestCase):
 
 
 class GuardTests(ReturnTestCase):
+    def test_the_public_checks_wait_until_this_machine_resolves_the_primary(self):
+        self.system.local_lag = [RECOVERY_ADDRESS] * 3
+        self.assertEqual(self.run_back(), 0)
+        self.assertEqual(self.system.local_lag, [])
+
+    def test_a_stale_local_answer_fails_before_the_public_checks(self):
+        self.system.local_lag = [RECOVERY_ADDRESS] * 1000
+        self.assertEqual(self.run_back(), 1)
+        self.assertFalse(self.system.ran("check-fixtures CLUSTER=primary GIT_HOST=git.sindrg.com"))
+        self.assertIn("this machine does not resolve", self.events()[-1][2])
+
+    def test_a_return_state_of_another_recovery_starts_nothing(self):
+        self.system.override("write-check", module.recover.Result(2, "", ""))
+        self.run_back()
+        later = dict(RECOVERED, started="2026-10-18T09:00:00Z")
+        (self.drill / module.recover.STATE_FILE).write_text(json.dumps(later))
+        self.system.overrides.clear()
+        self.system.calls.clear()
+        self.assertEqual(self.run_back(), 1)
+        self.assertEqual(self.system.calls, [])
+
     def test_no_recovery_state_starts_nothing(self):
         (self.drill / module.recover.STATE_FILE).unlink()
         self.assertEqual(self.run_back(), 1)

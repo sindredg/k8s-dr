@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import socket
 import subprocess
 import sys
 import time
@@ -38,6 +39,10 @@ DRILL_DIR = Path(".drill")
 STATE_FILE = "recover.json"
 LOCK_FILE = "recover.lock"
 TIMELINE_FILE = "timeline.tsv"
+# Written by scripts/return_to_primary.py. A reset archives them too, so a
+# later return cannot resume against another recovery environment.
+RETURN_STATE_FILE = "return.json"
+RETURN_TIMELINE_FILE = "return.tsv"
 SETTINGS = "deploy/clusters/{}/cluster-settings.yaml"
 INVENTORY = "ansible/inventory/generated/recovery/hosts.json"
 PLAN_FILE = "recovery.tfplan"
@@ -101,6 +106,14 @@ class System:
             return error.code
         except (urllib.error.URLError, OSError):
             return None
+
+    def local_addresses(self, host: str) -> list[str]:
+        """The IPv4 addresses this machine's own resolver returns, which the checks use."""
+        try:
+            infos = socket.getaddrinfo(host, 443, socket.AF_INET, socket.SOCK_STREAM)
+        except OSError:
+            return []
+        return sorted({info[4][0] for info in infos})
 
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
@@ -430,8 +443,10 @@ def run(recovery: Recovery, through: str | None = None) -> int:
     if last < len(STAGES) - 1:
         print(f"Stopped after {through}, as requested. Run again without --through to continue.")
     else:
+        # startingDeadlineSeconds in deploy/apps/gitea/backup.yaml runs a slot
+        # missed in the last ten minutes as soon as the CronJob resumes.
         print("Recovery complete. The recovery cluster writes its first set under recovery/ "
-              "at the next scheduled backup.")
+              "at once if a scheduled slot passed in the last ten minutes, else at the next slot.")
     print(drill_report.timeline_table(drill_report.read_events(recovery.drill_dir / TIMELINE_FILE)))
     return 0
 
@@ -468,7 +483,7 @@ def main(argv=None, system: System | None = None) -> int:
             print("error: another recovery run holds the lock", file=sys.stderr)
             return 1
         if args.command == "reset":
-            archive(args.drill_dir, (STATE_FILE, TIMELINE_FILE),
+            archive(args.drill_dir, (STATE_FILE, TIMELINE_FILE, RETURN_STATE_FILE, RETURN_TIMELINE_FILE),
                     datetime.now(timezone.utc).strftime(drill_report.SET_FORMAT))
             return 0
         recovery = Recovery(system or System(), args.drill_dir)
