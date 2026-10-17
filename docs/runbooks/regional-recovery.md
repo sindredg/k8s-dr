@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage). Amended on 2026-10-17 with [Run the procedure from GitHub Actions](#run-the-procedure-from-github-actions). Its setup and runs through `verification` passed on 2026-10-17, as two runs split at `preflight`; see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#workflow-runs). Step 5 and a rerun after a failed stage have not run.
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage). Amended on 2026-10-17 with [Run the procedure from GitHub Actions](#run-the-procedure-from-github-actions). Its setup and runs through `verification` passed on 2026-10-17, as two runs split at `preflight`; see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#workflow-runs). Step 5 and a rerun after a failed stage have not run. Amended on 2026-10-17 for step 4 of milestone 10: the run resumes recovery backups through a ConfigMap in the cluster, not a change in Git, and a `recovery/` set from an earlier drill no longer stops a run. Built and checked against stubs; not run live.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -34,27 +34,28 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
 ## Run the procedure with one command
 
-`make recover` runs steps 2 to 9 below in order, as the stages of [decision 0013](../decisions/0013-automated-recovery.md#one-entry-point-runs-every-stage). Each stage ends with the check that its step states. The first failed command or check stops the run. Run the same command again after fixing the cause: it skips the stages that passed and starts at the failed one.
+`make recover` runs steps 2 to 9.1 below in order, as the stages of [decision 0013](../decisions/0013-automated-recovery.md#one-entry-point-runs-every-stage). Each stage ends with the check that its step states. The first failed command or check stops the run. Run the same command again after fixing the cause: it skips the stages that passed and starts at the failed one.
 
 | Stage | Steps | What it checks |
 | --- | --- | --- |
 | `preflight` | Preconditions | `make preflight` with the `fixtures` line skipped, because a lost primary cannot pass it |
 | `provisioning` | 3, 5 | The recovery plan deletes nothing and creates no service account or IAM grant, then the apply. `git-dr` resolves to the recovery address at 1.1.1.1 |
 | `bootstrap` | 6 | `make inventory` and `make bootstrap` |
-| `flux-reconcile` | 6 | `make validate-cluster`, `make validate-services`, the CronJob reports `suspend` as `true`, and the `recovery/` prefix is empty |
+| `flux-reconcile` | 6 | `make validate-cluster`, `make validate-services`, the CronJob reports `suspend` as `true`, and `recovery/` holds no set named after the start of the run |
 | `restore` | 2, 7 | Selects the newest set with a manifest once, then restores it |
 | `verification` | 8 | `/api/healthz` on `git-dr` returns 200, `make check-fixtures` and `make write-check` on `git-dr`, and backups are still suspended |
 | `fence` | 9.2 | Stops the primary VMs, and notes a failed stop without stopping the run. Disables the primary worker's account and requires `True`. Requires that the primary's own name stops returning 200 within five minutes |
 | `dns-cutover` | 9 | `git` resolves to the recovery address at 1.1.1.1 |
 | `probe-recovery` | 9 | `/api/healthz`, `make check-fixtures`, and `make write-check` through `git.sindrg.com` |
+| `resume-backups` | 9.1 | Creates the `run-settings` ConfigMap with `backup_suspend: "false"`, requests a reconcile of the `gitea` Kustomization, and requires that the CronJob reports `suspend` as `false` within ten minutes |
 
-The fence runs before the cutover, so a primary that still answers stops the run before `git.sindrg.com` moves. The manual procedure fences after the cutover, as the drills ran it.
+The fence runs before the cutover, so a primary that still answers stops the run before `git.sindrg.com` moves. The manual procedure fences after the cutover, as the drills ran it. The RTO ends with `probe-recovery`; `resume-backups` runs after the service is back.
 
 ```bash
 make recover
 ```
 
-Expected: every stage ends, and the run prints `Recovery complete` and the stage timeline. Then enable recovery backups as in step 9.1, and compute the results as in step 10.
+Expected: every stage ends, and the run prints `Recovery complete` and the stage timeline. The first `recovery/` set follows at the next scheduled backup. Compute the results as in step 10.
 
 The run keeps its state in `DRILL_DIR`, by default `.drill/`:
 
@@ -199,7 +200,7 @@ Inputs: the applied shared root from the [primary infrastructure runbook](primar
    gcloud storage ls "gs://${BUCKET}/recovery/"
    ```
 
-   Expected: `true`, and the listing matches no objects.
+   Expected: `true`, and the listing matches no objects or lists only sets named before the drill started. Sets from an earlier drill stay under `recovery/` for the retention period of [decision 0007](../decisions/0007-consistent-backups.md).
 
 7. Restore PostgreSQL and Gitea data from the set selected in step 2. See the [backup and restore procedure](backup-restore.md#restore-a-set).
 
@@ -233,7 +234,19 @@ Inputs: the applied shared root from the [primary infrastructure runbook](primar
 
    Expected: the wait ends within the 60-second TTL. Confirm the external probe reports a healthy service and repeat `make check-fixtures` and `make write-check` without `GIT_HOST`, which targets `git.sindrg.com`. Record the time when all checks pass. Then:
 
-   1. Enable recovery backups: merge a change that sets `backup_suspend: "false"` in `deploy/clusters/recovery/cluster-settings.yaml` and in the expected settings in `tests/test_services.py`, which pins the value. Do not use `kubectl patch`; Flux reverts it. The next scheduled run writes the first `recovery/` set.
+   1. Enable recovery backups: create the `run-settings` ConfigMap, which the `gitea` Kustomization reads after `cluster-settings`, and request a reconcile. Do not use `kubectl patch` on the CronJob; Flux reverts it. Git does not change.
+
+      ```bash
+      gcloud compute ssh "$RECOVERY_CP" --zone "$RECOVERY_ZONE" --tunnel-through-iap --command='sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl create configmap run-settings --namespace flux-system --from-literal=backup_suspend=false --dry-run=client --output=yaml | sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply --filename=-'
+      gcloud compute ssh "$RECOVERY_CP" --zone "$RECOVERY_ZONE" --tunnel-through-iap -- \
+        sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl annotate --overwrite --namespace flux-system \
+        kustomization/gitea "reconcile.fluxcd.io/requestedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      gcloud compute ssh "$RECOVERY_CP" --zone "$RECOVERY_ZONE" --tunnel-through-iap -- \
+        sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get cronjob/gitea-backup \
+        --namespace gitea --output=jsonpath='{.spec.suspend}'; echo
+      ```
+
+      Expected: `false`, within the ten-minute timeout of the `gitea` Kustomization. The next scheduled run writes the first `recovery/` set.
    2. Fence the primary: disable the primary worker's service account, so a primary that returns cannot write backups. `infra/shared` ignores the account's `disabled` flag, so a later apply does not undo the fence.
 
       ```bash
@@ -281,7 +294,17 @@ A drill ends by returning to the stopped primary, which still holds its data as 
    make write-check
    ```
 
-3. Suspend recovery backups again: merge a change that sets `backup_suspend: "true"` in `deploy/clusters/recovery/cluster-settings.yaml` and in `tests/test_services.py`. The next recovery bootstrap must not write a set.
+3. Suspend recovery backups again, so the recovery cluster stops writing sets and pinging the shared heartbeat check before the primary's backups resume. Delete the `run-settings` ConfigMap and request a reconcile; `cluster-settings` then applies `"true"`. A new recovery cluster starts without the ConfigMap.
+
+   ```bash
+   gcloud compute ssh "$RECOVERY_CP" --zone "$RECOVERY_ZONE" --tunnel-through-iap -- \
+     sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl delete configmap/run-settings --namespace flux-system
+   gcloud compute ssh "$RECOVERY_CP" --zone "$RECOVERY_ZONE" --tunnel-through-iap -- \
+     sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl annotate --overwrite --namespace flux-system \
+     kustomization/gitea "reconcile.fluxcd.io/requestedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+   ```
+
+   Expected: the CronJob reports `suspend` as `true` within ten minutes, read as in step 9.1.
 
 4. Lift the fence: enable the primary worker's service account again. The recovery grants stay; they belong to the recovery node account, not to the recovery VMs.
 

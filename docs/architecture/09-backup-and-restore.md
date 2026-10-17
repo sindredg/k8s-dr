@@ -81,6 +81,6 @@ The namespace has no default. `gitea` replaces a live service; `gitea-restore` i
 - The backup Pod holds a privileged container that can act as root on the worker.
 - If more than the free 20% of the volume group is written while a snapshot exists, the snapshot becomes invalid and that backup fails. The data volume is not affected.
 
-A recovery cluster starts with its backups suspended, so a bootstrap writes no set before the restore is verified. A change in Git enables them after the cutover, and its sets land under `recovery/`. See [decision 0008](../decisions/0008-cold-recovery.md#amendment-recovery-backups-stay-suspended-until-the-cutover).
+A recovery cluster starts with its backups suspended, so a bootstrap writes no set before the restore is verified. The recovery run enables them after the cutover through the `run-settings` ConfigMap, not a change in Git, and its sets land under `recovery/`. See [decision 0008](../decisions/0008-cold-recovery.md#amendment-recovery-backups-stay-suspended-until-the-cutover) and the [decision 0013 amendment](../decisions/0013-automated-recovery.md#amendment-run-settings-in-the-cluster).
 
 See decisions [0007](../decisions/0007-consistent-backups.md) and [0014](../decisions/0014-snapshot-backups.md), the [backup and restore runbook](../runbooks/backup-restore.md), and the [snapshot backups runbook](../runbooks/snapshot-backups.md).

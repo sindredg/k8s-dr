@@ -52,6 +52,11 @@ HEALTH_TIMEOUT = 300
 # A stopped primary stops answering within the stop call; a primary that
 # cannot be reached never answers.
 FENCE_TIMEOUT = 300
+# The gitea Kustomization timeout in deploy/sync/sync.yaml.
+RESUME_TIMEOUT = 600
+# Created by the resume-backups stage, read by the gitea Kustomization after
+# cluster-settings. See deploy/sync/sync.yaml.
+RUN_SETTINGS = "run-settings"
 POLL_INTERVAL = 5
 # A recovery plan creates resources only. It never deletes one, and the node
 # accounts and their grants live in infra/shared.
@@ -203,25 +208,50 @@ class Recovery:
             self.values["bucket"] = self.output("shared", "backup_bucket_name")
         return self.values["bucket"]
 
-    def require_backups_suspended(self) -> None:
-        """Runbook step 6: the recovery CronJob is suspended and wrote no set."""
+    def kubectl(self, *commands: list[str], capture: bool = True) -> str:
+        """Run kubectl on the recovery control plane; several commands form a pipeline."""
         hosts = json.loads(Path(INVENTORY).read_text())
         node = hosts["all"]["children"]["kube_control_plane"]["hosts"]["control-plane"]
-        remote = shlex.join([
-            "sudo", "KUBECONFIG=/etc/kubernetes/admin.conf", "kubectl", "get",
-            "cronjob/gitea-backup", "--namespace", "gitea", "--output=jsonpath={.spec.suspend}",
-        ])
-        suspend = self.run([
+        remote = " | ".join(
+            shlex.join(["sudo", "KUBECONFIG=/etc/kubernetes/admin.conf", "kubectl", *command])
+            for command in commands
+        )
+        return self.run([
             "gcloud", "compute", "ssh", node["gcp_instance_name"], "--zone", node["gcp_zone"],
             "--project", node["gcp_project"], "--tunnel-through-iap", f"--command={remote}",
-        ], capture=True).strip()
-        if suspend != "true":
-            raise StageFailed(f"the recovery backup CronJob has suspend={suspend or '<empty>'}")
-        # An empty prefix is an error from gcloud; only that error passes.
+        ], capture=capture)
+
+    def backup_suspend(self) -> str:
+        return self.kubectl(["get", "cronjob/gitea-backup", "--namespace", "gitea",
+                             "--output=jsonpath={.spec.suspend}"]).strip()
+
+    def recovery_sets(self) -> list[str]:
+        """The set names under recovery/. An empty prefix is an error from gcloud; only that error passes."""
         listing = self.system.call(["gcloud", "storage", "ls", f"gs://{self.bucket()}/recovery/"],
                                    capture=True)
-        if listing.returncode == 0 or "matched no objects" not in listing.stderr:
-            raise StageFailed("the recovery prefix is not empty, or the bucket listing failed")
+        if listing.returncode != 0:
+            if "matched no objects" in listing.stderr:
+                return []
+            raise StageFailed("the listing of the recovery prefix failed")
+        return [line.rstrip("/").split("/")[-1] for line in listing.stdout.splitlines() if line.strip()]
+
+    def require_backups_suspended(self) -> None:
+        """Runbook step 6: the recovery CronJob is suspended and wrote no set during this run.
+
+        Sets from an earlier drill stay under recovery/ for the retention
+        period, so only a set named after the start of this run fails.
+        """
+        suspend = self.backup_suspend()
+        if suspend != "true":
+            raise StageFailed(f"the recovery backup CronJob has suspend={suspend or '<empty>'}")
+        started = datetime.strptime(self.state["started"], drill_report.TIME_FORMAT)
+        for name in self.recovery_sets():
+            try:
+                written = datetime.strptime(name, drill_report.SET_FORMAT)
+            except ValueError:
+                raise StageFailed(f"recovery/{name} is not a set name") from None
+            if written >= started:
+                raise StageFailed(f"recovery/{name} was written during this run, before the cutover")
 
     def init_roots(self) -> None:
         """Every run initializes the roots: a resumed run can start on a new runner."""
@@ -331,6 +361,20 @@ class Recovery:
         self.make("check-fixtures", "CLUSTER=recovery", f"GIT_HOST={self.public_host}")
         self.make("write-check", "CLUSTER=recovery", f"GIT_HOST={self.public_host}")
 
+    def resume_backups(self) -> None:
+        """Set backup_suspend to false in the cluster, not in Git, and wait for the CronJob."""
+        self.kubectl(
+            ["create", "configmap", RUN_SETTINGS, "--namespace", "flux-system",
+             "--from-literal=backup_suspend=false", "--dry-run=client", "--output=yaml"],
+            ["apply", "--filename=-"],
+        )
+        # Flux does not watch the ConfigMap; request the reconcile.
+        requested = self.system.now().strftime(drill_report.TIME_FORMAT)
+        self.kubectl(["annotate", "--overwrite", "--namespace", "flux-system", "kustomization/gitea",
+                      f"reconcile.fluxcd.io/requestedAt={requested}"])
+        self.wait("the recovery backup CronJob is still suspended",
+                  lambda: self.backup_suspend() == "false", RESUME_TIMEOUT)
+
 
 # The order of the runbook. Each name is a stage of scripts/drill_report.py.
 STAGES: tuple[tuple[str, Callable[[Recovery], None]], ...] = (
@@ -343,6 +387,7 @@ STAGES: tuple[tuple[str, Callable[[Recovery], None]], ...] = (
     ("fence", Recovery.fence),
     ("dns-cutover", Recovery.dns_cutover),
     ("probe-recovery", Recovery.probe_recovery),
+    ("resume-backups", Recovery.resume_backups),
 )
 STAGE_NAMES = tuple(name for name, _ in STAGES)
 
@@ -385,8 +430,8 @@ def run(recovery: Recovery, through: str | None = None) -> int:
     if last < len(STAGES) - 1:
         print(f"Stopped after {through}, as requested. Run again without --through to continue.")
     else:
-        print("Recovery complete. Enable recovery backups as in step 9.1 of "
-              "docs/runbooks/regional-recovery.md.")
+        print("Recovery complete. The recovery cluster writes its first set under recovery/ "
+              "at the next scheduled backup.")
     print(drill_report.timeline_table(drill_report.read_events(recovery.drill_dir / TIMELINE_FILE)))
     return 0
 

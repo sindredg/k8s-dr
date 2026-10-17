@@ -172,6 +172,24 @@ class DeployTreeTests(unittest.TestCase):
         # A slow ACME order must not fail the bootstrap wait on flux-system.
         self.assertFalse(certificates["wait"])
 
+    def test_only_gitea_reads_the_run_settings_after_the_cluster_settings(self):
+        # A recovery run resumes backups through run-settings, which Git never
+        # defines. Absent, it must define nothing; present, it must win.
+        documents = {
+            document["metadata"]["name"]: document
+            for document in yaml.safe_load_all(Path("deploy/sync/sync.yaml").read_text())
+        }
+        for name, document in documents.items():
+            sources = document["spec"].get("postBuild", {}).get("substituteFrom", [])
+            with self.subTest(kustomization=name):
+                expected = [{"kind": "ConfigMap", "name": "cluster-settings"}]
+                if name == "gitea":
+                    expected.append({"kind": "ConfigMap", "name": "run-settings", "optional": True})
+                self.assertEqual(sources, expected if sources else [])
+        for path in Path("deploy").rglob("*.yaml"):
+            with self.subTest(path=str(path)):
+                self.assertNotRegex(path.read_text(), r"(?m)^  name: run-settings$")
+
     def test_issuers_use_the_cloudflare_token_and_no_email(self):
         issuers = list(yaml.safe_load_all(Path("deploy/certificates/cluster-issuers.yaml").read_text()))
         self.assertEqual(

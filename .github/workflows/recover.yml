@@ -27,6 +27,7 @@ name: Recover
           - fence
           - dns-cutover
           - probe-recovery
+          - resume-backups
       reset:
         description: Archive the state of an earlier run and start again at preflight.
         type: boolean
