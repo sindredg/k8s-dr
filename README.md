@@ -46,7 +46,7 @@ The recovery region has no running VMs until a drill. Terraform state, deploymen
 | PostgreSQL and Gitea | Stateful service used to prove recovery |
 | Offsite object storage | Encrypted application backups every 15 minutes, with a Healthchecks.io heartbeat that alerts when they stop |
 | Grafana Cloud | Cluster metrics that stay readable after the primary region is lost |
-| GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, and a daily scan of the public surface |
+| GitHub Actions | Tests and linters, a weekly check that pinned downloads still exist, a daily scan of the public surface, and the recovery workflow, which signs in to Google Cloud without a stored key |
 | External health probe | Measure outage and restored service from outside the cluster |
 
 ## Documentation

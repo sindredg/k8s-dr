@@ -1,6 +1,6 @@
 # Primary infrastructure: operator procedure
 
-Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, on 2026-10-14 after a rebuild from empty state, on 2026-10-16 for the recovery reader check in step 9, which passed as the reader the same day (see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#migration-after-the-merge)), and on 2026-10-16 for milestone 10, which applies the shared root first. The new order and plan counts are written, not run from empty state. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
+Status: Implemented and validated on 2026-09-23. The milestone gate is closed. Amended on 2026-09-25 for the `infra/shared` root, on 2026-10-14 after a rebuild from empty state, on 2026-10-16 for the recovery reader check in step 9, which passed as the reader the same day (see the [milestone 10 worklog](../worklogs/10-automated-recovery.md#migration-after-the-merge)), on 2026-10-16 for milestone 10, which applies the shared root first, and on 2026-10-17 for the recovery pipeline in the shared root. The new order and plan counts are written, not run from empty state; the pipeline count comes from a plan against the live state on 2026-10-17. Run these steps to reproduce or revalidate milestone 1. Use a shell on an operator machine outside the Finland VMs. Never commit local values, plans, state, credentials, or raw output.
 
 ## Inputs and access
 
@@ -67,7 +67,7 @@ Read the [state security guidance](https://docs.cloud.google.com/docs/terraform/
 
 Apply the shared root before the primary root. The shared root creates the node service accounts of both clusters, and the primary root only looks them up. From empty state, a primary plan that runs first fails with `Permission 'iam.serviceAccounts.get' denied`, which is the error Google Cloud returns for a missing account. See [decision 0013](../decisions/0013-automated-recovery.md#node-identities-and-backup-grants-move-to-the-shared-root).
 
-5. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, the node service accounts of every cluster, the project-level administrator grants that every region uses, and the uptime check.
+5. Fill in the shared root's local variables and backend configuration. This root owns the Belgium backup bucket, its IAM members, the node service accounts of every cluster, the project-level administrator grants that every region uses, the uptime check, and the identity of the recovery pipeline.
 
    ```bash
    cd ../shared
@@ -81,7 +81,7 @@ Apply the shared root before the primary root. The shared root creates the node 
    terraform apply shared.tfplan
    ```
 
-   Expected for an initial apply: `Plan: 18 to add, 0 to change, 0 to destroy.` The plan contains:
+   Expected for an initial apply: `Plan: 46 to add, 0 to change, 0 to destroy.` The plan contains:
 
    | Resources | Count |
    | --- | --- |
@@ -91,8 +91,16 @@ Apply the shared root before the primary root. The shared root creates the node 
    | The administrator's use of each node account | 4 |
    | Bucket IAM members: a writer and a reader grant for each worker, and the recovery reader | 5 |
    | Uptime check | 1 |
+   | APIs for the federation and the key secrets | 4 |
+   | Workload identity pool and provider for GitHub Actions | 2 |
+   | Pipeline account, and the federation's use of it | 2 |
+   | Project IAM members for the pipeline | 8 |
+   | The pipeline's use of each recovery node account | 2 |
+   | Fence role, and its grant on the primary worker account | 2 |
+   | Bucket IAM members for the pipeline: two on the backup bucket, two on the state bucket | 4 |
+   | Age key secrets, and the pipeline's access to each | 4 |
 
-   Inspect bucket names and IAM members before apply. The uptime check fails until the service is deployed.
+   Inspect bucket names and IAM members before apply. The uptime check fails until the service is deployed. Then set up the recovery workflow as in [Set up the workflow once](regional-recovery.md#set-up-the-workflow-once). [Decision 0013](../decisions/0013-automated-recovery.md#amendment-pipeline-grants-and-run-state) lists the pipeline grants.
 
 ## Apply the primary root
 

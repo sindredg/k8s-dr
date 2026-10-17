@@ -7,3 +7,7 @@ admin_member           = "user:REPLACE_WITH_CLUSTER_ADMIN_EMAIL@example.com"
 recovery_reader_member = "user:REPLACE_WITH_RECOVERY_READER_EMAIL@example.com"
 
 # Leave clusters unset to use the name_prefix values of the regional examples.
+
+# The bucket from infra/bootstrap. The recovery pipeline gets read access to
+# it and write access under its own prefixes.
+state_bucket_name = "REPLACE_WITH_GLOBALLY_UNIQUE_STATE_BUCKET"

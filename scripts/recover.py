@@ -223,12 +223,29 @@ class Recovery:
         if listing.returncode == 0 or "matched no objects" not in listing.stderr:
             raise StageFailed("the recovery prefix is not empty, or the bucket listing failed")
 
-    # Stages
-
-    def preflight(self) -> None:
+    def init_roots(self) -> None:
+        """Every run initializes the roots: a resumed run can start on a new runner."""
         for root in ("shared", "primary", "recovery"):
             self.run(["terraform", f"-chdir=infra/{root}", "init", "-input=false",
                       "-backend-config=backend.hcl"])
+
+    def inventory(self) -> None:
+        """Generate the recovery inventory, which a new runner does not have."""
+        self.make("inventory", "CLUSTER=recovery")
+
+    def require_recorded_environment(self) -> None:
+        """A resumed run must find the recovery environment it recorded."""
+        try:
+            address = self.output("recovery", "public_web_address")
+        except StageFailed:
+            address = ""
+        if address != self.values.get("recovery_address"):
+            raise StageFailed("the recovery environment that this run recorded no longer exists; "
+                              "archive the run state with reset and start again")
+
+    # Stages
+
+    def preflight(self) -> None:
         # The fixtures are checked on the recovery cluster after the restore.
         # In a real loss the primary cannot pass them.
         self.run(["make", "--no-print-directory", "preflight"], env={"PREFLIGHT_SKIP": "fixtures"})
@@ -246,7 +263,7 @@ class Recovery:
         self.wait_for_record(self.recovery_host, address)
 
     def bootstrap(self) -> None:
-        self.make("inventory", "CLUSTER=recovery")
+        self.inventory()
         self.make("bootstrap", "CLUSTER=recovery")
 
     def flux_reconcile(self) -> None:
@@ -335,6 +352,19 @@ def run(recovery: Recovery, through: str | None = None) -> int:
     if recovery.state["started"] is None:
         recovery.state["started"] = recovery.system.now().strftime(drill_report.TIME_FORMAT)
         recovery.save()
+    pending = [name for name in STAGE_NAMES[: last + 1] if name not in recovery.state["passed"]]
+    try:
+        recovery.init_roots()
+        # A resumed run may start on a new runner, and the environment it
+        # recorded may have been removed since.
+        if pending and "provisioning" in recovery.state["passed"]:
+            recovery.require_recorded_environment()
+            recovery.inventory()
+    except (StageFailed, OSError) as error:
+        if pending:
+            recovery.event(pending[0], "note", f"failed before the stage: {error}")
+        print(f"error: {error}", file=sys.stderr)
+        return 1
     for name, stage in STAGES[: last + 1]:
         if name in recovery.state["passed"]:
             print(f"== {name}: passed earlier, skipped", flush=True)

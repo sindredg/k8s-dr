@@ -158,10 +158,54 @@ class RunTests(RecoverTestCase):
 
         self.system.calls.clear()
         self.assertEqual(self.recover("run"), 0)
-        first = " ".join(self.system.calls[0])
-        self.assertTrue(first.startswith("make --no-print-directory restore"), first)
+        # A rerun initializes the roots and rebuilds the inventory, then
+        # starts at the failed stage.
+        commands = [" ".join(argv) for argv in self.system.calls]
+        self.assertEqual(commands[:6], [
+            *(f"terraform -chdir=infra/{root} init -input=false -backend-config=backend.hcl"
+              for root in ("shared", "primary", "recovery")),
+            "terraform -chdir=infra/recovery output -raw public_web_address",
+            "make --no-print-directory inventory CLUSTER=recovery",
+            "make --no-print-directory restore CLUSTER=recovery RESTORE_NAMESPACE=gitea "
+            f"RESTORE_SET={SET}",
+        ])
         self.assertFalse(self.system.ran("terraform -chdir=infra/recovery apply"))
+        self.assertFalse(self.system.ran("make --no-print-directory preflight"))
         self.assertEqual(self.state()["passed"], list(module.STAGE_NAMES))
+
+    def test_a_resumed_run_stops_when_its_environment_is_gone(self):
+        self.recover("run", "--through", "verification")
+        # The rehearsal environment is removed; its outputs are gone.
+        self.system.override("output -raw public_web_address", module.Result(1, "", "No outputs found"))
+        self.system.calls.clear()
+        self.assertEqual(self.recover("run"), 1)
+        self.assertFalse(self.system.ran("instances stop"))
+        self.assertFalse(self.system.ran("service-accounts disable"))
+        self.assertNotIn("git.sindrg.com", self.system.dns)
+        self.assertEqual(self.events()[-1][:2], ("fence", "note"))
+        self.assertIn("no longer exists", self.events()[-1][2])
+
+    def test_a_resumed_run_stops_when_the_address_changed(self):
+        self.recover("run", "--through", "verification")
+        self.system.override("output -raw public_web_address", module.Result(0, "198.51.100.7", ""))
+        self.assertEqual(self.recover("run"), 1)
+        self.assertFalse(self.system.ran("service-accounts disable"))
+
+    def test_a_missing_tool_is_a_recorded_failure(self):
+        real = self.system.call
+        def call(argv, **kwargs):
+            if argv[0] == "terraform":
+                raise FileNotFoundError("terraform")
+            return real(argv, **kwargs)
+        self.system.call = call
+        self.assertEqual(self.recover("run"), 1)
+        self.assertEqual(self.events()[-1][:2], ("preflight", "note"))
+
+    def test_a_failed_init_stops_before_any_stage(self):
+        self.system.override("infra/primary init", module.Result(1, "", ""))
+        self.assertEqual(self.recover("run"), 1)
+        self.assertFalse(self.system.ran("make --no-print-directory preflight"))
+        self.assertEqual(self.state()["passed"], [])
 
     def test_a_retried_restore_reads_the_same_set(self):
         self.system.override("make --no-print-directory restore", module.Result(2, "", ""))
