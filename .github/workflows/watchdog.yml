@@ -1,0 +1,66 @@
+---
+name: Watchdog
+
+# Starts the Recover workflow when the primary is down from everywhere. The
+# local job needs no cloud access and decides almost every run. The confirm
+# job signs in as the pipeline account only when the service is down, reads
+# the uptime check, and dispatches one full recovery. The AUTO_FAILOVER
+# repository variable is the switch: anything but "true" starts nothing. See
+# decision 0013 and docs/runbooks/regional-recovery.md.
+"on":
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  local:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      candidate: ${{ steps.check.outputs.candidate }}
+    env:
+      AUTO_FAILOVER: ${{ vars.AUTO_FAILOVER }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - id: check
+        run: python3 scripts/watchdog.py local
+
+  confirm:
+    needs: local
+    if: needs.local.outputs.candidate == 'true'
+    runs-on: ubuntu-24.04
+    environment: recovery
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      actions: write
+    env:
+      AUTO_FAILOVER: ${{ vars.AUTO_FAILOVER }}
+      GITHUB_TOKEN: ${{ github.token }}
+      # The environment's secrets are masked in the public log.
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db  # v3.0.1
+        with:
+          version: "589.0.0"
+      - run: python3 scripts/watchdog.py confirm --start
