@@ -116,15 +116,17 @@ resource "google_service_account_iam_member" "pipeline_can_use_recovery_node" {
   member             = google_service_account.pipeline.member
 }
 
-# The fence disables the primary worker account. No predefined role holds
-# that permission without the right to change the account's IAM policy.
+# The fence disables the primary worker account, and the return after a
+# drill enables it again. No predefined role holds those permissions without
+# the right to change the account's IAM policy.
 resource "google_project_iam_custom_role" "fence" {
   project     = var.project_id
   role_id     = "k8sdrFence"
   title       = "k8s-dr fence"
-  description = "Disable a node service account to fence a cluster out of the backups."
+  description = "Disable a node service account to fence a cluster out of the backups, and enable it again."
   permissions = [
     "iam.serviceAccounts.disable",
+    "iam.serviceAccounts.enable",
     "iam.serviceAccounts.get",
   ]
 }

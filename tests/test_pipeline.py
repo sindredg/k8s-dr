@@ -11,6 +11,7 @@ from scripts import pipeline as module
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/recover.yml"
+ACTION = ROOT / ".github/actions/pipeline/action.yml"
 KEY = "AGE-SECRET-KEY-1EXAMPLE\n"
 ENVIRON = {
     "GCP_PROJECT_ID": "example-project",
@@ -188,7 +189,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("id-token: write", text)
         self.assertNotIn("credentials_json", text)
         # Other workflows write the pip cache; this job holds the keys.
-        self.assertIsNone(re.search(r"(?m)^\s+cache:", text))
+        for path in (WORKFLOW, ACTION):
+            self.assertIsNone(re.search(r"(?m)^\s+cache:", path.read_text()), path)
 
     def test_the_stage_choices_are_the_stages_of_the_run(self):
         from scripts import recover
@@ -303,9 +305,10 @@ class TerraformTests(unittest.TestCase):
         grant = re.search(r'"pipeline_can_use_recovery_node" \{(.*?)\n\}', self.text, re.S).group(1)
         self.assertIn('if startswith(key, "recovery/")', grant)
 
-    def test_the_fence_role_only_disables_an_account(self):
+    def test_the_fence_role_only_disables_and_enables_an_account(self):
         permissions = re.findall(r'"(iam\.[^"]+)"', self.block(r"permissions = \["))
-        self.assertEqual(sorted(permissions), ["iam.serviceAccounts.disable", "iam.serviceAccounts.get"])
+        self.assertEqual(sorted(permissions), ["iam.serviceAccounts.disable", "iam.serviceAccounts.enable",
+                                               "iam.serviceAccounts.get"])
 
     def test_state_writes_are_limited_to_the_pipeline_prefixes(self):
         writer = re.search(r'"pipeline_state_writer" \{(.*?)\n\}', self.text, re.S).group(1)
