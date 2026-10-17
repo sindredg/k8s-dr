@@ -1,6 +1,6 @@
 # Regional recovery
 
-Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage).
+Status: Every step and the [return to the primary](#return-to-the-primary-after-a-drill) ran in drill 1 of [milestone 6](../../plan.md#6-disaster-drill) on 2026-10-04, except the `suspend` check in step 6; see the [drill worklog](../worklogs/06-disaster-drill.md#drill-1). Drill 2 repeated it with the changes from drill 1 and no failed step. [Drill 3](../worklogs/07-faster-recovery.md#drill-3) ran the `suspend` check. [Decision 0008](../decisions/0008-cold-recovery.md) records the design. Amended on 2026-10-16 for [milestone 10](../../plan.md#10-automated-recovery): the node accounts and backup grants live in `infra/shared`, so step 4 is gone, and the fence disables the primary worker's account. The amended steps are written, not run. `make recover` runs the procedure in one command; see [Run the procedure with one command](#run-the-procedure-with-one-command). A rehearsal through `verification` passed against the live system on 2026-10-16; the fence, the cutover, and the checks through the public name have run against stubs only. See the [milestone 10 worklog](../worklogs/10-automated-recovery.md#step-2-one-command-for-every-stage). Amended on 2026-10-17 with [Run the procedure from GitHub Actions](#run-the-procedure-from-github-actions), which is built and not run.
 
 Every command against the recovery cluster sets `CLUSTER=recovery`. It selects `infra/recovery`, the recovery inventory, and `deploy/clusters/recovery`.
 
@@ -38,7 +38,7 @@ If any prerequisite is missing, record it as a blocked drill. Do not route users
 
 | Stage | Steps | What it checks |
 | --- | --- | --- |
-| `preflight` | Preconditions | `terraform init` of the shared, primary, and recovery roots, then `make preflight` with the `fixtures` line skipped, because a lost primary cannot pass it |
+| `preflight` | Preconditions | `make preflight` with the `fixtures` line skipped, because a lost primary cannot pass it |
 | `provisioning` | 3, 5 | The recovery plan deletes nothing and creates no service account or IAM grant, then the apply. `git-dr` resolves to the recovery address at 1.1.1.1 |
 | `bootstrap` | 6 | `make inventory` and `make bootstrap` |
 | `flux-reconcile` | 6 | `make validate-cluster`, `make validate-services`, the CronJob reports `suspend` as `true`, and the `recovery/` prefix is empty |
@@ -67,7 +67,57 @@ Other forms:
 - `python3 scripts/recover.py status` lists the stages that passed and the recorded values.
 - `python3 scripts/recover.py reset` archives `recover.json` and `timeline.tsv`, so the next run starts from `preflight`.
 
-Only one run holds the lock in `DRILL_DIR` at a time. A second run exits with `another recovery run holds the lock`.
+Every run, including a rerun, first runs `terraform init` in the shared, primary, and recovery roots. Each stage that reaches the recovery nodes regenerates the recovery inventory first. A rerun on another machine therefore needs only the run state.
+
+Only one run holds the lock in `DRILL_DIR` at a time. A second run exits with `another recovery run holds the lock`. The lock guards one machine only.
+
+## Run the procedure from GitHub Actions
+
+The `Recover` workflow runs `make recover` on a GitHub-hosted runner, as the pipeline account of [decision 0013](../decisions/0013-automated-recovery.md#amendment-pipeline-grants-and-run-state). It signs in through workload identity federation, reads both age keys from Secret Manager, and keeps the run state under `pipeline/drill/` in the state bucket, so a rerun on a new runner resumes at the failed stage.
+
+Run either the workflow or `make recover` on an operator machine, not both: their lock files do not see each other. To continue a workflow run on an operator machine, copy its state first with `STATE_BUCKET=<state bucket> python3 scripts/pipeline.py pull --drill-dir .drill`.
+
+### Set up the workflow once
+
+Inputs: the applied shared root from the [primary infrastructure runbook](primary-infrastructure.md#apply-the-shared-root), the local `terraform.tfvars` and `backend.hcl` of `infra/shared` and `infra/recovery`, both age keys at their default paths, and `gh` signed in as a repository administrator.
+
+1. Create the `recovery` environment, store the identifiers as its secrets, and add both age keys to Secret Manager. No value is printed.
+
+   ```bash
+   python3 scripts/pipeline.py setup
+   ```
+
+   Expected: `environment recovery: 7 secrets and 1 variable set; both age keys are in Secret Manager`. A rerun changes nothing. It fails with `holds a different key` if Secret Manager holds another key than the local file.
+
+2. Check that only `main` can deploy to the environment.
+
+   ```bash
+   gh api repos/sindredg/k8s-dr/environments/recovery/deployment-branch-policies --jq '.branch_policies[] | .type + " " + .name'
+   gh secret list --env recovery
+   ```
+
+   Expected: `branch main` is the only policy, and the secret list names `ADMIN_MEMBER`, `BACKUP_BUCKET`, `GCP_PROJECT_ID`, `GCP_SERVICE_ACCOUNT`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `RECOVERY_READER_MEMBER`, and `STATE_BUCKET`.
+
+### Start a run
+
+3. Start a run. `through` stops after a stage, as `--through` does; `verification` rehearses without the fence and the cutover. `reset=true` archives the state of an earlier run and starts at `preflight`.
+
+   ```bash
+   gh workflow run recover.yml --ref main -f through=verification -f reset=true
+   gh run watch "$(gh run list --workflow recover.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+   ```
+
+   Expected: the run ends with success, and its summary shows the stage timeline. The log shows the project, bucket, and account names as `***`.
+
+4. If a stage fails, fix the cause and start the workflow again without `reset`.
+
+   ```bash
+   gh workflow run recover.yml --ref main -f through=verification
+   ```
+
+   Expected: the log shows `passed earlier, skipped` for each stage that passed, and the run continues at the failed one.
+
+5. For a full recovery, start the workflow with `through=all`. After a rehearsal or a drill, remove the recovery environment as in [Remove the recovery environment](#remove-the-recovery-environment).
 
 ## Procedure
 

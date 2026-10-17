@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
 
 Date: 2026-10-11
 
@@ -94,3 +94,38 @@ If the watchdog starts a recovery while the primary is healthy but unreachable f
 - The pipeline account can delete compute resources in both regions. Production would give recovery its own project and identity; see [production readiness](../production-readiness.md).
 - The Cloudflare token expires and can only be replaced in the Cloudflare dashboard. The preflight stage fails when less than a week remains.
 - The Healthchecks.io period is set in that account, not in this repository.
+
+## Amendment: pipeline grants and run state
+
+Date: 2026-10-17. [Step 3](../../plan.md#10-automated-recovery) of milestone 10 builds the workflow. `infra/shared/pipeline.tf` holds everything below.
+
+### Grants
+
+| Grant | On | Why |
+| --- | --- | --- |
+| `roles/compute.instanceAdmin.v1`, `roles/compute.networkAdmin`, `roles/compute.securityAdmin` | Project | Create and delete the recovery resources, and stop the primary VMs |
+| `roles/compute.osAdminLogin`, `roles/iap.tunnelResourceAccessor` | Project | Run the playbooks as root through IAP |
+| `roles/viewer`, `roles/iam.securityReviewer`, `roles/iam.workloadIdentityPoolViewer` | Project | Plan `infra/shared` in the preflight, which reads every IAM policy it manages |
+| `roles/iam.serviceAccountUser` | The two recovery node accounts | Attach them to the recovery VMs and sign in to those VMs |
+| A custom role with `iam.serviceAccounts.disable` and `iam.serviceAccounts.get` | The primary worker account | The fence. No predefined role can disable an account without also changing its IAM policy |
+| `roles/storage.objectViewer`, `roles/storage.legacyBucketReader` | Backup bucket | List and verify the newest set |
+| `roles/storage.objectViewer` | State bucket | Read the outputs of the shared and primary roots |
+| `roles/storage.objectUser`, limited to the `recovery/` and `pipeline/` prefixes | State bucket | Write the recovery state and the run state |
+| `roles/secretmanager.secretAccessor` | The two age key secrets | Decrypt the SOPS files and the backup sets |
+
+The three compute roles also hold `setIamPolicy` on compute objects such as disks, images, and subnetworks. Predefined roles do not separate it, and a custom role would have to list every permission that a plan and an apply use. The pipeline still cannot change the IAM policy of the project, a service account, a bucket, or a secret, so it cannot give itself access to delete backups. It can already read every backup with the backup key, so the compute object grants add no access to the data.
+
+A job signs in only when its token names this repository by numeric ID, the `recovery` environment, and `refs/heads/main`. The environment allows `main` as its only deployment branch, so either check alone blocks a workflow from another branch.
+
+The key secrets hold no version in Terraform. `scripts/pipeline.py setup` adds each key once from the operator machine, and fails if a stored version differs from the local key, so the key material never reaches the Terraform state.
+
+### Run state
+
+A rerun of the workflow starts on a new runner. The runner copies `.drill/` from `pipeline/drill/` in the state bucket before the run and back after it, whether the run passed or failed. `make recover` initializes the Terraform roots and regenerates the recovery inventory on every run, so a run that resumes at a later stage has both.
+
+The workflow's concurrency group allows one run at a time. The lock file in `.drill/` only guards one machine, so it does not stop an operator from running `make recover` on a laptop during a workflow run. The two runs would use different run state. The runbook says to run one or the other.
+
+### Not changed
+
+The workflow builds only the recovery cluster. Building the primary from the same workflow, which the decision above names, is [issue #101](https://github.com/sindredg/k8s-dr/issues/101). Until then the primary is built from an operator machine.
+

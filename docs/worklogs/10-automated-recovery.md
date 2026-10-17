@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Steps 3 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is built and checked locally on 2026-10-17; the workflow has not run. See [Step 3](#step-3-the-workflow-runs-the-command). Steps 4 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -137,3 +137,51 @@ Afterwards `make dns-delete DNS_NAME=git-dr` deleted the record at 21:06:38Z, an
 
 - The `fence`, `dns-cutover`, and `probe-recovery` stages have not run live. They run in a full recovery, which the milestone 10 gate runs. `True` from `gcloud iam service-accounts describe` is taken from the runbook.
 - A resume after a failed stage ran against stubs only; the rehearsal had no failure.
+
+## Step 3: the workflow runs the command
+
+[Decision 0013](../decisions/0013-automated-recovery.md#github-actions-runs-it-with-no-stored-cloud-key) runs `make recover` from GitHub Actions, signed in through workload identity federation with no service account key. The [amendment of 2026-10-17](../decisions/0013-automated-recovery.md#amendment-pipeline-grants-and-run-state) lists the grants and how a rerun resumes.
+
+### What was built
+
+| Part | File | What it does |
+| --- | --- | --- |
+| Identity | `infra/shared/pipeline.tf` | A workload identity pool and provider that accept only a token for this repository's numeric ID, the `recovery` environment, and `refs/heads/main`. The pipeline account, its project roles, its use of the recovery node accounts, and a custom fence role on the primary worker account |
+| Data access | `infra/shared/pipeline.tf` | Read access to the backup bucket. Read access to every Terraform state, and write access limited to the `recovery/` and `pipeline/` prefixes |
+| Keys | `infra/shared/pipeline.tf` | Two Secret Manager secrets, replicated to `europe-west1` and `europe-west4`, readable by the pipeline account only. Terraform holds no secret version |
+| Runner setup | `scripts/pipeline.py` | `configure` writes `backend.hcl` and `terraform.tfvars` from the environment's secrets and masks the project number. `keys` writes both age keys with mode 600. `ssh-key` registers an OS Login key that expires after six hours. `pull` and `push` copy the run state to and from the state bucket |
+| One-time setup | `scripts/pipeline.py setup` | Creates the `recovery` environment with `main` as its only deployment branch, stores the identifiers as its secrets on standard input, and adds each age key to Secret Manager once |
+| Workflow | `.github/workflows/recover.yml` | Started by hand with a `through` stage and a `reset` flag. One run at a time. Saves the run state whether the run passed or failed, and writes the stage timeline to the run summary |
+| Resume on a new runner | `scripts/recover.py` | Every run initializes the three roots, and each stage that reaches the recovery nodes regenerates the inventory, so a rerun needs only the run state |
+| Tests | `tests/test_pipeline.py`, `tests/test_recover.py` | The runner commands and the setup against a stub, the workflow inputs and secrets against the scripts, and the grants in `pipeline.tf` |
+| Runbooks | [Regional recovery](../runbooks/regional-recovery.md#run-the-procedure-from-github-actions), [primary infrastructure](../runbooks/primary-infrastructure.md#apply-the-shared-root) | The setup and a run from the workflow. The shared root plan counts include the pipeline |
+
+Tool versions on the runner, read from the official release pages on 2026-10-17: gcloud 589.0.0, sops 3.13.3, and age 1.3.2. The sops digest is the one in the release's checksum file. age publishes no checksum file, so its digest was computed from the downloaded release archive. The action pins are the commits of `actions/checkout` v7.0.1, `actions/setup-python` v7.0.0, `hashicorp/setup-terraform` v4.0.1, `google-github-actions/auth` v3.0.0, and `google-github-actions/setup-gcloud` v3.0.1.
+
+### Local checks
+
+Local, against stubs, 2026-10-17. Expected before the run: the runner commands write only private files, never pass a secret as an argument, treat only an empty prefix as a first run, and the grants in `pipeline.tf` include no role that can change IAM or backups.
+
+| Check | Result | Can it fail |
+| --- | --- | --- |
+| `python -m unittest tests.test_pipeline` | 26 tests `OK` | Nine edits to a copy of `scripts/pipeline.py` each failed at least one test: a secret passed with `--body`, an environment open to another branch accepted, any listing error taken as a first run, the lock file pushed, a different stored key accepted, a secret without an age key accepted, the SSH key registered without a TTL, the project number left unmasked, and key files written with mode 644. Five edits to a copy of `pipeline.tf` each failed a test: `roles/iam.serviceAccountTokenCreator` added, the `ref` clause removed, the node account filter removed, `setIamPolicy` added to the fence role, and the state writer condition removed |
+| `python -m unittest tests.test_recover` | 22 tests `OK` | Two edits each failed a test: no inventory before the verification stage, and the roots initialized only in the preflight stage |
+| `make check` | Exit 0, 283 tests `OK` | |
+| `terraform validate` in `infra/shared` (Terraform 1.16.6, provider 7.46.1) | `Success! The configuration is valid.` | |
+
+The first run of `tests.test_pipeline` found a defect: the placeholder pattern did not match a value such as `"user:REPLACE_WITH_..."`, so `configure` would have written placeholders into the shared variables. The pattern now matches a placeholder anywhere in the value.
+
+### Plan against the live state
+
+Live state, read-only plan, 2026-10-17, from this branch. Expected before the run: the plan adds the pipeline resources and changes or destroys nothing, which shows that the new file leaves the node accounts, the backup grants, and the bucket as they are.
+
+| Root | Command | Result |
+| --- | --- | --- |
+| `infra/shared` | `terraform plan -lock=false -out=shared.tfplan` | `Plan: 28 to add, 0 to change, 0 to destroy.` All 28 are in `pipeline.tf`: 4 APIs, the pool and provider, the account and its federation grant, 8 project roles, 2 recovery node account grants, the fence role and its grant, 4 bucket grants, and 2 secrets with 2 accessor grants |
+
+### Not verified
+
+- The shared apply, `scripts/pipeline.py setup`, and a workflow run have not run. The environment only accepts `main`, so the workflow runs after the merge.
+- That the predefined roles cover every call of a recovery. A missing permission shows as a failed stage in the first run.
+- That GitHub masks every identifier in the log. The first run's log is read for unmasked values before it is linked anywhere.
+
