@@ -158,10 +158,34 @@ class RunTests(RecoverTestCase):
 
         self.system.calls.clear()
         self.assertEqual(self.recover("run"), 0)
-        first = " ".join(self.system.calls[0])
-        self.assertTrue(first.startswith("make --no-print-directory restore"), first)
+        # A rerun initializes the roots and rebuilds the inventory, then
+        # starts at the failed stage.
+        commands = [" ".join(argv) for argv in self.system.calls]
+        self.assertEqual(commands[:5], [
+            *(f"terraform -chdir=infra/{root} init -input=false -backend-config=backend.hcl"
+              for root in ("shared", "primary", "recovery")),
+            "make --no-print-directory inventory CLUSTER=recovery",
+            "make --no-print-directory restore CLUSTER=recovery RESTORE_NAMESPACE=gitea "
+            f"RESTORE_SET={SET}",
+        ])
         self.assertFalse(self.system.ran("terraform -chdir=infra/recovery apply"))
+        self.assertFalse(self.system.ran("make --no-print-directory preflight"))
         self.assertEqual(self.state()["passed"], list(module.STAGE_NAMES))
+
+    def test_every_stage_that_reaches_the_nodes_rebuilds_the_inventory(self):
+        self.recover("run")
+        makes = [" ".join(argv[2:4]) for argv in self.system.calls if argv[:1] == ["make"]]
+        # The make call before each of these regenerates the inventory.
+        for target in ("bootstrap CLUSTER=recovery", "validate-cluster CLUSTER=recovery",
+                       "restore CLUSTER=recovery", "check-fixtures CLUSTER=recovery"):
+            index = makes.index(target)
+            self.assertEqual(makes[index - 1], "inventory CLUSTER=recovery", target)
+
+    def test_a_failed_init_stops_before_any_stage(self):
+        self.system.override("infra/primary init", module.Result(1, "", ""))
+        self.assertEqual(self.recover("run"), 1)
+        self.assertFalse(self.system.ran("make --no-print-directory preflight"))
+        self.assertEqual(self.state()["passed"], [])
 
     def test_a_retried_restore_reads_the_same_set(self):
         self.system.override("make --no-print-directory restore", module.Result(2, "", ""))

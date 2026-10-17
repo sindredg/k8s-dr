@@ -223,12 +223,19 @@ class Recovery:
         if listing.returncode == 0 or "matched no objects" not in listing.stderr:
             raise StageFailed("the recovery prefix is not empty, or the bucket listing failed")
 
-    # Stages
-
-    def preflight(self) -> None:
+    def init_roots(self) -> None:
+        """Every run initializes the roots: a resumed run can start on a new runner."""
         for root in ("shared", "primary", "recovery"):
             self.run(["terraform", f"-chdir=infra/{root}", "init", "-input=false",
                       "-backend-config=backend.hcl"])
+
+    def inventory(self) -> None:
+        """Generate the recovery inventory, which a new runner does not have."""
+        self.make("inventory", "CLUSTER=recovery")
+
+    # Stages
+
+    def preflight(self) -> None:
         # The fixtures are checked on the recovery cluster after the restore.
         # In a real loss the primary cannot pass them.
         self.run(["make", "--no-print-directory", "preflight"], env={"PREFLIGHT_SKIP": "fixtures"})
@@ -246,15 +253,17 @@ class Recovery:
         self.wait_for_record(self.recovery_host, address)
 
     def bootstrap(self) -> None:
-        self.make("inventory", "CLUSTER=recovery")
+        self.inventory()
         self.make("bootstrap", "CLUSTER=recovery")
 
     def flux_reconcile(self) -> None:
+        self.inventory()
         self.make("validate-cluster", "CLUSTER=recovery")
         self.make("validate-services", "CLUSTER=recovery")
         self.require_backups_suspended()
 
     def restore(self) -> None:
+        self.inventory()
         # The set is chosen once, so a retried restore reads the same set.
         if "backup_set" not in self.values:
             listing = self.run(["gcloud", "storage", "ls",
@@ -270,6 +279,7 @@ class Recovery:
                   f"RESTORE_SET={self.values['backup_set']}")
 
     def verification(self) -> None:
+        self.inventory()
         self.wait_for_health(self.recovery_host)
         report = self.make("check-fixtures", "CLUSTER=recovery", f"GIT_HOST={self.recovery_host}",
                            capture=True)
@@ -335,6 +345,11 @@ def run(recovery: Recovery, through: str | None = None) -> int:
     if recovery.state["started"] is None:
         recovery.state["started"] = recovery.system.now().strftime(drill_report.TIME_FORMAT)
         recovery.save()
+    try:
+        recovery.init_roots()
+    except StageFailed as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
     for name, stage in STAGES[: last + 1]:
         if name in recovery.state["passed"]:
             print(f"== {name}: passed earlier, skipped", flush=True)

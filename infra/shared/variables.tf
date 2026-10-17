@@ -54,3 +54,31 @@ variable "probe_host" {
   type        = string
   default     = "git.sindrg.com"
 }
+
+variable "state_bucket_name" {
+  description = "Terraform state bucket from infra/bootstrap. The recovery pipeline reads every state and writes under its own prefixes."
+  type        = string
+}
+
+variable "github_repository_id" {
+  description = "Numeric ID of the GitHub repository whose workflow may sign in as the pipeline. The ID survives a rename of the repository."
+  type        = string
+  default     = "1382368836"
+}
+
+variable "github_environment" {
+  description = "GitHub environment the recovery workflow runs in. Only main can deploy to it."
+  type        = string
+  default     = "recovery"
+}
+
+variable "secret_locations" {
+  description = "Regions that hold the age key secrets, outside Finland."
+  type        = list(string)
+  default     = ["europe-west1", "europe-west4"]
+
+  validation {
+    condition     = length(var.secret_locations) >= 2 && !contains(var.secret_locations, "europe-north1")
+    error_message = "Keep the age keys in at least two regions outside the Finland primary region."
+  }
+}
