@@ -326,8 +326,8 @@ Live system, read-only, 2026-10-17 about 12:40Z, from the operator machine with 
 
 - The workflow has not run. Scheduled runs start after the merge. The first runs are read for `candidate=false` and a skipped `confirm` job.
 - That GitHub records `github-actions[bot]` as the triggering actor of a dispatched run, and that a dispatch from `GITHUB_TOKEN` starts the run. Taken from the GitHub documentation; the gate run shows it.
-- The `confirm` job as the pipeline account. Its reads ran with the operator's credentials.
-- The gate's second half: no start during a probe failure shorter than the window, and none while the switch is off.
+- The `confirm` job as the pipeline account. Its reads ran with the operator's credentials. It ran after the merge, in run 39035847549.
+- The gate's second half: no start during a probe failure shorter than the window, and none while the switch is off. Both ran after the merge; see [A probe failure shorter than the window](#a-probe-failure-shorter-than-the-window).
 
 ### After the merge
 
@@ -339,6 +339,27 @@ Live system, 2026-10-17, from `main` at `3a82ea4`, with `AUTO_FAILOVER` unset an
 | 39034870755 | `schedule`, 13:01:36Z | The same two lines. `local` success, `confirm` skipped |
 
 The scheduled run started 10 minutes after the merge.
+
+### A probe failure shorter than the window
+
+Live system, 2026-10-17, from `main` at `3a82ea4`. This is the second condition of the [milestone gate](../../plan.md#10-automated-recovery): with the switch on, a failure shorter than five minutes starts nothing. Expected before the run: the `local` job reports `candidate=true`, because the switch is on and neither name answers, and the `confirm` job starts nothing because results from before the outage passed within the window.
+
+A temporary firewall rule denied tcp:443 to the primary's web tag at priority 100. The load balancer health check uses tcp:80, so the backend stayed healthy and removing the rule restored the service at once. The switch was turned off before the rule was removed, so a failed delete could not lead to a start.
+
+| Time (UTC) | Event |
+| --- | --- |
+| 13:15:04 | `AUTO_FAILOVER` set to `true` |
+| 13:15:33 | Deny rule created |
+| 13:15:53 | From the operator machine, `git` and `git-primary` both returned no HTTP status (`000`) |
+| 13:15:55 | Watchdog dispatched, run 39035847549 |
+| 13:16:22 | `local`: `candidate=true` |
+| 13:16:58 | `confirm`: `no start: checker usa-virginia passed within the window`. Both jobs ended with success |
+| 13:17:05 | `AUTO_FAILOVER` deleted |
+| 13:17:12 | Deny rule deleted; `git` returned `200`. The outage lasted about 99 s |
+
+Afterwards, the newest `Recover` run was still 39019029597 from 08:52:58Z, `gh variable list` printed nothing, and the firewall rule list held only the five standing rules. The `confirm` job therefore signed in as the pipeline account, read the uptime results, and started nothing.
+
+The switch-off condition is shown by every run above: the `local` job checks the switch first and reports it as the reason.
 
 ## Step 6: the return after a drill
 
