@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is built and checked locally on 2026-10-17; the workflow has not run. See [Step 3](#step-3-the-workflow-runs-the-command). Steps 4 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: In progress. Step 1 is applied and verified on the live system on 2026-10-16; see [Migration after the merge](#migration-after-the-merge). Step 2 is built, and a rehearsal through `verification` passed on the live system on 2026-10-16; see [Rehearsal against the live system](#rehearsal-against-the-live-system). Its fence, cutover, and checks through the public name have not run live. Step 3 is applied, and two workflow runs through `verification` passed on the live system on 2026-10-17; see [Workflow runs](#workflow-runs). For steps 2 and 3, the fence, the cutover, and the checks through the public name have not run live. Steps 4 to 6 are planned. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -194,9 +194,52 @@ Live state, read-only plan, 2026-10-17, from this branch. Expected before the ru
 | --- | --- | --- |
 | `infra/shared` | `terraform plan -lock=false -out=shared.tfplan` | `Plan: 28 to add, 0 to change, 0 to destroy.` All 28 are in `pipeline.tf`: 4 APIs, the pool and provider, the account and its federation grant, 8 project roles, 2 recovery node account grants, the fence role and its grant, 4 bucket grants, and 2 secrets with 2 accessor grants |
 
+### Apply and setup
+
+Live system, 2026-10-17, from `main` at `11faeed`. Expected before the run: the plan matches the reviewed one, and the setup creates the environment from nothing.
+
+| Step | Command | Result |
+| --- | --- | --- |
+| Plan | `terraform -chdir=infra/shared plan -input=false -out=shared.tfplan` | `Plan: 28 to add, 0 to change, 0 to destroy.` The 28 addresses are the ones of the plan above |
+| Apply | `terraform -chdir=infra/shared apply -input=false shared.tfplan` | `Apply complete! Resources: 28 added, 0 changed, 0 destroyed.` |
+| Before setup | `gh api repos/sindredg/k8s-dr/environments/recovery` and `gcloud secrets versions list k8sdr-sops-age-key` | `HTTP 404`, and no secret version |
+| Setup | `python3 scripts/pipeline.py setup` | Exit 0; the output was not captured. The reads in the next rows confirm it |
+| Branch policy | `gh api .../environments/recovery/deployment-branch-policies` and `.../environments/recovery` | `branch main` only; `{"custom_branch_policies":true,"protected_branches":false}` |
+| Secrets | `gh secret list --env recovery`, `gh variable list --env recovery` | The seven secret names of the runbook, and `RECOVERY_SUBNET_CIDR` |
+| Keys | `gcloud secrets versions list` for both secrets | One `enabled` version each. Replicas in `europe-west1` and `europe-west4` |
+| No stored key | `gcloud iam service-accounts keys list --managed-by=user` for the pipeline account; `gh secret list` for the repository | No key; no repository secret |
+
+The setup's failure paths are the stub tests above: `tests.test_pipeline` ran again on 2026-10-17 with 28 tests `OK`. The key listing was not shown to fail, because creating a key would break the claim it checks.
+
+### Workflow runs
+
+Live system, 2026-10-17, from `main` at `11faeed`. The primary kept serving and `git.sindrg.com` did not move. Expected before the runs: the preflight passes as the pipeline account with no permission error, the second run resumes after `preflight` from the state in the bucket, every later stage ends as in the [step 2 rehearsal](#rehearsal-against-the-live-system), and the log shows no project ID, project number, bucket name, or email address.
+
+| Run | Input | Duration | Result |
+| --- | --- | --- | --- |
+| 1 | `through=preflight`, `reset=true` | 08:50:06 to 08:52:16 | Success. `10 passed, 0 failed, 0 missing` |
+| 2 | `through=verification` | 08:52:58 to 09:08:01 | Success. `== preflight: passed earlier, skipped` |
+
+The stage timeline of run 2, from its summary:
+
+| Stage | Start (UTC) | Duration | Result |
+| --- | --- | --- | --- |
+| `preflight` | 08:51:07 | 1 min 02 s | From run 1 |
+| `provisioning` | 08:53:48 | 2 min 22 s | Plan check: `plan creates 16 and updates 0`. `Apply complete! Resources: 16 added, 0 changed, 0 destroyed.` |
+| `bootstrap` | 08:56:10 | 8 min 35 s | Both hosts `failed=0` |
+| `flux-reconcile` | 09:04:45 | 1 min 08 s | Both validations `failed=0`. The CronJob printed `true`, and the `recovery/` listing returned `One or more URLs matched no objects.` |
+| `restore` | 09:05:53 | 1 min 41 s | Set `20261017T085201Z`, `backup age at restore start 892 seconds`, `restored primary/20261017T085201Z in 27 seconds` |
+| `verification` | 09:07:34 | 21 s | `make check-fixtures` on `git-dr` `failed=0`, restored HEAD `909d15f` recorded. `make write-check` pushed at 09:07:48Z. The suspend and prefix checks repeated with the same results |
+
+The five stages of run 2 took 14 min 07 s, from 08:53:48 to 09:07:55. The step 2 rehearsal took 14 min 42 s for the same stages. From outside, `https://git-dr.sindrg.com/api/healthz` returned `200` from the recovery address after the run.
+
+The saved logs of both runs were searched for the project ID, the project number, the suffixes of both bucket names, `@gmail.com`, `AGE-SECRET-KEY`, and the repository ID: no match. Four lines name a node account; each shows the project as `***`. The account names are in `infra/shared/main.tf`.
+
+Afterwards `make dns-delete DNS_NAME=git-dr` deleted the record at 09:09:38Z. The destroy plan of `infra/recovery` showed `Plan: 0 to add, 0 to change, 16 to destroy.`, all in the recovery module or its data disk, and applying it returned `Apply complete! Resources: 0 added, 0 changed, 16 destroyed.` A read afterwards listed only the primary VMs, the primary and default networks, and the primary addresses. `terraform state list` in `infra/recovery` printed nothing, and `git-dr.sindrg.com` had no answer at 1.1.1.1. The run state under `pipeline/drill/` describes the removed environment, so the next run starts with `reset=true`.
+
 ### Not verified
 
-- The shared apply, `scripts/pipeline.py setup`, and a workflow run have not run. The environment only accepts `main`, so the workflow runs after the merge.
-- That the predefined roles cover every call of a recovery. A missing permission shows as a failed stage in the first run.
-- That GitHub masks every identifier in the log. The first run's log is read for unmasked values before it is linked anywhere.
+- The `fence`, `dns-cutover`, and `probe-recovery` stages have not run from the workflow or anywhere else live. The milestone 10 gate runs them.
+- A rerun after a failed stage on a new runner. Run 2 resumed after a passed stage, which uses the same pull of the run state.
+- That the roles cover the fence and the cutover. The runs above cover every call through `verification`.
 
