@@ -246,6 +246,13 @@ class GuardTests(ReturnTestCase):
         self.assertEqual(self.run_back(), 1)
         self.assertFalse(self.system.ran("plan -destroy"))
 
+    def test_the_fence_lift_waits_for_the_account_to_read_enabled(self):
+        # Return run 39056248685 read disabled=True right after a successful enable.
+        self.system.override("service-accounts describe", module.recover.Result(0, "True\n", ""),
+                             module.recover.Result(0, "False\n", ""))
+        self.assertEqual(self.run_back(), 0)
+        self.assertTrue(self.system.ran("plan -destroy"))
+
     def test_a_destroy_plan_that_changes_anything_else_stops_before_apply(self):
         for actions, kind in ((["create"], "google_compute_instance"),
                               (["delete", "create"], "google_compute_instance"),
