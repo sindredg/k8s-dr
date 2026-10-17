@@ -33,6 +33,7 @@ STAGES = (
     "fence",
     "dns-cutover",
     "probe-recovery",
+    "resume-backups",
 )
 
 

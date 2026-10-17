@@ -31,6 +31,9 @@ class FakeSystem(module.System):
         self.overrides: dict[str, list[module.Result]] = {}
         self.plan = PLAN
         self.suspend = "true"
+        # The value the CronJob reports once run-settings exists.
+        self.resumed = "false"
+        self.recovery_sets: list[str] = []
         self.primary_status: list[int | None] = [None]
         self.public_status = 200
         self.dns: dict[str, str] = {}
@@ -73,8 +76,13 @@ class FakeSystem(module.System):
         if argv[0] == "dig":
             return ok(self.dns.get(argv[2], "") + "\n")
         if "kubectl get cronjob/gitea-backup" in line:
-            return ok(self.suspend + "\n")
+            return ok(self.suspend)
+        if "kubectl create configmap run-settings" in line:
+            self.suspend = self.resumed
+            return ok()
         if line.startswith("gcloud storage ls gs://example-backups/recovery/"):
+            if self.recovery_sets:
+                return ok("".join(f"gs://example-backups/recovery/{name}/\n" for name in self.recovery_sets))
             return module.Result(1, "", "ERROR: (gcloud.storage.ls) One or more URLs matched no objects.\n")
         if line.startswith("gcloud storage ls gs://example-backups/primary/"):
             return ok("".join(f"gs://example-backups/primary/{name}/manifest.json\n"
@@ -273,6 +281,22 @@ class CheckTests(RecoverTestCase):
         self.assertNotIn("flux-reconcile", self.state()["passed"])
         self.assertFalse(self.system.ran("make --no-print-directory restore"))
 
+    def test_a_set_from_an_earlier_drill_does_not_stop_the_run(self):
+        self.system.recovery_sets = ["20261004T150702Z"]
+        self.assertEqual(self.recover("run"), 0)
+
+    def test_a_set_written_during_the_run_stops_it(self):
+        # The run starts at 2026-10-16T12:00:01Z on the fake clock.
+        self.system.recovery_sets = ["20261004T150702Z", "20261016T120500Z"]
+        self.assertEqual(self.recover("run"), 1)
+        self.assertNotIn("flux-reconcile", self.state()["passed"])
+        self.assertFalse(self.system.ran("make --no-print-directory restore"))
+
+    def test_an_object_that_is_not_a_set_stops_the_run(self):
+        self.system.recovery_sets = ["planted"]
+        self.assertEqual(self.recover("run"), 1)
+        self.assertNotIn("flux-reconcile", self.state()["passed"])
+
     def test_a_failed_bucket_listing_is_not_an_empty_prefix(self):
         denied = module.Result(1, "", "ERROR: (gcloud.storage.ls) [user] does not have permission\n")
         self.system.override("gcloud storage ls gs://example-backups/recovery/", denied)
@@ -312,6 +336,39 @@ class FenceTests(RecoverTestCase):
         self.system.override("service-accounts describe", module.Result(0, "\n", ""))
         self.assertEqual(self.recover("run"), 1)
         self.assertNotIn("git.sindrg.com", self.system.dns)
+
+
+class ResumeTests(RecoverTestCase):
+    def commands(self):
+        return [" ".join(argv) for argv in self.system.calls]
+
+    def test_backups_resume_from_the_cluster_after_the_public_checks(self):
+        self.assertEqual(self.recover("run"), 0)
+        commands = self.commands()
+        create = next(i for i, line in enumerate(commands) if "create configmap run-settings" in line)
+        last_check = max(i for i, line in enumerate(commands) if "GIT_HOST=git.sindrg.com" in line)
+        self.assertLess(last_check, create)
+        remote = commands[create].split("--command=", 1)[1]
+        self.assertIn("--from-literal=backup_suspend=false --dry-run=client --output=yaml | "
+                      "sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply --filename=-", remote)
+        self.assertTrue(any("annotate --overwrite --namespace flux-system kustomization/gitea "
+                            "reconcile.fluxcd.io/requestedAt=" in line for line in commands[create:]))
+        self.assertFalse(self.system.ran("git push"))
+
+    def test_a_cronjob_that_stays_suspended_fails_the_stage(self):
+        self.system.resumed = "true"
+        self.assertEqual(self.recover("run"), 1)
+        self.assertEqual(self.state()["passed"][-1], "probe-recovery")
+        self.assertIn(("resume-backups", "note",
+                       f"failed: the recovery backup CronJob is still suspended after {module.RESUME_TIMEOUT} seconds"),
+                      self.events())
+
+    def test_a_retried_resume_applies_the_settings_again(self):
+        self.system.resumed = "true"
+        self.recover("run")
+        self.system.resumed = "false"
+        self.assertEqual(self.recover("run"), 0)
+        self.assertEqual(sum("create configmap run-settings" in line for line in self.commands()), 2)
 
 
 class StatusTests(RecoverTestCase):

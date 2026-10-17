@@ -85,10 +85,16 @@ spec:
     provider: sops
     secretRef:
       name: sops-age
+  # A recovery run creates run-settings after the cutover to resume backups;
+  # it is not in Git. Later sources override earlier ones, and a missing
+  # optional source defines nothing. See decision 0013.
   postBuild:
     substituteFrom:
       - kind: ConfigMap
         name: cluster-settings
+      - kind: ConfigMap
+        name: run-settings
+        optional: true
 ---
 # Cluster metrics. Nothing depends on it and it does not wait, so a failed
 # chart or an unreachable Grafana Cloud cannot block the service. See
