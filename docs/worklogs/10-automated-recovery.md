@@ -164,10 +164,25 @@ Local, against stubs, 2026-10-17. Expected before the run: the runner commands w
 
 | Check | Result | Can it fail |
 | --- | --- | --- |
-| `python -m unittest tests.test_pipeline` | 26 tests `OK` | Nine edits to a copy of `scripts/pipeline.py` each failed at least one test: a secret passed with `--body`, an environment open to another branch accepted, any listing error taken as a first run, the lock file pushed, a different stored key accepted, a secret without an age key accepted, the SSH key registered without a TTL, the project number left unmasked, and key files written with mode 644. Five edits to a copy of `pipeline.tf` each failed a test: `roles/iam.serviceAccountTokenCreator` added, the `ref` clause removed, the node account filter removed, `setIamPolicy` added to the fence role, and the state writer condition removed |
-| `python -m unittest tests.test_recover` | 22 tests `OK` | Two edits each failed a test: no inventory before the verification stage, and the roots initialized only in the preflight stage |
-| `make check` | Exit 0, 283 tests `OK` | |
+| `python -m unittest tests.test_pipeline` | 28 tests `OK` | Nine edits to a copy of `scripts/pipeline.py` each failed at least one test: a secret passed with `--body`, an environment open to another branch accepted, any listing error taken as a first run, the lock file pushed, a different stored key accepted, a secret without an age key accepted, the SSH key registered without a TTL, the project number left unmasked, and key files written with mode 644. Five edits to a copy of `pipeline.tf` each failed a test: `roles/iam.serviceAccountTokenCreator` added, the `ref` clause removed, the node account filter removed, `setIamPolicy` added to the fence role, and the state writer condition removed |
+| `python -m unittest tests.test_recover` | 24 tests `OK` | Two edits each failed a test: no inventory on a resumed run, and the roots initialized only in the preflight stage |
+| `make check` | Exit 0 | |
 | `terraform validate` in `infra/shared` (Terraform 1.16.6, provider 7.46.1) | `Success! The configuration is valid.` | |
+
+A code review of the change found ten defects, all fixed before the merge. Seven new or changed checks each failed on an edit that removed the fix: no check of the recorded environment on a resumed run, a missing tool left uncaught, no inventory on a resumed run, a push that keeps objects deleted locally, a PUT over an existing environment, an existing environment left unchecked, and a key compared against `latest` instead of the newest enabled version.
+
+| Finding | Fix |
+| --- | --- |
+| A run state left after a rehearsal makes a later run skip to the fence and move `git.sindrg.com` to a released address | A run that resumes after `provisioning` requires that `infra/recovery` still reports the recorded address. The teardown starts the next run with its state archived |
+| A reset is not mirrored to the bucket, so the old state returns on the next pull | `push` deletes objects that are no longer in the local directory. The state bucket keeps object versions |
+| Continuing a workflow run on an operator machine has no step that copies the state back | The runbook adds the `push` |
+| The bucket comment said the pipeline cannot create a backup object; it can, under `recovery/`, as the recovery worker account | The comment and the decision record say so |
+| `setup` replaced the environment's protection rules on every run | It creates a missing environment and only checks an existing one |
+| `setup` compared the key with `latest`, which can be a disabled version | It compares with the newest enabled version |
+| The concurrency comment said a second run waits; GitHub replaces a pending run with a newer one | The comment and the runbook say so |
+| A missing tool during `terraform init` raised a traceback, and a failed init left no timeline note | Both are caught and noted in the first pending stage |
+| The inventory was regenerated in four stages | It is regenerated once on a resumed run, and in `bootstrap` |
+| The job restored a pip cache that other workflows write | The workflow has no cache |
 
 The first run of `tests.test_pipeline` found a defect: the placeholder pattern did not match a value such as `"user:REPLACE_WITH_..."`, so `configure` would have written placeholders into the shared variables. The pattern now matches a placeholder anywhere in the value.
 

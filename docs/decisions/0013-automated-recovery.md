@@ -113,7 +113,7 @@ Date: 2026-10-17. [Step 3](../../plan.md#10-automated-recovery) of milestone 10 
 | `roles/storage.objectUser`, limited to the `recovery/` and `pipeline/` prefixes | State bucket | Write the recovery state and the run state |
 | `roles/secretmanager.secretAccessor` | The two age key secrets | Decrypt the SOPS files and the backup sets |
 
-The three compute roles also hold `setIamPolicy` on compute objects such as disks, images, and subnetworks. Predefined roles do not separate it, and a custom role would have to list every permission that a plan and an apply use. The pipeline still cannot change the IAM policy of the project, a service account, a bucket, or a secret, so it cannot give itself access to delete backups. It can already read every backup with the backup key, so the compute object grants add no access to the data.
+The three compute roles also hold `setIamPolicy` on compute objects such as disks, images, and subnetworks. Predefined roles do not separate it, and a custom role would have to list every permission that a plan and an apply use. The pipeline still cannot change the IAM policy of the project, a service account, a bucket, or a secret, so it cannot give itself access to delete or overwrite backups. It can already read every backup with the backup key, so the compute object grants add no access to the data. It can create objects under `recovery/` through a VM that runs as the recovery worker account, which the recovery cluster needs; a set planted there is not restored, because a recovery reads `primary/`, but it fails the check that the `recovery/` prefix is empty and so stops a run.
 
 A job signs in only when its token names this repository by numeric ID, the `recovery` environment, and `refs/heads/main`. The environment allows `main` as its only deployment branch, so either check alone blocks a workflow from another branch.
 
@@ -121,9 +121,9 @@ The key secrets hold no version in Terraform. `scripts/pipeline.py setup` adds e
 
 ### Run state
 
-A rerun of the workflow starts on a new runner. The runner copies `.drill/` from `pipeline/drill/` in the state bucket before the run and back after it, whether the run passed or failed. `make recover` initializes the Terraform roots and regenerates the recovery inventory on every run, so a run that resumes at a later stage has both.
+A rerun of the workflow starts on a new runner. The runner copies `.drill/` from `pipeline/drill/` in the state bucket before the run, and mirrors it back after the run, whether the run passed or failed. `make recover` initializes the Terraform roots on every run. A run that resumes after `provisioning` first requires that the recovery root still reports the address the run recorded, then regenerates the recovery inventory. A run whose environment was removed after a rehearsal therefore stops before the fence, instead of moving `git.sindrg.com` to a released address.
 
-The workflow's concurrency group allows one run at a time. The lock file in `.drill/` only guards one machine, so it does not stop an operator from running `make recover` on a laptop during a workflow run. The two runs would use different run state. The runbook says to run one or the other.
+The workflow's concurrency group allows one run at a time. GitHub keeps one pending run per group, and a newer dispatch replaces it. The lock file in `.drill/` only guards one machine, so it does not stop an operator from running `make recover` on a laptop during a workflow run. The two runs would use different run state. The runbook says to run one or the other.
 
 ### Not changed
 

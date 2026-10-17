@@ -67,7 +67,7 @@ Other forms:
 - `python3 scripts/recover.py status` lists the stages that passed and the recorded values.
 - `python3 scripts/recover.py reset` archives `recover.json` and `timeline.tsv`, so the next run starts from `preflight`.
 
-Every run, including a rerun, first runs `terraform init` in the shared, primary, and recovery roots. Each stage that reaches the recovery nodes regenerates the recovery inventory first. A rerun on another machine therefore needs only the run state.
+Every run, including a rerun, first runs `terraform init` in the shared, primary, and recovery roots. A rerun after `provisioning` then requires that `infra/recovery` still reports the recorded recovery address, and regenerates the recovery inventory. A rerun on another machine therefore needs only the run state. A rerun after the recovery environment was removed stops with `the recovery environment that this run recorded no longer exists`; archive the state with `reset` and start again.
 
 Only one run holds the lock in `DRILL_DIR` at a time. A second run exits with `another recovery run holds the lock`. The lock guards one machine only.
 
@@ -75,7 +75,9 @@ Only one run holds the lock in `DRILL_DIR` at a time. A second run exits with `a
 
 The `Recover` workflow runs `make recover` on a GitHub-hosted runner, as the pipeline account of [decision 0013](../decisions/0013-automated-recovery.md#amendment-pipeline-grants-and-run-state). It signs in through workload identity federation, reads both age keys from Secret Manager, and keeps the run state under `pipeline/drill/` in the state bucket, so a rerun on a new runner resumes at the failed stage.
 
-Run either the workflow or `make recover` on an operator machine, not both: their lock files do not see each other. To continue a workflow run on an operator machine, copy its state first with `STATE_BUCKET=<state bucket> python3 scripts/pipeline.py pull --drill-dir .drill`.
+Run either the workflow or `make recover` on an operator machine, not both: their lock files do not see each other. To continue a workflow run on an operator machine, start from an empty `.drill/`, copy the state with `STATE_BUCKET=<state bucket> python3 scripts/pipeline.py pull --drill-dir .drill`, run `make recover`, and copy the state back with `STATE_BUCKET=<state bucket> python3 scripts/pipeline.py push --drill-dir .drill` before the workflow runs again.
+
+The workflow runs one recovery at a time. GitHub keeps one pending run, and a newer dispatch replaces it without starting it. Wait for a run to end before dispatching another.
 
 ### Set up the workflow once
 
@@ -87,7 +89,7 @@ Inputs: the applied shared root from the [primary infrastructure runbook](primar
    python3 scripts/pipeline.py setup
    ```
 
-   Expected: `environment recovery: 7 secrets and 1 variable set; both age keys are in Secret Manager`. A rerun changes nothing. It fails with `holds a different key` if Secret Manager holds another key than the local file.
+   Expected: `environment recovery: 7 secrets and 1 variable set; both age keys are in Secret Manager`. A rerun sets the same secrets again, checks an existing environment without replacing its rules, and adds no key version. It fails with `holds a different key` if the newest enabled version in Secret Manager holds another key than the local file.
 
 2. Check that only `main` can deploy to the environment.
 
@@ -311,6 +313,8 @@ After a gate that left the primary in service, remove the recovery environment. 
    ```
 
    Expected: `16 to destroy`. The plan lists no primary or shared resource and no service account.
+
+4. Start the next run, from the workflow or with `make recover`, with its state archived: `reset=true` for the workflow, or `python3 scripts/recover.py reset` locally. A run that resumes the removed environment stops before the fence.
 
 ## Stop conditions and follow-up
 
