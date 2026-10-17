@@ -516,3 +516,61 @@ These fixes have not run live. They change only guards and waits, not the stages
 - [#110](https://github.com/sindredg/k8s-dr/issues/110): the recovery job installs Python dependencies without hashes.
 - [#111](https://github.com/sindredg/k8s-dr/issues/111): whether instance metadata lets the pipeline account reach a primary node.
 - [#112](https://github.com/sindredg/k8s-dr/issues/112): the access and monitoring diagrams do not show the watchdog or the return workflow. Found in the staleness pass, not by the review.
+
+## After the merge: verification
+
+Live system, 2026-10-17, from `main` at `609aedd`, with `AUTO_FAILOVER` unset. Three items of the gate and the review had not run live: a rerun after a failed stage on a new runner, the wait of `dns-return` for the runner's own resolver, and a return after a rehearsal that stopped before the fence.
+
+### A rerun after a cancelled run
+
+Expected before the run: the cancelled run pushes its state, and a new dispatch without `reset` skips the stages that passed and starts `bootstrap` again on a new runner.
+
+`gh workflow run recover.yml --ref main -f through=all`, run 39054564769, started `bootstrap` at 17:41:37Z and was cancelled with `gh run cancel` at 17:43:25Z. Its push step ran after the cancel and reported success.
+
+The next dispatch, run 39055060613, printed at 17:45:12Z:
+
+```text
+== preflight: passed earlier, skipped
+== provisioning: passed earlier, skipped
+== bootstrap
+```
+
+`bootstrap` ended at 17:53:28Z with both hosts `failed=0`, and every later stage passed: restore set `20261017T175201Z`, fence, `dns-cutover` (`was: git.sindrg.com A <primary address>`), `probe-recovery`, and `resume-backups`. The timeline keeps the start of a stage from its first attempt, so it reports `bootstrap` as 11 min 51 s, which includes the cancelled attempt and the gap between the runs. The `fence` stage took 2 min 33 s, of which the stop call took 2 min 20 s.
+
+### The return after the drill
+
+Expected before the run: the `dns-return` checks reach the primary, not the recovery cluster that still serves, and the return state records the start of its recovery run.
+
+`gh workflow run return.yml --ref main -f discard_recovery_writes=true`, run 39056248685, passed `start-primary`, `dns-return`, and `suspend-recovery-backups`, then failed `lift-fence`: the account read returned `disabled=True` one second after the enable succeeded. [Troubleshooting 07](../troubleshooting/07-service-account-read-lags.md) records the cause and the fix. A new dispatch without changes, run 39056698142, skipped the three passed stages, passed `lift-fence` at 18:08:16Z, destroyed the 16 recovery resources, and waited for primary set `20261017T182202Z`. The rerun after a failed stage on a new runner therefore ran for the return as well.
+
+Which cluster answered the `dns-return` checks, from the logs and a later read:
+
+| Read | Newest commit on `main` of the fixture repository |
+| --- | --- |
+| `probe-recovery` through `git.sindrg.com`, 17:59:21Z, served by the recovery cluster | `8dfb073`, `Write check 2026-10-17T17:56:26Z` |
+| `dns-return` through `git.sindrg.com`, 18:04:42Z | `ff1757e`, `Write check 2026-10-17T14:04:50Z`, the primary's last write before the fence |
+| `make check-fixtures CLUSTER=primary GIT_HOST=git.sindrg.com` from the operator machine, after the recovery environment was destroyed | `a265f62`, `Write check 2026-10-17T18:04:45Z`, the write of `dns-return` |
+
+The recovery cluster held newer commits than `ff1757e` from 17:56 on, so the `dns-return` checks reached the primary, and its write landed there. The archived `return-20261017T182343Z.json` records `recovery_started` as `2026-10-17T17:38:03Z`, the `started` value of the archived recovery state: the start of the cancelled run, kept through the resume.
+
+### A return after a rehearsal
+
+Expected before the run: `gcloud compute instances start` exits 0 on VMs that already run, and the return removes the environment of a rehearsal.
+
+`gh workflow run recover.yml --ref main -f through=verification`, run 39058025716, stopped after `verification` at 18:43:25Z with restored HEAD `a265f62`. `gh workflow run return.yml --ref main -f discard_recovery_writes=true`, run 39059422564, then ran:
+
+| Stage | Duration | Result |
+| --- | --- | --- |
+| `start-primary` | 18 s | `gcloud compute instances start` on the two running VMs exit 0 |
+| `dns-return` | 17 s | Passed |
+| `suspend-recovery-backups` | 0 s | `the recovery never resumed its backups` |
+| `lift-fence` | 4 s | Passed on an account that was never disabled |
+| `remove-recovery` | 4 min 27 s | `plan destroys 16` |
+| `primary-backup` | 3 min 15 s | Set `20261017T185201Z` |
+
+After the run: `git` and `git-primary` returned the primary address at 1.1.1.1, `git-dr` had no answer, the project listed only the two primary VMs, both `RUNNING`, and `terraform state list` in `infra/recovery` printed nothing.
+
+### Not verified
+
+- The account polling of troubleshooting 07 runs against stubs only. The next live `Recover` and `Return` runs from `main` exercise it.
+- The watchdog's automatic start, as in [Gate](#not-verified).
