@@ -1,6 +1,8 @@
 # Project plan
 
-Milestones 0 to 10 are complete, and 11 to 14 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 10 are complete, and 11 to 16 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. Milestone 15 decides how far the lab survives the loss of one zone, and milestone 16 shortens the reading path through the documentation. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+
+The planned milestones run in the order 12, 11, 13, 14, 15, 16. Unattended drills come first because they test whether the automated recovery works with nobody present, and they give milestone 11 a baseline measured the same way. Milestone numbers stay fixed because decision records and worklogs link to them.
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
@@ -19,6 +21,8 @@ Milestones 0 to 10 are complete, and 11 to 14 are planned. Milestone 8 rebuilt t
 | 12. Unattended drills | Measured recovery and cost with nobody present | Planned |
 | 13. Failback with data | Optional return that keeps the recovery writes | Planned |
 | 14. Close the recovery gaps of the lab | Separate backup project, threat model, and an accurate production readiness page | Planned |
+| 15. Zonal resilience decision | A recorded choice on surviving the loss of one zone | Planned |
+| 16. Documentation reading path | A short README and one ordered entry point to the documentation | Planned |
 
 ## 0. Recovery contract
 
@@ -160,23 +164,28 @@ See [decision 0013](docs/decisions/0013-automated-recovery.md) and the [worklog]
 
 ## 11. Faster cluster build
 
+Runs after [milestone 12](#12-unattended-drills), so the stage times before and after come from unattended drills.
+
 In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provisioning 2 min 43 s and the bootstrap playbook 7 min 59 s. The restore took 57 s. Most of the bootstrap installs packages and pulls container images from public sources during the outage. A decision record will compare the options before this is built.
 
 - [ ] Build a node image with the pinned packages and the container images of every deployed workload, from the existing Ansible roles, and store it outside Finland.
 - [ ] Bootstrap both clusters from that image, and keep the playbook able to build from the plain Ubuntu image.
 - [ ] Measure the provisioning and bootstrap stages before and after, from the stage timeline.
 
-**Gate:** The bootstrap stage of a recovery takes at most half of the 7 min 59 s of drill 3, and a recovery succeeds with no public registry or package mirror reachable from the nodes.
+**Gate:** The bootstrap stage of a recovery takes at most half of its mean in the milestone 12 drills, and a recovery succeeds with no public registry or package mirror reachable from the nodes.
 
 ## 12. Unattended drills
 
+Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start by the watchdog has run against stubs only. Because GitHub starts scheduled runs late, detection can take up to about 25 minutes ([decision 0013](docs/decisions/0013-automated-recovery.md#schedule)). A decision record will define how a drill isolates the primary, how it ends, and where its results are kept, before this is built.
+
 - [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
 - [ ] Turn on the Cloud Billing export to BigQuery before the first drill, so each drill's cost can be read from billing.
-- [ ] Isolate the primary and take no further action; record the recovery time from the first failed probe, including detection.
-- [ ] Repeat the drill once and compare both with the attended drills.
-- [ ] Record the cost of each drill from the billing export.
+- [ ] Start a drill from a schedule: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
+- [ ] End each drill with the return workflow, with no person acting.
+- [ ] Keep the results of every drill, attended and unattended, in one table that the README links to, and record the cost of each drill from the billing export.
+- [ ] Keep the drill schedule on after the gate, so results accumulate over time.
 
-**Gate:** Two consecutive unattended drills meet both targets, the worklog compares them with drills 1 to 3, and the cost of each comes from billing data.
+**Gate:** Two consecutive drills started by the schedule meet both targets with no person acting, the watchdog started each recovery, the worklog compares them with drills 1 to 3, and the cost of each comes from billing data.
 
 ## 13. Failback with data (optional)
 
@@ -195,3 +204,22 @@ In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provi
 - [ ] Update each production readiness row that milestones 9 to 14 changed, and state plainly what remains lab scope.
 
 **Gate:** A recovery restores from the separate backup project, deleting a set there fails for the project owner, and the production readiness page matches what is built.
+
+## 15. Zonal resilience decision
+
+Both nodes and the worker data disk are in one zone. The loss of that zone is handled like the loss of the region: a full recovery in Belgium. Surviving a zone loss inside the region is a separate problem, and building for it raises cost and the number of nodes every recovery builds.
+
+- [ ] Write a decision record that compares a stable control-plane endpoint, workers in two zones, a regional persistent disk, three control-plane nodes, and replicated PostgreSQL, with their cost and their effect on recovery time.
+- [ ] Build what the record accepts, and list the rest on the production readiness page as lab scope.
+
+**Gate:** The decision record is accepted. If anything is built, the service survives a stop of every VM in the zone that holds the worker, and a regional recovery still meets both targets.
+
+## 16. Documentation reading path
+
+The documentation keeps every decision, measurement, and failure, which makes it long for a first reader.
+
+- [ ] Shorten the README to the overview, the results, and links.
+- [ ] Add one page that orders the documentation for a first reading, and separates current state (architecture, runbooks, decisions) from history (worklogs, troubleshooting).
+- [ ] Replace repeated facts with links to one copy.
+
+**Gate:** From the README, a reader reaches the results, the architecture, and the recovery procedure in at most two links, and the documentation checks pass.
