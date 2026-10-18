@@ -82,6 +82,8 @@ class System:
                 return Response(response.status, response.read().decode())
         except urllib.error.HTTPError as error:
             return Response(error.code, error.read().decode(errors="replace"))
+        except (urllib.error.URLError, OSError):
+            return Response(None)
 
     def access_token(self) -> str:
         return subprocess.run(["gcloud", "auth", "print-access-token"], check=True,
@@ -228,7 +230,9 @@ class Watchdog:
     def start(self) -> None:
         api = self.environ.get("GITHUB_API_URL", "https://api.github.com")
         url = f"{api}/repos/{self.environ['GITHUB_REPOSITORY']}/actions/workflows/{RECOVERY_WORKFLOW}/dispatches"
-        response = self.system.post(url, {"ref": "main", "inputs": {"through": "all", "reset": True}}, {
+        # A string, as gh workflow run -f sends it: the form every live
+        # dispatch used. The workflow reads it as a boolean input.
+        response = self.system.post(url, {"ref": "main", "inputs": {"through": "all", "reset": "true"}}, {
             "Authorization": f"Bearer {self.environ['GITHUB_TOKEN']}",
             "Accept": "application/vnd.github+json",
         })

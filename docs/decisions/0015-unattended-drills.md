@@ -1,6 +1,6 @@
 # 0015: Unattended drills
 
-Status: Accepted on 2026-10-17. [Milestone 12](../../plan.md#12-unattended-drills) builds and measures it.
+Status: Accepted on 2026-10-17. Amended on 2026-10-18 with [what a drill does when it cannot finish](#amendment-a-drill-that-cannot-finish-restores-the-service). [Milestone 12](../../plan.md#12-unattended-drills) builds and measures it.
 
 Date: 2026-10-17
 
@@ -87,3 +87,16 @@ The watchdog remains a scheduled GitHub workflow. A faster start, such as a Clou
 - GitHub Actions runs both the drill and the recovery. An outage of GitHub Actions stops both, and no drill tests the fallback of running `make recover` from an operator machine.
 - The writes come from one GitHub runner every five minutes, not from real users.
 - Collecting the backup container logs during a drill (issue #85) is not part of this decision; the drill job does not connect to the primary nodes.
+
+## Amendment: a drill that cannot finish restores the service
+
+Date: 2026-10-18
+
+A review before the first drill found two failures that would leave the primary stopped with nobody to start it. Because the guard refuses every drill until the primary serves and the recovery state is empty, either failure also costs every later drill slot.
+
+- **No recovery starts.** The watchdog's automatic start had not run live. If it starts nothing, the drill waited four hours with the service down and then left the primary stopped. Now, if no `Recover` run has started an hour after the isolation, the drill starts the primary VMs again and reports the drill as failed. Nothing else changed before that point: no recovery environment exists, and the public name still points at the primary. A `Recover` run that started and failed still leaves the state for diagnosis, as before.
+- **The report fails after a recovery that passed.** The return ran only after a report that passed, so a transient read error, or a restored commit older than the write log, left the recovery cluster serving. Now the return runs after every recovery that passed, unless the drill missed a target. A missed target still keeps the state for diagnosis, as the decision states above. The drill is then reported as failed, with an incomplete measurement.
+
+The same change sends the boolean inputs of both dispatches as the string `"true"`, the form that `gh workflow run -f` sends and that every live dispatch used. It also retries the return dispatch and one failed write check.
+
+Trade-off: a drill that restarts the primary, or returns after a failed report, removes part of the evidence that a person would otherwise find in place. The issue and the stored result keep the reason, the run links, and the recovery's stage timeline.

@@ -42,6 +42,9 @@ class FakeSystem(module.System):
         self.clock = START
         self.calls: list[list[str]] = []
         self.failing: set[str] = set()
+        # Needle -> number of calls that fail before it succeeds.
+        self.failing_times: dict[str, int] = {}
+        self.dispatch_answers: list = []
         self.outputs: dict[str, str] = {}
         self.sleeps: list[float] = []
         self.posts: list[tuple[str, dict]] = []
@@ -69,6 +72,10 @@ class FakeSystem(module.System):
         line = " ".join(argv)
         for needle in self.failing:
             if needle in line:
+                return recover.Result(1, "", f"{needle} failed")
+        for needle, left in self.failing_times.items():
+            if needle in line and left:
+                self.failing_times[needle] -= 1
                 return recover.Result(1, "", f"{needle} failed")
         if line in self.outputs:
             return ok(self.outputs[line])
@@ -164,6 +171,13 @@ class FakeSystem(module.System):
         raise AssertionError(f"unexpected request {url}")
 
     def post(self, url, body, headers):
+        if url.endswith("return.yml/dispatches") and self.dispatch_answers:
+            # (status, run created): a lost answer may still start a run.
+            status, created = self.dispatch_answers.pop(0)
+            if created:
+                self.posts.append((url, body))
+                self.return_dispatched = self.clock
+            return watchdog.Response(status)
         self.posts.append((url, body))
         if url.endswith("return.yml/dispatches"):
             self.return_dispatched = self.clock
@@ -291,6 +305,12 @@ class StepTests(DrillTestCase):
         lines = (self.work_dir / module.WRITES_FILE).read_text().splitlines()
         self.assertEqual(len(lines), 6)
 
+    def test_one_failed_write_is_retried(self):
+        self.assertEqual(self.step("guard"), 0)
+        self.system.failing_times["write-check"] = 1
+        self.assertEqual(self.step("writes"), 0, self.errors)
+        self.assertEqual(len((self.work_dir / module.WRITES_FILE).read_text().splitlines()), 6)
+
     def test_a_failed_write_stops_before_the_isolation(self):
         self.assertEqual(self.step("guard"), 0)
         self.system.failing.add("write-check")
@@ -331,7 +351,24 @@ class StepTests(DrillTestCase):
              "html_url": "x", "triggering_actor": BOT}]
         self.through("isolate")
         self.assertEqual(self.step("wait"), 1)
-        self.assertIn("no run started by 2026-10-19T10:42:00Z", self.state()["failed"]["reason"])
+        self.assertIn("no run started by 2026-10-19T07:42:00Z", self.state()["failed"]["reason"])
+
+    def test_no_recovery_within_an_hour_starts_the_primary_again(self):
+        self.system.recovery_plan = None
+        self.through("isolate")
+        self.assertEqual(self.step("wait"), 1)
+        start = next(argv for argv in self.system.calls if argv[:4] == ["gcloud", "compute", "instances", "start"])
+        self.assertEqual(start[4:6], ["primary-cp", "primary-worker"])
+        self.assertEqual(self.state()["primary_restarted"], at(85).strftime(FORMAT))
+        self.assertIn("started the primary VMs again", self.state()["failed"]["reason"])
+        self.step("finish")
+        self.assertEqual(self.state()["outcome"], "failed")
+
+    def test_a_recovery_that_started_and_failed_keeps_the_primary_stopped(self):
+        self.system.recovery_plan["conclusion"] = "failure"
+        self.through("isolate")
+        self.assertEqual(self.step("wait"), 1)
+        self.assertFalse(self.ran("instances start"))
 
     def test_a_failed_watchdog_run_fails_the_wait(self):
         self.system.recovery_plan["conclusion"] = "failure"
@@ -422,8 +459,41 @@ class ReturnTests(DrillTestCase):
         self.through("return")
         url, body = self.system.posts[0]
         self.assertTrue(url.endswith("/actions/workflows/return.yml/dispatches"))
-        self.assertEqual(body, {"ref": "main", "inputs": {"discard_recovery_writes": True}})
+        self.assertEqual(body, {"ref": "main", "inputs": {"discard_recovery_writes": "true"}})
         self.assertEqual(self.state()["return_run"]["id"], 901)
+
+    def test_a_failed_dispatch_is_retried(self):
+        self.system.dispatch_answers = [(None, False), (502, False)]
+        self.through("return")
+        self.assertEqual(self.state()["return_run"]["id"], 901)
+
+    def test_a_dispatch_whose_answer_was_lost_is_not_sent_again(self):
+        self.system.dispatch_answers = [(None, True)]
+        self.through("return")
+        self.assertEqual(sum(url.endswith("return.yml/dispatches") for url, _ in self.system.posts), 1)
+
+    def test_three_failed_dispatches_fail_the_return(self):
+        self.system.dispatch_answers = [(None, False)] * 3
+        self.through("report")
+        self.assertEqual(self.step("return"), 1)
+        self.assertIn("failed 3 times", self.state()["failed"]["reason"])
+
+    def test_a_report_that_failed_for_another_reason_still_returns(self):
+        del self.system.series["apac-singapore"]
+        self.through("wait")
+        self.assertEqual(self.step("report"), 1)
+        self.assertEqual(self.step("return"), 0, self.errors)
+        self.step("finish")
+        self.assertEqual(self.state()["outcome"], "failed")
+        issue = next(body for url, body in self.system.posts if url.endswith("/issues"))
+        self.assertIn("The recovery and the return passed", issue["body"])
+
+    def test_return_refuses_without_a_recovery_that_passed(self):
+        self.system.recovery_plan["conclusion"] = "failure"
+        self.through("isolate")
+        self.step("wait")
+        self.assertEqual(self.step("return"), 1)
+        self.assertEqual(self.system.posts, [])
 
     def test_a_failed_return_fails_the_drill(self):
         self.system.return_plan["conclusion"] = "failure"
@@ -479,6 +549,17 @@ class FinishTests(DrillTestCase):
         self.assertEqual(self.step("finish"), 1)
 
 
+class SystemTests(unittest.TestCase):
+    def test_the_real_system_takes_requests_from_the_watchdog_and_commands_from_the_recovery(self):
+        system = module.System({"A": "1"})
+        self.assertEqual(system.environ, {"A": "1"})
+        for name, owner in (("get", module.watchdog.System), ("post", module.watchdog.System),
+                            ("access_token", module.watchdog.System),
+                            ("call", module.recover.System), ("sleep", module.recover.System)):
+            self.assertIs(getattr(module.System, name), getattr(owner, name), name)
+        self.assertIsNotNone(system.now().tzinfo)
+
+
 class ResultsTests(unittest.TestCase):
     def test_the_table_has_one_row_per_drill_oldest_first(self):
         passed = {"id": "20261021T061700Z", "outcome": "passed", "event": "schedule", "run_url": "https://x/2",
@@ -523,6 +604,11 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(self.job["permissions"], {"contents": "read", "id-token": "write",
                                                    "actions": "write", "issues": "write"})
         self.assertEqual(self.job["environment"], "recovery")
+
+    def test_the_return_runs_after_any_passed_wait(self):
+        step = next(step for step in self.job["steps"] if step.get("run", "").endswith(" return"))
+        self.assertEqual(step["if"], "always() && steps.wait.outcome == 'success'")
+        self.assertTrue(any(step.get("id") == "wait" and step["run"].endswith(" wait") for step in self.job["steps"]))
 
     def test_the_steps_run_in_order_and_finish_always(self):
         commands = [step["run"].split()[4] for step in self.job["steps"]

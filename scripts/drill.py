@@ -7,9 +7,11 @@ The Drill workflow runs these commands in order (decision 0015):
   writes   push a write check every five minutes for 25 minutes
   isolate  record the time and stop both primary VMs
   wait     take no action until a Recover run that the watchdog started
-           after the isolation ends, for at most four hours
+           after the isolation ends, for at most four hours. If no run
+           starts within an hour, start the primary again
   report   compute recovery time and data loss, and check the dataset
-  return   dispatch the Return workflow and wait for it to succeed
+  return   dispatch the Return workflow and wait for it to succeed. Runs
+           after any passed recovery unless the drill missed a target
   finish   store the result and open an issue labelled drill; runs always
 
 The steps share drill.json in --work-dir. Each step copies the directory to
@@ -53,6 +55,12 @@ RTO_TARGET = timedelta(hours=4)
 RPO_TARGET = timedelta(hours=2)
 # The return job's own limit in return.yml, plus time to queue.
 RETURN_TIMEOUT = timedelta(minutes=100)
+# Detection took up to about 25 minutes in decision 0013's estimate. A
+# watchdog that has started nothing after an hour will not, and the primary
+# would otherwise stay stopped until the four-hour deadline.
+START_TIMEOUT = timedelta(minutes=60)
+DISPATCH_ATTEMPTS = 3
+RETRY_SECONDS = 30
 POLL_SECONDS = 60
 # A dispatched run's creation time comes from GitHub, not the runner clock.
 CLOCK_SKEW = timedelta(seconds=60)
@@ -175,7 +183,8 @@ class Drill:
             "Accept": "application/vnd.github+json",
         })
 
-    def wait_for_run(self, workflow: str, since: datetime, deadline: datetime, key: str) -> dict:
+    def wait_for_run(self, workflow: str, since: datetime, deadline: datetime, key: str,
+                     start_deadline: datetime | None = None) -> dict:
         """Poll until the first bot run since the given time ends. Transient API errors only wait."""
         while True:
             try:
@@ -194,6 +203,8 @@ class Drill:
                     if run["conclusion"] != "success":
                         raise DrillFailed(f"{workflow} run {run['id']} ended with {run['conclusion']}")
                     return run
+            if not found and start_deadline and self.system.now() >= start_deadline:
+                raise DrillFailed(f"{workflow}: no run started by {stamp(start_deadline)}")
             if self.system.now() >= deadline:
                 what = f"run {found[0]['id']} did not end" if found else "no run started"
                 raise DrillFailed(f"{workflow}: {what} by {stamp(deadline)}")
@@ -227,20 +238,42 @@ class Drill:
         for number in range(WRITES):
             if number:
                 self.system.sleep(WRITE_INTERVAL)
-            self.make("write-check", f"WRITE_LOG={log.resolve()}")
+            # One retry, so a transient failure does not cost the drill.
+            try:
+                self.make("write-check", f"WRITE_LOG={log.resolve()}")
+            except DrillFailed as error:
+                print(f"warning: {error}; retrying once", file=sys.stderr)
+                self.system.sleep(RETRY_SECONDS)
+                self.make("write-check", f"WRITE_LOG={log.resolve()}")
             self.try_push()
 
-    def isolate(self) -> None:
+    def primary_vms(self, action: str) -> int:
         names = sorted(self.output("primary", "instance_names", raw=False).values())
         zone, project = self.output("primary", "zone"), self.output("primary", "project_id")
-        self.state["isolated_at"] = stamp(self.system.now())
-        self.save()
-        self.run(["gcloud", "compute", "instances", "stop", *names, "--zone", zone, "--project", project])
-        print(f"isolated at {self.state['isolated_at']}: stopped {len(names)} primary VMs")
+        if action == "stop":
+            self.state["isolated_at"] = stamp(self.system.now())
+            self.save()
+        self.run(["gcloud", "compute", "instances", action, *names, "--zone", zone, "--project", project])
+        return len(names)
+
+    def isolate(self) -> None:
+        count = self.primary_vms("stop")
+        print(f"isolated at {self.state['isolated_at']}: stopped {count} primary VMs")
 
     def wait(self) -> None:
         isolated = parse(self.state["isolated_at"])
-        self.wait_for_run(watchdog.RECOVERY_WORKFLOW, isolated, isolated + RTO_TARGET, "recovery_run")
+        try:
+            self.wait_for_run(watchdog.RECOVERY_WORKFLOW, isolated, isolated + RTO_TARGET, "recovery_run",
+                              start_deadline=isolated + START_TIMEOUT)
+        except DrillFailed as error:
+            if "recovery_run" in self.state:
+                raise
+            # Nothing changed but the stop: no recovery environment, and the
+            # public name still points at the primary.
+            self.primary_vms("start")
+            self.state["primary_restarted"] = stamp(self.system.now())
+            self.save()
+            raise DrillFailed(f"{error}; the drill started the primary VMs again") from None
 
     def first_failed_probe(self, isolated: datetime, end: datetime) -> tuple[datetime, dict]:
         """The earliest failed result of any checker after the isolation, and each checker's first."""
@@ -305,10 +338,19 @@ class Drill:
 
     def return_(self) -> None:
         dispatched = self.system.now()
-        response = self.github_post(f"actions/workflows/{watchdog.RETURN_WORKFLOW}/dispatches", {
-            "ref": "main", "inputs": {"discard_recovery_writes": True}})
-        if response.status not in (200, 204):
-            raise DrillFailed(f"dispatching the return returned {response.status}")
+        for attempt in range(1, DISPATCH_ATTEMPTS + 1):
+            # A dispatch whose answer was lost may still have started a run.
+            if attempt > 1 and self.bot_runs_since(watchdog.RETURN_WORKFLOW, dispatched - CLOCK_SKEW):
+                break
+            # A string, as gh workflow run -f sends it; see watchdog.start.
+            response = self.github_post(f"actions/workflows/{watchdog.RETURN_WORKFLOW}/dispatches", {
+                "ref": "main", "inputs": {"discard_recovery_writes": "true"}})
+            if response.status in (200, 204):
+                break
+            print(f"warning: dispatching the return returned {response.status or 'no answer'}", file=sys.stderr)
+            if attempt == DISPATCH_ATTEMPTS:
+                raise DrillFailed(f"dispatching the return failed {DISPATCH_ATTEMPTS} times")
+            self.system.sleep(RETRY_SECONDS)
         self.wait_for_run(watchdog.RETURN_WORKFLOW, dispatched - CLOCK_SKEW, dispatched + RETURN_TIMEOUT,
                           "return_run")
 
@@ -355,6 +397,12 @@ class Drill:
                       drill_report.timeline_table(drill_report.read_events(timeline))]
         if outcome != "passed" and not state.get("isolated_at"):
             lines += ["", "The primary was not isolated."]
+        elif state.get("primary_restarted"):
+            lines += ["", "No recovery started, so the drill started the primary VMs again at "
+                      f"{state['primary_restarted']}. Read the watchdog runs since the isolation."]
+        elif outcome != "passed" and state["steps"].get("return") == "passed":
+            lines += ["", "The recovery and the return passed, and the primary serves again. The report "
+                      "failed, so this drill's measurement is incomplete."]
         elif outcome != "passed":
             lines += ["", "The return did not finish, and the run state is kept for diagnosis. The guard "
                       "refuses further drills until the primary serves and infra/recovery is empty."]
@@ -489,6 +537,16 @@ def main(argv=None, system: System | None = None) -> int:
             return 1
         drill.state["id"] = system.now().strftime(drill_report.SET_FORMAT)
         drill.save()
+    elif args.command == "return":
+        # A report that failed for any reason but a missed target still
+        # returns: the recovery passed, and staying on the recovery cluster
+        # would block every later drill.
+        if any(drill.state["steps"].get(step) != "passed" for step in STEPS[:STEPS.index("report")]):
+            print("error: return needs a recovery that passed", file=sys.stderr)
+            return 1
+        if (drill.state.get("result") or {}).get("met") is False:
+            print("error: the drill missed a target; the recovery state is kept for diagnosis", file=sys.stderr)
+            return 1
     elif drill.state["failed"] or any(drill.state["steps"].get(step) != "passed"
                                       for step in STEPS[:STEPS.index(args.command)]):
         print(f"error: {args.command} needs every earlier step to have passed", file=sys.stderr)
