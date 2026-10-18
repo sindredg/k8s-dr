@@ -86,13 +86,16 @@ Each drill is a real outage of `git.sindrg.com`, and the return discards every w
 
 ## After a drill that did not pass
 
-The issue names the step that stopped the drill. The guard refuses every later drill until the primary serves again and `infra/recovery` is empty.
+The issue names the step that stopped the drill. The guard refuses every later drill until the primary serves again and `infra/recovery` is empty. Two cases restore the service on their own: if no `Recover` run starts within an hour of the isolation, the drill starts the primary VMs again, and after a recovery that passed, the drill returns even if its report failed.
 
 | Outcome | State left | What to do |
 | --- | --- | --- |
 | `refused` | Nothing changed | Fix the condition the issue names. The next scheduled drill runs the guard again |
 | `failed` in `writes` | Nothing changed; the primary serves | Read the write-check error in the workflow log |
-| `failed` in `wait` or later | The primary is stopped. The recovery environment may exist, and it may serve the public name | Follow the [regional recovery runbook](regional-recovery.md#start-automatically-with-the-watchdog) to resume the failed `Recover` run, then return as in step 9 |
+| `failed` in `wait`, no recovery run | The drill started the primary VMs again. Nothing else changed | Read the watchdog runs after the isolation to see why none started. Check the service with `make check-fixtures` |
+| `failed` in `wait`, with a recovery run | The primary is stopped. The recovery environment may exist, and it may serve the public name | Follow the [regional recovery runbook](regional-recovery.md#start-automatically-with-the-watchdog) to resume the failed `Recover` run, then return as in step 9 |
+| `failed` in `report`, return passed | The primary serves again; the measurement is incomplete | Read the report error in the issue. No action is needed for the service |
+| `failed` in `return` | The recovery cluster serves the public name | Rerun the failed `Return` run, or return as in step 9 |
 | `missed` | The recovery cluster serves the public name | Return as in step 9 |
 
 9. Return to the primary after a recovery that passed, as the drill would have.

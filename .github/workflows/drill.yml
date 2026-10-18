@@ -75,10 +75,14 @@ jobs:
       - name: Isolate the primary
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" isolate
       - name: Wait for the recovery
+        id: wait
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" wait
       - name: Report
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" report
+      # Also after a failed report, unless the drill missed a target; the
+      # command decides.
       - name: Return to the primary
+        if: always() && steps.wait.outcome == 'success'
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" return
       - name: Store the result and open an issue
         if: always()

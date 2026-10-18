@@ -162,7 +162,7 @@ class ConfirmTests(WatchdogTestCase):
         self.assertTrue(self.started())
         url, body = self.system.dispatches[0]
         self.assertEqual(url, "https://api.github.com/repos/example/repo/actions/workflows/recover.yml/dispatches")
-        self.assertEqual(body, {"ref": "main", "inputs": {"through": "all", "reset": True}})
+        self.assertEqual(body, {"ref": "main", "inputs": {"through": "all", "reset": "true"}})
         self.assertIn('metric.labels.check_id="git-healthz-abc"', self.system.query)
 
     def test_a_failure_shorter_than_the_window_starts_nothing(self):
@@ -217,6 +217,16 @@ class ConfirmTests(WatchdogTestCase):
         self.system.dispatch_status = 403
         with self.assertRaises(RuntimeError):
             self.watchdog("confirm", "--start")
+
+
+class SystemTests(unittest.TestCase):
+    def test_a_post_that_gets_no_answer_returns_no_status(self):
+        import urllib.error
+        system = module.System({})
+        with mock.patch.object(module.urllib.request, "urlopen", side_effect=urllib.error.URLError("timed out")):
+            self.assertIsNone(system.post("https://api.example.test/x", {}, {}).status)
+        with mock.patch.object(module.urllib.request, "urlopen", side_effect=TimeoutError()):
+            self.assertIsNone(system.post("https://api.example.test/x", {}, {}).status)
 
 
 class WorkflowTests(unittest.TestCase):

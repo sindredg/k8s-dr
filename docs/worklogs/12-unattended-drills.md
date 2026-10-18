@@ -54,3 +54,35 @@ Expected before running: `make check-dataset` fails before the load, because no 
 - No drill has run. The drill steps ran against stubs only, including the GitHub API, Cloud Monitoring, and every command.
 - The `Recover`, `Return`, and `Watchdog` workflows have not run on `ubuntu-26.04`. The first drill runs all three.
 - The first drill is also the first restore of a 2 GiB set. The preflight's download and decryption of a set that size has not run on a runner.
+
+## Step 2: review before the first drill
+
+An independent review read the drill code against decision 0015 and against the grants, tokens, and APIs it uses, before the first scheduled run on 2026-10-19. It ran the local tests and read-only API calls only. It found no defect that stops a drill that goes well. The findings below are about what happens when a step fails.
+
+### Fixed
+
+| Finding | Evidence | Fix |
+| --- | --- | --- |
+| A failed `report` skipped the return, even after a recovery that passed | The `Return` step had no condition, and `return` required every earlier step to pass. A transient read, or a restored commit older than the write log, would leave the recovery cluster serving and the guard refusing every later drill | `return` runs after every recovery that passed, unless the drill missed a target. The workflow step runs on `always() && steps.wait.outcome == 'success'` |
+| If the watchdog started no recovery, nothing started the primary again | `wait` failed after four hours and left the VMs stopped. The `Return` workflow needs a recovery environment | If no `Recover` run starts within an hour of the isolation, `wait` starts the primary VMs and fails the drill |
+| Both dispatches sent JSON booleans | `watchdog.start` sent `"reset": True` and `return` sent `"discard_recovery_writes": True`. Every live dispatch was `gh workflow run -f`, which sends strings. No authoritative source on booleans was found | Both send `"true"` |
+| A dispatch that got no answer was not retried | `watchdog.System.post` caught only HTTP errors | `post` returns no status on a network error. `return` retries up to three times, and does not dispatch again if a run already started |
+| One failed write check ended the drill before the isolation | `writes` stopped at the first failure | One retry after 30 seconds |
+| The runbook sent a failed report to the `Recover` resume | The table in the runbook | One row per case, including a failed report and a failed return |
+
+[Decision 0015](../decisions/0015-unattended-drills.md#amendment-a-drill-that-cannot-finish-restores-the-service) records the first two as an amendment.
+
+### Plan only
+
+- The job's worst case exceeds its timeout: [issue #122](https://github.com/sindredg/k8s-dr/issues/122).
+- The tests stub out the runner wiring and the real API responses: [issue #123](https://github.com/sindredg/k8s-dr/issues/123).
+- The workload identity credentials have not been used by a job that runs longer than an hour. The first drill uses them one to two hours after the setup step.
+
+### Local checks
+
+Source: local machine, against stubs.
+
+Expected before running: the new tests pass, and each new check fails when the code it guards is broken.
+
+- `tests/test_drill.py` and `tests/test_watchdog.py`: 78 tests, `OK`.
+- 12 single-line mutations of the new code, each applied alone: all 12 failed their tests. They removed the start deadline, the primary restart, the check for a started run, both return gates, the string inputs, the lost-answer check, the last-attempt failure, the write retry, the network-error handling in `post`, and the issue text after a failed report. The 25 mutations of step 1 still fail their tests.
