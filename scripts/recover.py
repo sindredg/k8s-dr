@@ -314,7 +314,16 @@ class Recovery:
 
     def bootstrap(self) -> None:
         self.inventory()
-        self.make("bootstrap", "CLUSTER=recovery")
+        # One more certificate name per run, so that every run orders a new
+        # set of names: Let's Encrypt allows five certificates a week for the
+        # same set. A resumed run keeps its name. See decision 0016.
+        if "certificate_host" not in self.values:
+            started = datetime.strptime(self.state["started"], drill_report.TIME_FORMAT)
+            domain = self.public_host.split(".", 1)[1]
+            self.values["certificate_host"] = f"run-{started:%Y%m%dt%H%M%Sz}.{domain}"
+            self.save()
+        self.make("bootstrap", "CLUSTER=recovery",
+                  f"BOOTSTRAP_ARGS=-e run_certificate_host={self.values['certificate_host']}")
 
     def flux_reconcile(self) -> None:
         self.make("validate-cluster", "CLUSTER=recovery")

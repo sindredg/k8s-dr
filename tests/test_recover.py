@@ -151,6 +151,21 @@ class RunTests(RecoverTestCase):
         order = [drill_report.STAGES.index(name) for name in module.STAGE_NAMES]
         self.assertEqual(order, sorted(order))
 
+    def test_bootstrap_passes_one_certificate_name_per_run(self):
+        # Each run orders a new set of names; Let's Encrypt allows five
+        # certificates a week for the same set. See decision 0016.
+        failed = module.Result(2, "", "")
+        self.system.override("make --no-print-directory bootstrap", failed, module.Result(0, "", ""))
+        self.assertEqual(self.recover("run"), 1)
+        self.assertEqual(self.recover("run"), 0)
+        bootstraps = [argv for argv in self.system.calls if argv[:3] == ["make", "--no-print-directory", "bootstrap"]]
+        started = datetime.strptime(self.state()["started"], drill_report.TIME_FORMAT)
+        name = started.strftime("run-%Y%m%dt%H%M%Sz.sindrg.com")
+        self.assertRegex(name, r"^run-20261016t12000\dz\.sindrg\.com$")
+        self.assertEqual([argv[3:] for argv in bootstraps],
+                         [["CLUSTER=recovery", f"BOOTSTRAP_ARGS=-e run_certificate_host={name}"]] * 2)
+        self.assertEqual(self.state()["values"]["certificate_host"], name)
+
     def test_preflight_skips_only_the_fixture_check(self):
         self.recover("run", "--through", "preflight")
         index = self.system.calls.index(["make", "--no-print-directory", "preflight"])

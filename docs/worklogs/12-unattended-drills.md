@@ -1,6 +1,6 @@
 # Unattended drills
 
-Status: In progress. The drill workflow and the dataset are built, and the dataset is loaded on the primary; no drill has run. This file is the record of [milestone 12](../../plan.md#12-unattended-drills).
+Status: In progress. The drill workflow and the dataset are built, and the dataset is loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. The drills on demand of step 3 are built and have not run live. This file is the record of [milestone 12](../../plan.md#12-unattended-drills).
 
 ## Step 1: the drill workflow and the dataset
 
@@ -86,3 +86,59 @@ Expected before running: the new tests pass, and each new check fails when the c
 
 - `tests/test_drill.py` and `tests/test_watchdog.py`: 78 tests, `OK`.
 - 12 single-line mutations of the new code, each applied alone: all 12 failed their tests. They removed the start deadline, the primary restart, the check for a started run, both return gates, the string inputs, the lost-answer check, the last-attempt failure, the write retry, the network-error handling in `post`, and the issue text after a failed report. The 25 mutations of step 1 still fail their tests.
+
+## Drill 1: the first scheduled drill, 2026-10-19
+
+Source: live system. The `Drill` run 39213159208, the `Watchdog` runs, the `Recover` run 39218739238, and issue #126, read through the GitHub API after the drill had failed. No expected values were written down before the result was read; decision 0015 expects a drill to pass.
+
+| Step | Time (UTC) | Result |
+| --- | --- | --- |
+| Scheduled start | 06:59:44Z | The cron is `17 6 * * 1,3,5`. GitHub created the run 42 min 44 s late |
+| `guard` | 07:00:24Z | Passed, including `make preflight` and the dataset check |
+| `writes` | 07:04:46Z to 07:30:58Z | Six write checks passed |
+| `isolate` | 07:31:05Z | Stopped both primary VMs |
+| Watchdog | 07:50:47Z | Run 39218628119 on `ubuntu-26.04`: `local` and `confirm` passed, and `confirm` dispatched the recovery |
+| `Recover` 39218739238 | 07:51:48Z | Created by `github-actions[bot]`, on `ubuntu-26.04`. `preflight` 07:53:12Z, `provisioning` 07:55:18Z, `bootstrap` 07:57:43Z, `flux-reconcile` 08:06:57Z, `restore` 08:08:16Z |
+| `restore` | 08:10:35Z | Failed: `restore failed with status 141 before any change`. Cause and fix in [troubleshooting 08](../troubleshooting/08-restore-dump-check-sigpipe.md) |
+| `wait` | 08:11:47Z | Failed: `recover.yml run 39218739238 ended with failure` |
+| `report`, `return` | | Skipped, as decision 0015 specified after a failed recovery |
+| `finish` | 08:11:56Z | Stored `result.json` and opened issue #126, `Drill 20261019T070024Z: failed` |
+
+What the drill showed:
+
+- The automatic start ran end to end for the first time: the watchdog's `confirm` job dispatched the `Recover` run with nobody present. Detection, from the isolation to the run's creation, took 20 min 43 s. GitHub ran the five-minute watchdog schedule at 06:50:57Z, 07:17:32Z, 07:50:47Z, and 08:04:52Z, so the first run after the isolation came 19 min 42 s later.
+- The `Recover`, `Watchdog`, and `Drill` workflows ran on `ubuntu-26.04`.
+- The workload identity credentials outlived an hour. `google-github-actions/auth` created them at 07:00:04Z, and the `finish` step copied the result to the state bucket at 08:11:54Z.
+- The real GitHub API answered the run polling and the issue creation, and `gcloud` stopped the VMs from the runner: paths that [issue #123](https://github.com/sindredg/k8s-dr/issues/123) lists as tested against stubs only.
+- The failed recovery left the primary stopped, and nothing restored the service, as designed. The watchdog then logged `no start: automatic recovery run 39218739238 ended with failure` on every run. The `Return` run 39264176899, dispatched by hand at 13:54:25Z, started the primary at 13:58:23Z and removed the recovery environment by 14:01:58Z. The public name did not serve for about 6 h 27 min. Issue #127 records the gap.
+- The recovery issued production certificates for `git.sindrg.com` and `git-dr.sindrg.com` before it failed. With the recoveries of 2026-10-17, that left about one certificate for each name in the Let's Encrypt limit of five a week, so the next drill could not follow the fix the same day.
+
+## Step 3: drills on demand
+
+[Decision 0016](../decisions/0016-drills-on-demand.md) addresses the last three findings of drill 1.
+
+### What was built
+
+| Part | Files | What it does |
+| --- | --- | --- |
+| Run name on the recovery's certificates | `scripts/recover.py`, `ansible/roles/flux/tasks/main.yml`, `deploy/clusters/recovery/kustomization.yaml`, `deploy/clusters/recovery/certificates/`, `deploy/clusters/recovery/cluster-settings.yaml` | The `bootstrap` stage records `run-<start>.sindrg.com` in the run state and passes it to `make bootstrap`. The Flux role writes it to `certificate-settings`. On the recovery cluster only, the `certificates` Kustomization adds it to both certificates; the default is `recovery.sindrg.com` |
+| A drill ends on the primary | `scripts/drill.py`, `.github/workflows/drill.yml` | The return step runs after every step. After an isolation it dispatches the `Return` if the recovery recorded an environment, and otherwise starts the primary VMs. A missed target returns too. The issue keeps the first failure and copies the recovery's stage timeline |
+| A passed return clears a failed automatic start | `scripts/watchdog.py` | A `Return` run that passed and was created after the failed `Recover` run lifts the block, in the watchdog and in the drill guard |
+| Documents | Decision 0016 and pointers in decisions 0008, 0013, and 0015, the plan, architecture pages 06 and 10, the runbooks, the results page, the readiness page, and the `flux-kustomizations` diagram | The gate counts dispatched drills. The runbook's table for a drill that did not pass follows the new ends |
+
+### Local checks
+
+Source: local machine, against stubs, and offline renders of the manifests.
+
+Expected before running: every new test fails against the code before the change and passes after it, and each new condition is caught when it is broken alone.
+
+- New tests, each run against the code before the change and failing there: `test_a_return_that_passed_after_a_failed_automatic_start_clears_it`, `test_bootstrap_passes_one_certificate_name_per_run`, `test_a_recovery_run_sets_its_certificate_name_before_flux_applies`, `test_only_the_recovery_certificates_carry_the_run_name`, and in `tests/test_drill.py` the tests for a failed recovery with and without an environment, a run state older than the isolation, a missing run state, a return without an isolation or after a restart, a failed return after a failed recovery, and a missed target that returns.
+- `make check`: exit `0`, 423 tests `OK`, and the linters pass.
+- `make manifests`: `recovery/certificates: 5 objects from ./deploy/clusters/recovery/certificates`, and kubeconform reports 146 resources valid. The recovery's `git-tls` names `git.sindrg.com` and `recovery.sindrg.com`, its `git-cluster-tls` names `git-dr.sindrg.com` and `recovery.sindrg.com`, and the primary's certificates are unchanged.
+- 17 single-line mutations of the new code, each applied alone and run against its test module. 15 failed their tests at first. A recovery state with `provisioning` passed and no address survived, so a test case was added, and it now fails. A check that the drill had seen a `Recover` run survived because the age check on the run state already covers it, so the check was removed. They covered both conditions of the cleared start, each condition of the recovery environment, both early exits of `return`, the first failure kept in the issue, the copied timeline, the issue text after a missed target, the bootstrap argument, the role's condition, the settings source and the patch on the recovery cluster, and the workflow condition.
+
+### Not verified
+
+- Nothing of step 3 has run live. The first recovery after the merge is the first order of a certificate with a run name, the first `certificate-settings` ConfigMap, and the first render of `deploy/clusters/recovery/certificates` by Flux.
+- The return after a failed recovery and the cleared failed start have run against stubs only. The `Return` run 39264176899 took the path that the drill now takes after a failed recovery, by hand, and passed.
+- Detection took longer than the rest of a passing recovery in drill 1, which is the revisit condition of [decision 0015](../decisions/0015-unattended-drills.md#detection-stays-with-the-github-schedule-for-now). One drill is not enough to decide; the next drills measure it again.

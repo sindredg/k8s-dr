@@ -95,6 +95,28 @@ class RepositoryRenderTests(unittest.TestCase):
                 self.assertIs(cronjob["spec"]["suspend"], 'backup_suspend: "true"' in settings)
                 self.assertNotIn("${", str(renders["certificates"].documents))
 
+    def test_only_the_recovery_certificates_carry_the_run_name(self):
+        # Each recovery run orders a new set of names. The default comes from
+        # cluster-settings; scripts/recover.py sets one per run in
+        # certificate-settings. See decision 0016.
+        names, sources = {}, {}
+        for cluster in ("primary", "recovery"):
+            renders = {render.name: render for render in module.render_cluster(cluster)}
+            names[cluster] = {document["metadata"]["name"]: document["spec"]["dnsNames"]
+                              for document in renders["certificates"].documents
+                              if document["kind"] == "Certificate"}
+            sync = next(document for document in renders["flux-system"].documents
+                        if document["kind"] == "Kustomization" and document["metadata"]["name"] == "certificates")
+            sources[cluster] = sync["spec"]["postBuild"]["substituteFrom"]
+        self.assertEqual(names["primary"], {"git-tls": ["git.sindrg.com"],
+                                            "git-cluster-tls": ["git-primary.sindrg.com"]})
+        self.assertEqual(names["recovery"], {"git-tls": ["git.sindrg.com", "recovery.sindrg.com"],
+                                             "git-cluster-tls": ["git-dr.sindrg.com", "recovery.sindrg.com"]})
+        settings = {"kind": "ConfigMap", "name": "cluster-settings"}
+        self.assertEqual(sources["primary"], [settings])
+        self.assertEqual(sources["recovery"],
+                         [settings, {"kind": "ConfigMap", "name": "certificate-settings", "optional": True}])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 # 0008: Cold recovery
 
-Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03. Amended on 2026-10-04 with the [return to the primary after a drill](#amendment-return-to-the-primary-after-a-drill). Since 2026-10-16, [decision 0013](0013-automated-recovery.md#node-identities-and-backup-grants-move-to-the-shared-root) creates the recovery node accounts and grants in `infra/shared` ahead of time, which removes the shared apply from the recovery order.
+Status: Accepted. Implemented, and validated by the milestone 5 gate on 2026-10-03. Amended on 2026-10-04 with the [return to the primary after a drill](#amendment-return-to-the-primary-after-a-drill). Since 2026-10-16, [decision 0013](0013-automated-recovery.md#node-identities-and-backup-grants-move-to-the-shared-root) creates the recovery node accounts and grants in `infra/shared` ahead of time, which removes the shared apply from the recovery order. Since 2026-10-19, [decision 0016](0016-drills-on-demand.md#each-recovery-run-adds-one-name-to-its-certificates) adds one name per recovery run to the recovery's certificates, so repeated recoveries are not held to five certificates a week.
 
 Date: 2026-09-30
 

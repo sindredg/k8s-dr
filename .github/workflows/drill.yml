@@ -3,17 +3,17 @@ name: Drill
 
 # Runs one unattended drill: checks that a drill is safe, keeps a write log,
 # stops both primary VMs, and then takes no action until the Recover run
-# that the watchdog starts has passed. It measures recovery time and data
-# loss, returns to the primary with the Return workflow, stores the result in
+# that the watchdog starts has ended. It measures recovery time and data
+# loss, ends on the primary whatever the recovery did, stores the result in
 # the Terraform state bucket, and opens an issue labelled drill. The
-# SCHEDULED_DRILLS repository variable is the switch: anything but "true"
-# skips the job. See decision 0015 and docs/runbooks/unattended-drills.md.
+# SCHEDULED_DRILLS repository variable is the switch for both triggers:
+# anything but "true" skips the job. See decisions 0015 and 0016 and
+# docs/runbooks/unattended-drills.md.
 "on":
-  # Monday, Wednesday, and Friday, outside the top of the hour. Each drill
-  # issues one production certificate; Let's Encrypt allows five a week for
-  # the same name.
+  # Monday, Wednesday, and Friday, outside the top of the hour.
   schedule:
     - cron: "17 6 * * 1,3,5"
+  # A drill on demand: gh workflow run drill.yml --ref main
   workflow_dispatch:
 
 permissions: {}
@@ -75,14 +75,13 @@ jobs:
       - name: Isolate the primary
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" isolate
       - name: Wait for the recovery
-        id: wait
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" wait
       - name: Report
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" report
-      # Also after a failed report, unless the drill missed a target; the
-      # command decides.
+      # After every step, passed or failed: a drill that stopped the primary
+      # ends on it. The command decides how. See decision 0016.
       - name: Return to the primary
-        if: always() && steps.wait.outcome == 'success'
+        if: always()
         run: python3 scripts/drill.py --work-dir "$WORK_DIR" return
       - name: Store the result and open an issue
         if: always()

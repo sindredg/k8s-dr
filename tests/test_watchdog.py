@@ -151,6 +151,20 @@ class LocalTests(WatchdogTestCase):
                              "triggering_actor": {"login": module.BOT}}]
         self.assertFalse(self.candidate())
 
+    def test_a_return_that_passed_after_a_failed_automatic_start_clears_it(self):
+        # The return started the primary and removed the recovery environment,
+        # so nothing of the failed start is left. See decision 0016.
+        self.system.runs = [{"id": 2, "status": "completed", "conclusion": "failure",
+                             "created_at": "2026-10-19T07:51:48Z", "triggering_actor": {"login": module.BOT}}]
+        for conclusion, created, expected in (("failure", "2026-10-19T13:54:25Z", False),
+                                              ("success", "2026-10-19T07:40:00Z", False),
+                                              ("success", "2026-10-19T13:54:25Z", True)):
+            with self.subTest(conclusion=conclusion, created=created):
+                self.system.returns = [{"id": 3, "status": "completed", "conclusion": conclusion,
+                                        "created_at": created}]
+                self.output.clear()
+                self.assertEqual(self.candidate(), expected)
+
     def test_a_failed_run_started_by_a_person_does_not_block(self):
         self.system.runs = [{"id": 2, "status": "completed", "conclusion": "failure",
                              "triggering_actor": {"login": "operator"}}]

@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), with [the return workflow](#amendment-the-return-workflow), and with [changes after the milestone 10 review](#amendment-changes-after-the-milestone-10-review). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), with [the return workflow](#amendment-the-return-workflow), and with [changes after the milestone 10 review](#amendment-changes-after-the-milestone-10-review). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md). Since 2026-10-19, a `Return` run that passed after a failed automatic start clears it ([decision 0016](0016-drills-on-demand.md#a-return-that-passed-clears-a-failed-automatic-start)).
 
 Date: 2026-10-11
 

@@ -1,8 +1,8 @@
 # Unattended drills
 
-Status: Written on 2026-10-17 for [milestone 12](../../plan.md#12-unattended-drills). No drill has run yet. [Decision 0015](../decisions/0015-unattended-drills.md) records the design, and [worklog 12](../worklogs/12-unattended-drills.md) records each validation.
+Status: Written on 2026-10-17 for [milestone 12](../../plan.md#12-unattended-drills). The first drill ran on 2026-10-19 from the schedule and failed in the restore. The changes of [decision 0016](../decisions/0016-drills-on-demand.md) have not run live: the run name on the recovery's certificates, the return after every isolation, and the failed start that a passed return clears. Decisions [0015](../decisions/0015-unattended-drills.md) and 0016 record the design, and [worklog 12](../worklogs/12-unattended-drills.md) records each validation.
 
-The `Drill` workflow runs one drill with nobody present. It refuses to start unless a drill is safe, pushes a write check every five minutes for 25 minutes, stops both primary VMs, and then only reads run status until the `Recover` run that the watchdog starts has ended. It then measures recovery time and data loss, runs the `Return` workflow, stores the result under `pipeline/drills/<id>/` in the Terraform state bucket, and opens an issue labelled `drill`.
+The `Drill` workflow runs one drill with nobody present. It refuses to start unless a drill is safe, pushes a write check every five minutes for 25 minutes, stops both primary VMs, and then only reads run status until the `Recover` run that the watchdog starts has ended. It then measures recovery time and data loss, ends on the primary whatever the recovery did, stores the result under `pipeline/drills/<id>/` in the Terraform state bucket, and opens an issue labelled `drill`.
 
 Each drill is a real outage of `git.sindrg.com`, and the return discards every write that the recovery cluster accepted.
 
@@ -57,13 +57,13 @@ Each drill is a real outage of `git.sindrg.com`, and the return discards every w
 
    Expected: `gh variable list` shows both with `true`. The schedule starts a drill at 06:17 UTC on Monday, Wednesday, and Friday, and GitHub may start it later.
 
-6. Optionally start a drill now instead of waiting for the schedule.
+6. Start a drill now, for example after a fix. The schedule starts the same drill.
 
    ```bash
    gh workflow run drill.yml --ref main
    ```
 
-   Expected: a `Drill` run starts. About 30 minutes later its `Isolate the primary` step stops the primary, a `Recover` run started by `github-actions[bot]` follows within about 25 minutes, and a `Return` run follows after the recovery.
+   Expected: a `Drill` run starts. About 30 minutes later its `Isolate the primary` step stops the primary, a `Recover` run started by `github-actions[bot]` follows within about 25 minutes, and a `Return` run follows after the recovery, also after a failed one. The recovery's certificates name `run-<start>.sindrg.com` besides their own name, so a drill does not count against the Let's Encrypt limit of five certificates a week for the same names.
 
 ## Read a result
 
@@ -86,19 +86,19 @@ Each drill is a real outage of `git.sindrg.com`, and the return discards every w
 
 ## After a drill that did not pass
 
-The issue names the step that stopped the drill. The guard refuses every later drill until the primary serves again and `infra/recovery` is empty. Two cases restore the service on their own: if no `Recover` run starts within an hour of the isolation, the drill starts the primary VMs again, and after a recovery that passed, the drill returns even if its report failed.
+The issue names the first step that failed. Every drill that stopped the primary ends on it: if the recovery built an environment, the drill runs the `Return` workflow, whether the recovery passed, failed, or missed a target, and otherwise it starts the primary VMs again. A `Return` that passed also clears a failed automatic start, so the watchdog and the guard start again. A scheduled drill does not wait for a fix; turn `SCHEDULED_DRILLS` off while a cause is open.
 
 | Outcome | State left | What to do |
 | --- | --- | --- |
-| `refused` | Nothing changed | Fix the condition the issue names. The next scheduled drill runs the guard again |
+| `refused` | Nothing changed | Fix the condition the issue names, then start a drill as in step 6 |
 | `failed` in `writes` | Nothing changed; the primary serves | Read the write-check error in the workflow log |
 | `failed` in `wait`, no recovery run | The drill started the primary VMs again. Nothing else changed | Read the watchdog runs after the isolation to see why none started. Check the service with `make check-fixtures` |
-| `failed` in `wait`, with a recovery run | The primary is stopped. The recovery environment may exist, and it may serve the public name | Follow the [regional recovery runbook](regional-recovery.md#start-automatically-with-the-watchdog) to resume the failed `Recover` run, then return as in step 9 |
+| `failed` in `wait`, with a recovery run | The drill returned to the primary, or started its VMs if the recovery built no environment | Read the failed stage in the issue's stage table and the `Recover` run log. Fix the cause, then start a drill as in step 6 |
 | `failed` in `report`, return passed | The primary serves again; the measurement is incomplete | Read the report error in the issue. No action is needed for the service |
-| `failed` in `return` | The recovery cluster serves the public name | Rerun the failed `Return` run, or return as in step 9 |
-| `missed` | The recovery cluster serves the public name | Return as in step 9 |
+| `missed` | The drill returned; the primary serves | Read the stage table in the issue |
+| The issue says `The return failed` | The recovery cluster may serve the public name, or the primary may still be stopped | Rerun the failed `Return` run, or return as in step 9 |
 
-9. Return to the primary after a recovery that passed, as the drill would have.
+9. Return to the primary when the drill's own return failed.
 
    ```bash
    gh workflow run return.yml --ref main -f discard_recovery_writes=true
