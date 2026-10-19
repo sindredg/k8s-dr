@@ -219,11 +219,12 @@ class DrillTestCase(unittest.TestCase):
             self.assertEqual(self.step(name), 0, (name, self.errors))
 
     def script_recovery(self) -> None:
-        """A Recover run started 50 minutes in, whose stages end 69 minutes in."""
+        """A Recover run started 50 minutes in, which serves 69 minutes in and ends at 70."""
         events = [(at(51), "preflight", "start", ""), (at(52), "preflight", "end", ""),
                   (at(53), "bootstrap", "start", ""), (at(61), "bootstrap", "end", ""),
                   (at(62), "restore", "start", ""), (at(64), "restore", "end", ""),
-                  (at(65), "probe-recovery", "start", ""), (at(69), "probe-recovery", "end", "")]
+                  (at(65), "probe-recovery", "start", ""), (at(69), "probe-recovery", "end", ""),
+                  (at(69), "resume-backups", "start", ""), (at(70), "resume-backups", "end", "")]
         self.system.timeline = "".join(f"{time.strftime(FORMAT)}\t{stage}\t{event}\t{note}\n"
                                        for time, stage, event, note in events)
         self.system.recovered["started"] = at(51).strftime(FORMAT)
