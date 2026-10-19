@@ -364,7 +364,7 @@ class StepTests(DrillTestCase):
         self.step("finish")
         self.assertEqual(self.state()["outcome"], "failed")
 
-    def test_a_recovery_that_started_and_failed_keeps_the_primary_stopped(self):
+    def test_the_wait_leaves_a_failed_recovery_to_the_return(self):
         self.system.recovery_plan["conclusion"] = "failure"
         self.through("isolate")
         self.assertEqual(self.step("wait"), 1)
@@ -438,16 +438,20 @@ class ReportTests(DrillTestCase):
         self.assertEqual(self.step("report"), 1)
         self.assertIn("not a write acknowledged before isolation", self.state()["failed"]["reason"])
 
-    def test_a_missed_target_stops_before_the_return(self):
+    def test_a_missed_target_still_returns(self):
+        # The result and the stage timeline are stored; the recovery
+        # environment is not needed to read them. See decision 0016.
         self.system.series = {location: uptime(26, 69) for location in LOCATIONS}
         self.through("wait")
         with mock.patch.object(module, "RTO_TARGET", timedelta(minutes=42)):
             self.assertEqual(self.step("report"), 1)
         self.assertIs(self.state()["result"]["met"], False)
-        self.assertEqual(self.step("return"), 1)
-        self.assertEqual(self.system.posts, [])
+        self.assertEqual(self.step("return"), 0, self.errors)
+        self.assertEqual(self.state()["return_run"]["id"], 901)
         self.step("finish")
         self.assertEqual(self.state()["outcome"], "missed")
+        issue = next(body for url, body in self.system.posts if url.endswith("/issues"))
+        self.assertIn("The recovery missed a target. The drill returned to the primary", issue["body"])
 
 
 class ReturnTests(DrillTestCase):
@@ -488,12 +492,84 @@ class ReturnTests(DrillTestCase):
         issue = next(body for url, body in self.system.posts if url.endswith("/issues"))
         self.assertIn("The recovery and the return passed", issue["body"])
 
-    def test_return_refuses_without_a_recovery_that_passed(self):
+    def test_a_failed_recovery_with_an_environment_returns(self):
+        # Drill 20261019T070024Z: the restore failed, and the primary stayed
+        # stopped until a person returned. See decision 0016.
         self.system.recovery_plan["conclusion"] = "failure"
+        self.system.recovered["passed"] = ["preflight", "provisioning", "bootstrap", "flux-reconcile"]
+        self.through("isolate")
+        self.assertEqual(self.step("wait"), 1)
+        self.assertEqual(self.step("return"), 0, self.errors)
+        url, body = self.system.posts[0]
+        self.assertTrue(url.endswith("/actions/workflows/return.yml/dispatches"))
+        self.assertEqual(body["inputs"], {"discard_recovery_writes": "true"})
+        self.assertFalse(self.ran("instances start"))
+        self.step("finish")
+        self.assertEqual(self.state()["outcome"], "failed")
+        self.assertEqual(self.state()["failed"]["step"], "wait")
+        issue = next(body for url, body in self.system.posts if url.endswith("/issues"))
+        self.assertIn("The recovery failed. The drill returned to the primary", issue["body"])
+        self.assertIn("| restore |", issue["body"])
+
+    def test_a_failed_recovery_without_an_environment_starts_the_primary(self):
+        for passed, values in ((["preflight"], {}),
+                               (["preflight"], {"recovery_address": "203.0.113.10"}),
+                               (["preflight", "provisioning"], {})):
+            with self.subTest(passed=passed, values=values):
+                self.setUp()
+                self.system.recovery_plan["conclusion"] = "failure"
+                self.system.recovered.update({"passed": passed, "values": values})
+                self.through("isolate")
+                self.step("wait")
+                self.assertEqual(self.step("return"), 0, self.errors)
+                self.assertTrue(self.ran("gcloud compute instances start primary-cp primary-worker"))
+                self.assertFalse(any("return.yml" in url for url, _ in self.system.posts))
+                self.assertIn("primary_restarted", self.state())
+
+    def test_a_recovery_state_from_before_the_isolation_starts_the_primary(self):
+        self.system.recovery_plan["conclusion"] = "failure"
+        self.system.recovered["started"] = at(5).strftime(FORMAT)
+        self.through("isolate")
+        self.step("wait")
+        self.assertEqual(self.step("return"), 0, self.errors)
+        self.assertTrue(self.ran("instances start"))
+        self.assertFalse(any("return.yml" in url for url, _ in self.system.posts))
+
+    def test_a_missing_recovery_state_starts_the_primary(self):
+        self.system.recovery_plan["conclusion"] = "failure"
+        self.system.failing.add(f"pipeline/drill/{recover.STATE_FILE}")
+        self.through("isolate")
+        self.step("wait")
+        self.assertEqual(self.step("return"), 0, self.errors)
+        self.assertTrue(self.ran("instances start"))
+
+    def test_return_does_nothing_without_an_isolation_or_after_a_restart(self):
+        self.system.environ["AUTO_FAILOVER"] = "false"
+        self.step("guard")
+        self.assertEqual(self.step("return"), 0, self.errors)
+        self.assertEqual(self.system.posts, [])
+        self.assertFalse(self.ran("instances start"))
+        self.setUp()
+        self.system.recovery_plan = None
+        self.through("isolate")
+        self.step("wait")
+        starts = sum("instances start" in " ".join(argv) for argv in self.system.calls)
+        self.assertEqual(self.step("return"), 0, self.errors)
+        self.assertEqual(sum("instances start" in " ".join(argv) for argv in self.system.calls), starts)
+        self.assertEqual(self.system.posts, [])
+
+    def test_a_failed_return_after_a_failed_recovery_keeps_the_first_failure(self):
+        self.system.recovery_plan["conclusion"] = "failure"
+        self.system.recovered["passed"] = ["preflight", "provisioning"]
+        self.system.return_plan["conclusion"] = "failure"
         self.through("isolate")
         self.step("wait")
         self.assertEqual(self.step("return"), 1)
-        self.assertEqual(self.system.posts, [])
+        self.assertEqual(self.state()["failed"]["step"], "wait")
+        self.assertIn("ended with failure", self.state()["return_failed"])
+        self.step("finish")
+        issue = next(body for url, body in self.system.posts if url.endswith("/issues"))
+        self.assertIn("The return did not finish", issue["body"])
 
     def test_a_failed_return_fails_the_drill(self):
         self.system.return_plan["conclusion"] = "failure"
@@ -605,10 +681,10 @@ class WorkflowTests(unittest.TestCase):
                                                    "actions": "write", "issues": "write"})
         self.assertEqual(self.job["environment"], "recovery")
 
-    def test_the_return_runs_after_any_passed_wait(self):
+    def test_the_return_runs_after_every_step_and_decides_itself(self):
+        # A drill that stopped the primary ends on it. See decision 0016.
         step = next(step for step in self.job["steps"] if step.get("run", "").endswith(" return"))
-        self.assertEqual(step["if"], "always() && steps.wait.outcome == 'success'")
-        self.assertTrue(any(step.get("id") == "wait" and step["run"].endswith(" wait") for step in self.job["steps"]))
+        self.assertEqual(step["if"], "always()")
 
     def test_the_steps_run_in_order_and_finish_always(self):
         commands = [step["run"].split()[4] for step in self.job["steps"]

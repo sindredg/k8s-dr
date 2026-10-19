@@ -10,8 +10,9 @@ The Drill workflow runs these commands in order (decision 0015):
            after the isolation ends, for at most four hours. If no run
            starts within an hour, start the primary again
   report   compute recovery time and data loss, and check the dataset
-  return   dispatch the Return workflow and wait for it to succeed. Runs
-           after any passed recovery unless the drill missed a target
+  return   end on the primary after any isolation: dispatch the Return
+           workflow and wait for it to succeed if the recovery recorded an
+           environment, or else start the primary VMs again
   finish   store the result and open an issue labelled drill; runs always
 
 The steps share drill.json in --work-dir. Each step copies the directory to
@@ -290,15 +291,25 @@ class Drill:
                               f"expected at least {watchdog.MIN_CHECKERS}")
         return min(parse(time) for time in firsts.values()), firsts
 
-    def report(self) -> None:
-        isolated = parse(self.state["isolated_at"])
+    def copy_recovery_file(self, name: str) -> Path:
         copies = self.work_dir / RECOVERY_DIR
         copies.mkdir(mode=0o700, exist_ok=True)
-        for name in (recover.STATE_FILE, recover.TIMELINE_FILE):
-            self.run(["gcloud", "storage", "cp", self.state_url(f"{RUN_STATE_PREFIX}/{name}"), str(copies / name)])
-        recovered = json.loads((copies / recover.STATE_FILE).read_text())
-        if recovered.get("started") is None or parse(recovered["started"]) < isolated:
+        self.run(["gcloud", "storage", "cp", self.state_url(f"{RUN_STATE_PREFIX}/{name}"), str(copies / name)])
+        return copies / name
+
+    def recovery_state(self) -> dict | None:
+        """The recovery run state, or None unless a run started after the isolation wrote it."""
+        recovered = json.loads(self.copy_recovery_file(recover.STATE_FILE).read_text())
+        if recovered.get("started") is None or parse(recovered["started"]) < parse(self.state["isolated_at"]):
+            return None
+        return recovered
+
+    def report(self) -> None:
+        isolated = parse(self.state["isolated_at"])
+        recovered = self.recovery_state()
+        if recovered is None:
             raise DrillFailed("the recovery run state is not from a run started after the isolation")
+        copies = self.copy_recovery_file(recover.TIMELINE_FILE).parent
         missing = [name for name in recover.STAGE_NAMES if name not in recovered["passed"]]
         if missing:
             raise DrillFailed(f"the recovery run state has not passed {', '.join(missing)}")
@@ -337,6 +348,33 @@ class Drill:
         self.state["dataset_restored"] = self.check_dataset()
 
     def return_(self) -> None:
+        """End on the primary, whatever the recovery did. See decision 0016."""
+        if self.recovery_environment():
+            self.dispatch_return()
+            return
+        count = self.primary_vms("start")
+        self.state["primary_restarted"] = stamp(self.system.now())
+        self.save()
+        print(f"no recovery environment to return from: started {count} primary VMs")
+
+    def recovery_environment(self) -> bool:
+        """Whether a recovery run of this drill recorded the environment that a Return removes."""
+        try:
+            recovered = self.recovery_state()
+        except (DrillFailed, ValueError) as error:
+            print(f"warning: no recovery run state: {error}", file=sys.stderr)
+            return False
+        if recovered is None:
+            return False
+        # For the issue: the stage that failed. The report copies it otherwise.
+        try:
+            self.copy_recovery_file(recover.TIMELINE_FILE)
+        except DrillFailed as error:
+            print(f"warning: {error}", file=sys.stderr)
+        # The precondition of scripts/return_to_primary.py.
+        return "provisioning" in recovered["passed"] and bool(recovered["values"].get("recovery_address"))
+
+    def dispatch_return(self) -> None:
         dispatched = self.system.now()
         for attempt in range(1, DISPATCH_ATTEMPTS + 1):
             # A dispatch whose answer was lost may still have started a run.
@@ -397,13 +435,25 @@ class Drill:
                       drill_report.timeline_table(drill_report.read_events(timeline))]
         if outcome != "passed" and not state.get("isolated_at"):
             lines += ["", "The primary was not isolated."]
-        elif state.get("primary_restarted"):
+        elif state.get("primary_restarted") and "recovery_run" not in state:
             lines += ["", "No recovery started, so the drill started the primary VMs again at "
                       f"{state['primary_restarted']}. Read the watchdog runs since the isolation."]
-        elif outcome != "passed" and state["steps"].get("return") == "passed":
+        elif state.get("primary_restarted"):
+            lines += ["", "The recovery left no environment to return from, so the drill started the "
+                      f"primary VMs again at {state['primary_restarted']}. The Recover run holds the failure."]
+        elif outcome == "missed" and state["steps"].get("return") == "passed":
+            lines += ["", "The recovery missed a target. The drill returned to the primary, which serves "
+                      "again."]
+        elif outcome != "passed" and state["steps"].get("return") == "passed" \
+                and state["failed"]["step"] == "report":
             lines += ["", "The recovery and the return passed, and the primary serves again. The report "
                       "failed, so this drill's measurement is incomplete."]
+        elif outcome != "passed" and state["steps"].get("return") == "passed":
+            lines += ["", "The recovery failed. The drill returned to the primary, which serves again. "
+                      "The Recover run holds the failure."]
         elif outcome != "passed":
+            if state.get("return_failed"):
+                lines += ["", f"The return failed: {state['return_failed']}"]
             lines += ["", "The return did not finish, and the run state is kept for diagnosis. The guard "
                       "refuses further drills until the primary serves and infra/recovery is empty."]
         return self.masked("\n".join(lines)) + "\n"
@@ -538,15 +588,14 @@ def main(argv=None, system: System | None = None) -> int:
         drill.state["id"] = system.now().strftime(drill_report.SET_FORMAT)
         drill.save()
     elif args.command == "return":
-        # A report that failed for any reason but a missed target still
-        # returns: the recovery passed, and staying on the recovery cluster
-        # would block every later drill.
-        if any(drill.state["steps"].get(step) != "passed" for step in STEPS[:STEPS.index("report")]):
-            print("error: return needs a recovery that passed", file=sys.stderr)
-            return 1
-        if (drill.state.get("result") or {}).get("met") is False:
-            print("error: the drill missed a target; the recovery state is kept for diagnosis", file=sys.stderr)
-            return 1
+        # Runs after every step, passed or failed: a drill that stopped the
+        # primary ends on it. See decision 0016.
+        if not drill.state.get("isolated_at"):
+            print("no return: the primary was not isolated")
+            return 0
+        if drill.state.get("primary_restarted"):
+            print("no return: the drill started the primary VMs again")
+            return 0
     elif drill.state["failed"] or any(drill.state["steps"].get(step) != "passed"
                                       for step in STEPS[:STEPS.index(args.command)]):
         print(f"error: {args.command} needs every earlier step to have passed", file=sys.stderr)
@@ -555,7 +604,11 @@ def main(argv=None, system: System | None = None) -> int:
     try:
         COMMANDS[args.command](drill)
     except (DrillFailed, watchdog.NoStart, OSError, ValueError, KeyError, TypeError) as error:
-        drill.state["failed"] = {"step": args.command, "reason": str(error)}
+        # The return also runs after a failure; the issue names the first.
+        if drill.state["failed"]:
+            drill.state[f"{args.command}_failed"] = str(error)
+        else:
+            drill.state["failed"] = {"step": args.command, "reason": str(error)}
         drill.state["steps"][args.command] = "failed"
         drill.save()
         print(f"error: {args.command} failed: {error}", file=sys.stderr)

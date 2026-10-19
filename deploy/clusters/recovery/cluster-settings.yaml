@@ -12,6 +12,10 @@ data:
   git_host: git.sindrg.com
   # Reaches this cluster directly before the cutover.
   git_cluster_host: git-dr.sindrg.com
+  # One more name on each certificate. scripts/recover.py replaces it with
+  # one name per run through the certificate-settings ConfigMap; a bootstrap
+  # from the runbook keeps this one. See decision 0016.
+  run_certificate_host: recovery.sindrg.com
   # Use letsencrypt-staging for rebuild tests that skip the fixture checks.
   git_issuer: letsencrypt-production
   # Prefix for this cluster's backup sets. See decision 0007.

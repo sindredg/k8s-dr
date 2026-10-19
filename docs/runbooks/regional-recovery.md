@@ -144,7 +144,7 @@ The `Watchdog` workflow runs every five minutes and starts `Recover` with `throu
 
    Expected while the primary serves: `no start:` with the first condition that does not hold, and `candidate=false`. The `confirm` job is skipped.
 
-3. If an automatic run fails, the watchdog starts nothing more until a newer `Recover` run succeeds. Fix the cause and resume the run as in step 4 of [Start a run](#start-a-run), without `reset`.
+3. If an automatic run fails, the watchdog starts nothing more until a newer `Recover` run succeeds, or until a `Return` run created after it passes ([decision 0016](../decisions/0016-drills-on-demand.md#a-return-that-passed-clears-a-failed-automatic-start)). Fix the cause and resume the run as in step 4 of [Start a run](#start-a-run), without `reset`. After a drill, the drill's own return clears it.
 
 The `Drill` workflow tests this path with nobody present; see the [unattended drills runbook](unattended-drills.md).
 

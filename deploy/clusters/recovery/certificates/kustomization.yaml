@@ -1,0 +1,16 @@
+---
+# The certificates of a recovery cluster, with one more name on each. Every
+# recovery run sets its own name in the certificate-settings ConfigMap, so
+# every run orders a new set of names: Let's Encrypt allows five
+# certificates a week for the same set. See decision 0016.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../certificates
+patches:
+  - target:
+      kind: Certificate
+    patch: |-
+      - op: add
+        path: /spec/dnsNames/-
+        value: ${run_certificate_host}

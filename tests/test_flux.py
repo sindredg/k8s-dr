@@ -52,6 +52,21 @@ class FluxBootstrapTests(unittest.TestCase):
             for module in ("ansible.builtin.copy", "ansible.builtin.template"):
                 self.assertNotIn("sops_age_key_file", str(task.get(module, "")))
 
+    def test_a_recovery_run_sets_its_certificate_name_before_flux_applies(self):
+        # scripts/recover.py passes one name per run. A bootstrap without it,
+        # such as the primary's, leaves the cluster-settings default. See
+        # decision 0016.
+        tasks = list(_tasks_by_name())
+        task = _tasks_by_name()["Reconcile the certificate settings of this run"]
+        self.assertEqual(task["when"], "run_certificate_host is defined")
+        self.assertEqual(task["ansible.builtin.command"]["cmd"], "kubectl apply -f -")
+        stdin = task["ansible.builtin.command"]["stdin"]
+        for text in ("'name': 'certificate-settings'", "'namespace': 'flux-system'",
+                     "'run_certificate_host': run_certificate_host"):
+            self.assertIn(text, stdin)
+        self.assertLess(tasks.index("Reconcile the certificate settings of this run"),
+                        tasks.index("Apply the Flux Git source and cluster Kustomization"))
+
     def test_age_key_reaches_kubectl_unchanged(self):
         # Regression: a '\\n' suffix in the task rendered as a literal backslash
         # and n, and Flux rejected the key as "malformed secret key: mixed case".

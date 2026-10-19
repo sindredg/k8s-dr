@@ -158,13 +158,16 @@ class Watchdog:
         active = [run for run in runs if run["status"] in ACTIVE]
         if active:
             raise NoStart(f"recovery run {active[0]['id']} is {active[0]['status']}")
+        returns = self.github(f"actions/workflows/{RETURN_WORKFLOW}/runs?per_page=20")["workflow_runs"]
         # The newest run decides. A failed automatic start waits for a person,
-        # who resumes it or starts a run that passes.
+        # who resumes it or starts a run that passes, or for a return that
+        # passed after it, which removed what the start left. See decision 0016.
         newest = runs[0] if runs else None
         if newest and (newest.get("triggering_actor") or {}).get("login") == BOT \
-                and newest["conclusion"] != "success":
+                and newest["conclusion"] != "success" \
+                and not any(run["conclusion"] == "success" and run["created_at"] > newest["created_at"]
+                            for run in returns):
             raise NoStart(f"automatic recovery run {newest['id']} ended with {newest['conclusion']}")
-        returns = self.github(f"actions/workflows/{RETURN_WORKFLOW}/runs?per_page=20")["workflow_runs"]
         active = [run for run in returns if run["status"] in ACTIVE]
         if active:
             raise NoStart(f"return run {active[0]['id']} is {active[0]['status']}")

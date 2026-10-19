@@ -55,7 +55,7 @@ cert-manager proves control of a name with a DNS-01 challenge. Issuance needs no
 | Aspect | Detail |
 | --- | --- |
 | Issuers | Let's Encrypt production, and staging for rebuild tests |
-| Rate limit | Production allows five certificates per exact name each week. Each certificate covers one name, so every cluster build uses one for `git.sindrg.com` and one for its own name. |
+| Rate limit | Production allows five certificates per exact set of names each week. The primary's certificates cover one name each. A recovery cluster adds a name unique to its run, such as `run-20261019t151356z.sindrg.com`, to both of its certificates, so each recovery orders new sets and counts only against the limit of 50 a week for `sindrg.com` ([decision 0016](../decisions/0016-drills-on-demand.md#each-recovery-run-adds-one-name-to-its-certificates)). |
 | Renewal | Automatic, 30 days before expiry |
 | CAA | A record on `sindrg.com` allows only Let's Encrypt to issue and forbids wildcard certificates |
 | Private key | Created in the cluster and never backed up. A new cluster gets a new key and certificate. |

@@ -47,8 +47,9 @@ class ClusterSettingsTests(unittest.TestCase):
 
     def test_recovery_serves_the_public_host_with_backups_suspended(self):
         # See decision 0008. The recovery cluster differs from the primary
-        # only in its own hostname, its backup prefix and suspension, and its
-        # metrics label.
+        # only in its own hostname, its backup prefix and suspension, its
+        # metrics label, and the default of its run certificate name
+        # (decision 0016).
         settings = _by_name(RECOVERY / "cluster-settings.yaml")["cluster-settings"]
         self.assertEqual(settings["metadata"]["namespace"], "flux-system")
         self.assertEqual(
@@ -56,6 +57,7 @@ class ClusterSettingsTests(unittest.TestCase):
             {
                 "git_host": "git.sindrg.com",
                 "git_cluster_host": "git-dr.sindrg.com",
+                "run_certificate_host": "recovery.sindrg.com",
                 "git_issuer": "letsencrypt-production",
                 "backup_cluster": "recovery",
                 "backup_suspend": "true",
@@ -69,9 +71,12 @@ class ClusterSettingsTests(unittest.TestCase):
         for cluster in clusters:
             with self.subTest(cluster=cluster):
                 directory = DEPLOY / "clusters" / cluster
+                # The recovery adds its run name to its certificates; see
+                # decision 0016.
+                extra = ["certificates"] if cluster == "recovery" else []
                 self.assertEqual(
                     sorted(path.name for path in directory.iterdir()),
-                    ["cluster-settings.yaml", "kustomization.yaml"],
+                    sorted([*extra, "cluster-settings.yaml", "kustomization.yaml"]),
                 )
                 kustomization = yaml.safe_load((directory / "kustomization.yaml").read_text())
                 self.assertEqual(

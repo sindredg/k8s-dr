@@ -49,6 +49,22 @@
   changed_when: "'unchanged' not in flux_sops_secret.stdout"
   no_log: true
 
+# One certificate name per recovery run, from scripts/recover.py. The
+# recovery's certificates Kustomization reads it; see decision 0016.
+- name: Reconcile the certificate settings of this run
+  ansible.builtin.command:
+    cmd: kubectl apply -f -
+    stdin: >-
+      {{ {
+        'apiVersion': 'v1',
+        'kind': 'ConfigMap',
+        'metadata': {'name': 'certificate-settings', 'namespace': 'flux-system'},
+        'data': {'run_certificate_host': run_certificate_host}
+      } | to_json }}
+  register: flux_certificate_settings
+  changed_when: "'unchanged' not in flux_certificate_settings.stdout"
+  when: run_certificate_host is defined
+
 - name: Render the Flux Git source and cluster Kustomization
   ansible.builtin.template:
     src: flux-sync.yml.j2
