@@ -178,12 +178,12 @@ In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provi
 
 Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start by the watchdog has run against stubs only. Because GitHub starts scheduled runs late, detection can take up to about 25 minutes ([decision 0013](docs/decisions/0013-automated-recovery.md#schedule)). [Decision 0015](docs/decisions/0015-unattended-drills.md) defines how a drill isolates the primary, how it ends, and where its results are kept, and [decision 0016](docs/decisions/0016-drills-on-demand.md) lets a drill start on demand and end on the primary whatever the recovery does. Progress is in the [worklog](docs/worklogs/12-unattended-drills.md), and the results are on the [results page](docs/drills.md).
 
-- [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
-- [ ] Start a drill from the schedule or on demand: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
-- [ ] End each drill on the primary with no person acting: with the return workflow after a recovery, or by starting the primary VMs again.
-- [ ] Keep the results of every unattended drill in one table that the README links to.
+- [x] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
+- [x] Start a drill from the schedule or on demand: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
+- [x] End each drill on the primary with no person acting: with the return workflow after a recovery, or by starting the primary VMs again.
+- [x] Keep the results of every unattended drill in one table that the README links to.
 
-**Gate:** Two consecutive drills, started by the schedule or by a dispatch, meet both targets with no person acting after the start, the watchdog started each recovery, and the worklog compares them with drills 1 to 3.
+**Gate:** Two consecutive drills, started by the schedule or by a dispatch, meet both targets with no person acting after the start, the watchdog started each recovery, and the worklog compares them with drills 1 to 3. Passed on 2026-10-19: two drills started by a dispatch recovered in 34 min 21 s and 36 min 00 s, including detection, and lost 10 min 18 s and 5 min 09 s of writes. See the [worklog](docs/worklogs/12-unattended-drills.md#gate). The milestone stays in progress until its independent review.
 
 ## 13. Failback with data (optional)
 

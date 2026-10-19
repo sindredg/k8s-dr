@@ -13,27 +13,33 @@ Gitea and PostgreSQL run on a kubeadm-built Kubernetes cluster on Google Cloud V
 
 ## Results
 
-Only automated runs count. [Milestone 12](plan.md#12-unattended-drills) runs unattended drills: the primary is stopped, the watchdog starts the recovery, and nobody acts. The [drill results](docs/drills.md) give their recovery time and data loss, against targets of at most 4 hours and at most 2 hours ([decision 0002](docs/decisions/0002-recovery-contract.md#measurement)).
+Only automated runs count. In the unattended drills of [milestone 12](plan.md#12-unattended-drills), a workflow stops the primary, the watchdog starts the recovery, and nobody acts. The targets are a recovery time of at most 4 hours and a data loss of at most 2 hours ([decision 0002](docs/decisions/0002-recovery-contract.md#measurement)). Two consecutive drills on 2026-10-19 met both, with a 2 GiB dataset on the primary:
 
-The first full run of the `Recover` workflow, started by hand on 2026-10-17, took 17 min 07 s with no other action. It does not include detection, because the primary was still serving when the run started.
+| Drill | Detection | Recovery time | Data loss |
+| --- | --- | --- | --- |
+| [20261019T170003Z](https://github.com/sindredg/k8s-dr/actions/runs/39290237165) | 13 min 15 s | 34 min 21 s | 10 min 18 s |
+| [20261019T185625Z](https://github.com/sindredg/k8s-dr/actions/runs/39306669248) | 18 min 15 s | 36 min 00 s | 5 min 09 s |
+
+The recovery time runs from the first failed probe to the checks through the public name, so it includes detection. For drill 20261019T185625Z:
 
 | Phase | Stages | Duration |
 | --- | --- | --- |
-| Preflight | `preflight` | 1 min 19 s |
-| Build the cluster | `provisioning`, `bootstrap`, `flux-reconcile` | 11 min 41 s |
-| Restore and check | `restore`, `verification` | 2 min 18 s |
-| Fence and cut over | `fence`, `dns-cutover`, `probe-recovery` | 1 min 32 s |
-| Resume backups | `resume-backups` | 17 s |
-| Total | | 17 min 07 s |
+| Detection | From the first failed probe to the watchdog's `Recover` run | 18 min 15 s |
+| Runner start | | 54 s |
+| Preflight | `preflight` | 1 min 40 s |
+| Build the cluster | `provisioning`, `bootstrap`, `flux-reconcile` | 11 min 01 s |
+| Restore and check | `restore`, `verification` | 3 min 38 s |
+| Fence and cut over | `fence`, `dns-cutover`, `probe-recovery` | 32 s |
+| Total | | 36 min 00 s |
 
-Building the cluster takes most of the time. [Milestone 11](plan.md#11-faster-cluster-build) shortens it. The [worklog](docs/worklogs/10-automated-recovery.md#gate) has every stage and its check.
+Detection and building the cluster take most of the time. Detection needs five minutes of failed checks and then a watchdog run, which GitHub schedules every five minutes but started 12 and 13 minutes apart in these drills. [Milestone 11](plan.md#11-faster-cluster-build) shortens the build. The [drill results](docs/drills.md) list every drill, and the [worklog](docs/worklogs/12-unattended-drills.md#comparison-with-drills-1-to-3) compares them with the attended drills.
 
 ## How recovery works
 
 ![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a GitHub Actions watchdog that reads the probe results and starts a workflow, which builds a recovery cluster in Belgium from the same Git repository, restores it from the bucket, and moves the DNS name.](docs/diagrams/readme-overview.svg)
 
 1. **Back up.** Every 15 minutes the primary captures PostgreSQL and the Gitea repositories from one LVM snapshot while Gitea keeps running, encrypts them with age, and uploads them to a bucket in Belgium. The writer cannot delete or overwrite a backup.
-2. **Detect.** An uptime check probes `git.sindrg.com` from three continents. A scheduled watchdog starts a recovery only when every checker has failed for five minutes, the runner cannot reach the primary either, and the `AUTO_FAILOVER` switch is on. The automatic start has run against test stubs only; [milestone 12](plan.md#12-unattended-drills) runs it live.
+2. **Detect.** An uptime check probes `git.sindrg.com` from three continents. A scheduled watchdog starts a recovery only when every checker has failed for five minutes, the runner cannot reach the primary either, and the `AUTO_FAILOVER` switch is on. It started the recovery in every unattended drill of [milestone 12](plan.md#12-unattended-drills).
 3. **Recover.** The `Recover` workflow signs in to Google Cloud without a stored key and runs these stages in order: preflight, provisioning, bootstrap, Flux reconcile, restore, verification, fence, DNS cutover, checks through the public name, and resuming backups. Each stage ends with a check. A failure stops the run before the cutover, and a rerun resumes at the failed stage.
 4. **Return.** After a drill, the `Return` workflow starts the primary, moves the name back, and removes the recovery environment. It discards the writes that the recovery cluster accepted.
 
