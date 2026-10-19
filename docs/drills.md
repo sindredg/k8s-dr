@@ -18,6 +18,8 @@ The targets are a recovery time of at most 4 hours and a data loss of at most 2 
 | Drill | Started by | Outcome | Detection | Recovery time | Data loss | Writes lost | Bootstrap | Restore |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [20261019T070024Z](https://github.com/sindredg/k8s-dr/actions/runs/39213159208) | schedule | failed |  |  |  |  |  |  |
+| [20261019T170003Z](https://github.com/sindredg/k8s-dr/actions/runs/39290237165) | dispatch | passed | 0h 13m 15s | 0h 34m 21s | 0h 10m 18s | 2 | 0h 08m 50s | 0h 04m 11s |
+| [20261019T185625Z](https://github.com/sindredg/k8s-dr/actions/runs/39306669248) | dispatch | passed | 0h 18m 15s | 0h 36m 00s | 0h 05m 09s | 1 | 0h 07m 10s | 0h 03m 18s |
 <!-- end of drill results -->
 
 `make drill-results` rewrites the table from the result files in the Terraform state bucket. Each drill also opens an issue labelled [`drill`](https://github.com/sindredg/k8s-dr/issues?q=label%3Adrill) with its full report and stage timeline.

@@ -1,6 +1,6 @@
 # Unattended drills
 
-Status: Written on 2026-10-17 for [milestone 12](../../plan.md#12-unattended-drills). The first drill ran on 2026-10-19 from the schedule and failed in the restore. The changes of [decision 0016](../decisions/0016-drills-on-demand.md) have not run live: the run name on the recovery's certificates, the return after every isolation, and the failed start that a passed return clears. Decisions [0015](../decisions/0015-unattended-drills.md) and 0016 record the design, and [worklog 12](../worklogs/12-unattended-drills.md) records each validation.
+Status: Written on 2026-10-17 for [milestone 12](../../plan.md#12-unattended-drills). On 2026-10-19 the first drill ran from the schedule and failed in the restore, and drills 2 and 3 ran on demand and passed, with the run name on the recovery's certificates of [decision 0016](../decisions/0016-drills-on-demand.md). The return after a failed recovery or a missed target, the restart of the primary VMs, and the failed start that a passed return clears have run against stubs only. Decisions [0015](../decisions/0015-unattended-drills.md) and 0016 record the design, and [worklog 12](../worklogs/12-unattended-drills.md) records each validation.
 
 The `Drill` workflow runs one drill with nobody present. It refuses to start unless a drill is safe, pushes a write check every five minutes for 25 minutes, stops both primary VMs, and then only reads run status until the `Recover` run that the watchdog starts has ended. It then measures recovery time and data loss, ends on the primary whatever the recovery did, stores the result under `pipeline/drills/<id>/` in the Terraform state bucket, and opens an issue labelled `drill`.
 
@@ -63,7 +63,7 @@ Each drill is a real outage of `git.sindrg.com`, and the return discards every w
    gh workflow run drill.yml --ref main
    ```
 
-   Expected: a `Drill` run starts. About 30 minutes later its `Isolate the primary` step stops the primary, a `Recover` run started by `github-actions[bot]` follows within about 25 minutes, and a `Return` run follows after the recovery, also after a failed one. The recovery's certificates name `run-<start>.sindrg.com` besides their own name, so a drill does not count against the Let's Encrypt limit of five certificates a week for the same names.
+   Expected: a `Drill` run starts. About 30 minutes later its `Isolate the primary` step stops the primary, a `Recover` run started by `github-actions[bot]` follows, 14 to 21 minutes after the isolation in the drills of 2026-10-19, and a `Return` run follows after the recovery, also after a failed one. If no `Recover` run has started 60 minutes after the isolation, the drill starts the primary VMs again. The recovery's certificates name `run-<start>.sindrg.com` besides their own name, so a drill does not count against the Let's Encrypt limit of five certificates a week for the same names.
 
 ## Read a result
 
@@ -96,7 +96,7 @@ The issue names the first step that failed. Every drill that stopped the primary
 | `failed` in `wait`, with a recovery run | The drill returned to the primary, or started its VMs if the recovery built no environment | Read the failed stage in the issue's stage table and the `Recover` run log. Fix the cause, then start a drill as in step 6 |
 | `failed` in `report`, return passed | The primary serves again; the measurement is incomplete | Read the report error in the issue. No action is needed for the service |
 | `missed` | The drill returned; the primary serves | Read the stage table in the issue |
-| The issue says `The return failed` | The recovery cluster may serve the public name, or the primary may still be stopped | Rerun the failed `Return` run, or return as in step 9 |
+| The issue says `The return did not finish` | The recovery cluster may serve the public name, or the primary may still be stopped | Rerun the failed `Return` run, or return as in step 9 |
 
 9. Return to the primary when the drill's own return failed.
 

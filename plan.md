@@ -1,6 +1,6 @@
 # Project plan
 
-Milestones 0 to 10 are complete, and 11 to 16 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. Milestone 15 decides how far the lab survives the loss of one zone, and milestone 16 shortens the reading path through the documentation. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
+Milestones 0 to 10 and 12 are complete, and 11 and 13 to 16 are planned. Milestone 8 rebuilt the environment, which was removed after the drills, from the runbooks. Milestone 9 removed the backup downtime. Milestones 10 to 14 automate and shorten the recovery, measure it unattended, and close the recovery gaps of the lab. Milestone 15 decides how far the lab survives the loss of one zone, and milestone 16 shortens the reading path through the documentation. A step is ticked only after its validation gate passes, and the evidence for each gate is in the [worklogs](docs/worklogs/).
 
 The planned milestones run in the order 12, 11, 13, 14, 15, 16. Unattended drills come first because they test whether the automated recovery works with nobody present, and they give milestone 11 a baseline measured the same way. Milestone numbers stay fixed because decision records and worklogs link to them.
 
@@ -18,7 +18,7 @@ The planned milestones run in the order 12, 11, 13, 14, 15, 16. Unattended drill
 | 9. Backups without downtime | Gitea stays up while every backup is captured | Complete |
 | 10. Automated recovery | Recovery runs without a person | Complete |
 | 11. Faster cluster build | The cluster build no longer dominates recovery time | Planned |
-| 12. Unattended drills | Measured recovery with nobody present | In progress |
+| 12. Unattended drills | Measured recovery with nobody present | Done |
 | 13. Failback with data | Optional return that keeps the recovery writes | Planned |
 | 14. Close the recovery gaps of the lab | Separate backup project, threat model, and an accurate production readiness page | Planned |
 | 15. Zonal resilience decision | A recorded choice on surviving the loss of one zone | Planned |
@@ -166,24 +166,27 @@ See [decision 0013](docs/decisions/0013-automated-recovery.md) and the [worklog]
 
 Runs after [milestone 12](#12-unattended-drills), so the stage times before and after come from unattended drills.
 
-In drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provisioning 2 min 43 s and the bootstrap playbook 7 min 59 s. The restore took 57 s. Most of the bootstrap installs packages and pulls container images from public sources during the outage. A decision record will compare the options before this is built.
+In attended drill 3 the cluster build took 10 min 42 s of the 16 min 46 s recovery: provisioning 2 min 43 s and the bootstrap playbook 7 min 59 s. The restore took 57 s. Most of the bootstrap installs packages and pulls container images from public sources during the outage. A decision record will compare the options before this is built.
+
+In drill 3 of milestone 12, detection took longer than the rest of the recovery, which is the revisit condition of [decision 0015](docs/decisions/0015-unattended-drills.md#detection-stays-with-the-github-schedule-for-now). This milestone also decides how the watchdog starts.
 
 - [ ] Build a node image with the pinned packages and the container images of every deployed workload, from the existing Ansible roles, and store it outside Finland.
 - [ ] Bootstrap both clusters from that image, and keep the playbook able to build from the plain Ubuntu image.
 - [ ] Measure the provisioning and bootstrap stages before and after, from the stage timeline.
+- [ ] Decide in a decision record whether the watchdog leaves the GitHub schedule, from the detection times of the milestone 12 drills.
 
-**Gate:** The bootstrap stage of a recovery takes at most half of its mean in the milestone 12 drills, and a recovery succeeds with no public registry or package mirror reachable from the nodes.
+**Gate:** The bootstrap stage of a recovery takes at most half of its mean of 8 min 00 s in drills 2 and 3 of milestone 12, and a recovery succeeds with no public registry or package mirror reachable from the nodes.
 
 ## 12. Unattended drills
 
-Runs before milestone 11. Drills 1 to 3 were attended, and the automatic start by the watchdog has run against stubs only. Because GitHub starts scheduled runs late, detection can take up to about 25 minutes ([decision 0013](docs/decisions/0013-automated-recovery.md#schedule)). [Decision 0015](docs/decisions/0015-unattended-drills.md) defines how a drill isolates the primary, how it ends, and where its results are kept, and [decision 0016](docs/decisions/0016-drills-on-demand.md) lets a drill start on demand and end on the primary whatever the recovery does. Progress is in the [worklog](docs/worklogs/12-unattended-drills.md), and the results are on the [results page](docs/drills.md).
+Runs before milestone 11. Drills 1 to 3 on 2026-10-04 were attended; this milestone measures the recovery with the watchdog's automatic start. [Decision 0013](docs/decisions/0013-automated-recovery.md#schedule) estimated detection at up to about 25 minutes because GitHub starts scheduled runs late. On 2026-10-19 the scheduled watchdog runs came up to 42 min 57 s apart, and detection took 13 min 15 s and 18 min 15 s in the two drills that passed. [Decision 0015](docs/decisions/0015-unattended-drills.md) defines how a drill isolates the primary, how it ends, and where its results are kept, and [decision 0016](docs/decisions/0016-drills-on-demand.md) lets a drill start on demand and end on the primary whatever the recovery does. Progress is in the [worklog](docs/worklogs/12-unattended-drills.md), and the results are on the [results page](docs/drills.md).
 
-- [ ] Load a dataset of several gigabytes, so the restore time is measured at a realistic size.
-- [ ] Start a drill from the schedule or on demand: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
-- [ ] End each drill on the primary with no person acting: with the return workflow after a recovery, or by starting the primary VMs again.
-- [ ] Keep the results of every unattended drill in one table that the README links to.
+- [x] Load a dataset of 2 GiB, so the restore time is measured at a realistic size.
+- [x] Start a drill from the schedule or on demand: isolate the primary, then take no action until the watchdog has started the recovery and the recovery has passed its checks. Record the recovery time from the first failed probe, including detection.
+- [x] End each drill on the primary with no person acting: with the return workflow after a recovery, or by starting the primary VMs again.
+- [x] Keep the results of every unattended drill in one table that the README links to.
 
-**Gate:** Two consecutive drills, started by the schedule or by a dispatch, meet both targets with no person acting after the start, the watchdog started each recovery, and the worklog compares them with drills 1 to 3.
+**Gate:** Two consecutive drills, started by the schedule or by a dispatch, meet both targets with no person acting after the start, the watchdog started each recovery, and the worklog compares them with drills 1 to 3. Passed on 2026-10-19: two drills started by a dispatch recovered in 34 min 21 s and 36 min 00 s, including detection, and lost 10 min 18 s and 5 min 09 s of writes. See the [worklog](docs/worklogs/12-unattended-drills.md#gate) and its [independent review](docs/worklogs/12-unattended-drills.md#independent-review).
 
 ## 13. Failback with data (optional)
 
