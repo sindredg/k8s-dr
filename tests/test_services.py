@@ -416,6 +416,19 @@ class RestoreTests(unittest.TestCase):
             with self.subTest(check=check):
                 self.assertLess(self.script.index(check), destructive)
 
+    def test_reads_the_dump_from_a_decrypted_file(self):
+        # pg_restore --list reads only the table of contents. Fed from a
+        # pipe, it exits before age has written the rest of a large dump, and
+        # pipefail fails the restore on age's SIGPIPE. See troubleshooting 08.
+        self.assertNotRegex(self.script, r"\|\s*pg_restore")
+        decrypted = '"${STAGING}/postgresql.dump"'
+        decrypt = self.script.index(f'age --decrypt -i "$KEY" -o {decrypted}')
+        check = self.script.index(f"pg_restore --list {decrypted}")
+        restore = self.script.index('pg_restore --dbname="$PGDATABASE"')
+        self.assertLess(decrypt, check)
+        self.assertLess(check, self.script.index("DROP DATABASE"))
+        self.assertIn(decrypted, self.script[restore:self.script.index('log "restored the database"')])
+
     def test_selects_only_sets_with_a_manifest(self):
         self.assertIn('matchGlob=${RESTORE_SOURCE}/*/manifest.json', self.script)
 
