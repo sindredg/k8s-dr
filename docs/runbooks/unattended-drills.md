@@ -63,7 +63,7 @@ Each drill is a real outage of `git.sindrg.com`, and the return discards every w
    gh workflow run drill.yml --ref main
    ```
 
-   Expected: a `Drill` run starts. About 30 minutes later its `Isolate the primary` step stops the primary, a `Recover` run started by `github-actions[bot]` follows within about 25 minutes, and a `Return` run follows after the recovery, also after a failed one. The recovery's certificates name `run-<start>.sindrg.com` besides their own name, so a drill does not count against the Let's Encrypt limit of five certificates a week for the same names.
+   Expected: a `Drill` run starts. About 30 minutes later its `Isolate the primary` step stops the primary, a `Recover` run started by `github-actions[bot]` follows, 14 to 21 minutes after the isolation in the drills of 2026-10-19, and a `Return` run follows after the recovery, also after a failed one. If no `Recover` run has started 60 minutes after the isolation, the drill starts the primary VMs again. The recovery's certificates name `run-<start>.sindrg.com` besides their own name, so a drill does not count against the Let's Encrypt limit of five certificates a week for the same names.
 
 ## Read a result
 
@@ -96,7 +96,7 @@ The issue names the first step that failed. Every drill that stopped the primary
 | `failed` in `wait`, with a recovery run | The drill returned to the primary, or started its VMs if the recovery built no environment | Read the failed stage in the issue's stage table and the `Recover` run log. Fix the cause, then start a drill as in step 6 |
 | `failed` in `report`, return passed | The primary serves again; the measurement is incomplete | Read the report error in the issue. No action is needed for the service |
 | `missed` | The drill returned; the primary serves | Read the stage table in the issue |
-| The issue says `The return failed` | The recovery cluster may serve the public name, or the primary may still be stopped | Rerun the failed `Return` run, or return as in step 9 |
+| The issue says `The return did not finish` | The recovery cluster may serve the public name, or the primary may still be stopped | Rerun the failed `Return` run, or return as in step 9 |
 
 9. Return to the primary when the drill's own return failed.
 

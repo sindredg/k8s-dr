@@ -25,7 +25,7 @@ The recovery time runs from the first failed probe to the checks through the pub
 | Phase | Stages | Duration |
 | --- | --- | --- |
 | Detection | From the first failed probe to the watchdog's `Recover` run | 18 min 15 s |
-| Runner start | | 54 s |
+| Job setup | Before the first stage | 54 s |
 | Preflight | `preflight` | 1 min 40 s |
 | Build the cluster | `provisioning`, `bootstrap`, `flux-reconcile` | 11 min 01 s |
 | Restore and check | `restore`, `verification` | 3 min 38 s |
@@ -59,7 +59,7 @@ The recovery region runs no VMs until a recovery starts. Terraform state, the de
 
 ## Status
 
-Milestones 0 to 10 are complete, from the recovery contract to automated recovery. Next are unattended drills and a faster cluster build. The [roadmap](plan.md) gives every milestone, its gate, and the order.
+Milestones 0 to 10 and 12 are complete, from the recovery contract to unattended drills. Next is a faster cluster build. The [roadmap](plan.md) gives every milestone, its gate, and the order.
 
 [Production readiness](docs/production-readiness.md) lists what a production deployment adds to this lab.
 

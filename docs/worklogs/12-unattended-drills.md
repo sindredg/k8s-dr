@@ -1,6 +1,6 @@
 # Unattended drills
 
-Status: In progress. The drill workflow and the dataset are built, and the dataset is loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. Drills 2 and 3 ran on demand the same day and passed, and the [gate](#gate) is met; the milestone waits for its independent review. This file is the record of [milestone 12](../../plan.md#12-unattended-drills).
+Status: Done. The drill workflow and the dataset are built, and the dataset is loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. Drills 2 and 3 ran on demand the same day and passed, the [gate](#gate) is met, and the [independent review](#independent-review) found no claim that overturns it. This file is the record of [milestone 12](../../plan.md#12-unattended-drills).
 
 ## Step 1: the drill workflow and the dataset
 
@@ -187,9 +187,10 @@ Expected before running: the guard passes; the watchdog starts the recovery; the
 
 What it verified live:
 
-- The run name. The bootstrap received `run_certificate_host=run-20261019t174546z.sindrg.com`. `validate-services` listed `git-tls` with `[git.sindrg.com run-20261019t174546z.sindrg.com]` and `git-cluster-tls` with `[git-dr.sindrg.com run-20261019t174546z.sindrg.com]`, both Ready, eight minutes after the rehearsal's `429` for the old sets.
+- The run name. The bootstrap received `run_certificate_host=run-20261019t174546z.sindrg.com`. `validate-services` listed `git-tls` with `[git.sindrg.com run-20261019t174546z.sindrg.com]` and `git-cluster-tls` with `[git-dr.sindrg.com run-20261019t174546z.sindrg.com]`, both Ready.
 - The restore fix. The restore Job logged `digests match the manifest` at 18:03:11Z and `both archives decrypt and read` at 18:03:46Z, then restored the database and the 2 GiB Gitea volume.
 - The drill on demand. Nobody acted between the dispatch and the issue.
+- Paths that [issue #123](https://github.com/sindredg/k8s-dr/issues/123) lists as tested against stubs only, besides those that drill 1 ran: the report's read of the Cloud Monitoring `timeSeries`, the dispatch of the `Return` run with its string input, and the wait for that run.
 
 After the return, `git.sindrg.com` resolved to the primary address at Cloudflare's DNS-over-HTTPS resolver and returned `200`, both primary VMs were `RUNNING`, and `infra/recovery` held no resources.
 
@@ -225,7 +226,7 @@ Source: live system. The `Drill` run 39306669248, dispatched with `gh workflow r
 
 What it verified live:
 
-- A second run name within two hours. `validate-services` listed `git-tls` with `[git.sindrg.com run-20261019t194648z.sindrg.com]` and `git-cluster-tls` with `[git-dr.sindrg.com run-20261019t194648z.sindrg.com]`, both issued by `letsencrypt-production`.
+- A second run name within two hours. `validate-services` listed `git-tls` with `[git.sindrg.com run-20261019t194648z.sindrg.com]` and `git-cluster-tls` with `[git-dr.sindrg.com run-20261019t194648z.sindrg.com]`, both issued by `letsencrypt-production`. With the old names, this recovery would have been refused: the rehearsal's `429` gave one certificate per set back at 16:15:49Z, drill 2 would have used it, and the limit gives the next one back 34 hours later.
 - The restore fix with a second set. The restore Job logged `both archives decrypt and read` at 20:01:56Z.
 - The drill on demand. Nobody acted between the dispatch and the issue.
 
@@ -243,20 +244,20 @@ Source: [worklog 06](06-disaster-drill.md) and [worklog 07](07-faster-recovery.m
 | Backup interval | 1 hour | 1 hour | 15 minutes | 15 minutes | 15 minutes |
 | Data on the primary | Fixtures | Fixtures | Fixtures | Fixtures and the 2 GiB dataset | Fixtures and the 2 GiB dataset |
 | First failed probe to the start of the recovery | 2 min 07 s | 1 min 28 s | 1 min 38 s | 13 min 15 s | 18 min 15 s |
-| Start of the recovery to the end of `probe-recovery` | 17 min 10 s | 16 min 08 s | 15 min 08 s | 21 min 06 s | 17 min 45 s |
+| Start of the recovery to the checks through the public name | 17 min 10 s | 16 min 08 s | 15 min 08 s | 21 min 06 s | 17 min 45 s |
 | Recovery time | 19 min 17 s | 17 min 36 s | 16 min 46 s | 34 min 21 s | 36 min 00 s |
 | Bootstrap stage | 7 min 46 s | 8 min 35 s | 7 min 59 s | 8 min 50 s | 7 min 10 s |
 | Restore stage | 1 min 08 s | 1 min 10 s | 57 s | 4 min 11 s | 3 min 18 s |
 | Observed data loss | 25 min 28 s, 5 writes | 15 min 16 s, 3 writes | 10 min 10 s, 2 writes | 10 min 18 s, 2 writes | 5 min 09 s, 1 write |
 | Backup age at isolation | 21 min 02 s | 15 min 12 s | 9 min 31 s | 8 min 48 s | 4 min 42 s |
 
-The start of the recovery is the end of the `detection` stage in the attended drills, when the operator ran the first command, and the creation of the `Recover` run in the unattended drills. After that start, an unattended recovery also waits about a minute for a runner and runs a `preflight` stage that the attended drills did not have.
+The start of the recovery is the end of the `detection` stage in the attended drills, when the operator ran the first command, and the creation of the `Recover` run in the unattended drills. After that start, an unattended recovery also spends about a minute on job setup before its first stage, and runs a `preflight` stage that the attended drills did not have.
 
 What the comparison shows:
 
-- **Detection explains the longer recovery time.** After its start, the recovery took 17 min 45 s and 21 min 06 s, against 15 min 08 s to 17 min 10 s when attended, while it also restored the 2 GiB dataset and ran the preflight. Detection took 13 min 15 s and 18 min 15 s instead of at most 2 min 07 s. The watchdog needs five minutes of failures from every checker, and on its five-minute schedule the run that started each recovery came 12 min 12 s and 13 min 23 s after the run before it.
+- **Detection explains most of the longer recovery time.** After its start, the recovery took 17 min 45 s and 21 min 06 s, against 15 min 08 s to 17 min 10 s when attended, while it also restored the 2 GiB dataset and ran the preflight. Detection took 13 min 15 s and 18 min 15 s instead of at most 2 min 07 s. The watchdog needs five minutes of failures from every checker, and on its five-minute schedule the run that started each recovery came 12 min 12 s and 13 min 23 s after the run before it.
 - **The restore grows with the data.** With the dataset, the restore stage took 3 min 18 s and 4 min 11 s, and the restore Job 107 and 130 seconds, against 24 to 28 seconds for the fixtures.
-- **The bootstrap is unchanged.** Its mean in drills 2 and 3 is 8 min 00 s, the baseline of [milestone 11](../../plan.md#11-faster-cluster-build).
+- **The bootstrap is unchanged.** Its mean in drills 2 and 3 is 8 min 00 s, the baseline of [milestone 11](../../plan.md#11-faster-cluster-build). Drill 1's bootstrap passed in 9 min 14 s; the baseline uses the two gate drills, which ran from one commit.
 - **Data loss.** Each value is one sample. Both stay within the bound that [worklog 07](07-faster-recovery.md#comparison) gives for the 15-minute schedule: up to 15 minutes of backup age plus up to 5 minutes since the last write.
 - **Detection against decision 0015.** [Decision 0015](../decisions/0015-unattended-drills.md#detection-stays-with-the-github-schedule-for-now) revisits the GitHub schedule if detection takes longer than the rest of the recovery. In drill 3 it did: 18 min 15 s against 17 min 45 s. In drill 2 it did not: 13 min 15 s against 21 min 06 s. In drill 1, detection from the isolation took 20 min 43 s before the recovery failed. The condition is met; the choice of a faster start is open.
 
@@ -277,4 +278,26 @@ Expected before checking the run history: between each dispatch and its issue, o
 - **No person acted after the start.** Besides the `Watchdog` runs from the schedule, the runs created from 16:59Z to 20:28Z are the two dispatched `Drill` runs and two `Recover` and two `Return` runs by `github-actions[bot]`, as expected.
 - **Compared with drills 1 to 3.** See the [comparison](#comparison-with-drills-1-to-3).
 
-Result: Verified on 2026-10-19. The run history covers GitHub runs only; the other commands during both drills were read-only checks. The milestone closes after its independent review.
+Result: Verified on 2026-10-19. The run history covers GitHub runs only; the other commands during both drills were read-only checks.
+
+Accepted: the return after a failed recovery or a missed target, the restart of the primary VMs, and the failed start that a passed return clears have run against stubs only. Both drills passed, so they took the `Return` path. Forcing a failure on the live system would need a fault input that the workflows do not have, and one more outage. Each of these branches has a test that fails when the branch is broken. Trigger to check again: the first drill that fails or misses a target, whose issue names the end it took.
+
+[Issue #122](https://github.com/sindredg/k8s-dr/issues/122) belongs to milestone 12 only if a drill's recovery takes longer than two hours. The recoveries took 34 min 21 s and 36 min 00 s, so it stays open for milestone 14.
+
+## Independent review
+
+Source: a review of the milestone's claims against the code, the run history, the stored results, and the live endpoints, on 2026-10-19, before the milestone closed. It recomputed every figure of drills 2 and 3 from the `result.json` files, the issues, and the job logs, and found them correct. It ran 27 single-line mutations of the milestone's checks, of which 25 failed their tests. Of the two survivors, one gives the same result as the original code, and the other is fixed below.
+
+Fixed in the same change:
+
+- Stale text: the plan's introduction to this milestone and its header, the runbook's time to the `Recover` run, the misdated sentence in the status of the regional recovery runbook, and the limits and gates of architecture page 10.
+- The runbook keyed a failed return on `The return failed`, which the issue prints only after an earlier failure. It now keys on `The return did not finish`, which the issue prints in both cases.
+- In the comparison, the row to the checks through the public name, the job setup that the README called a runner start, and "most of" for what detection explains. The time between the rehearsal's `429` and drill 2's certificates was wrong and is removed; drill 3's certificates show the limit no longer applies.
+- The plan step named several gigabytes for a 2 GiB dataset, and the gate of milestone 11 did not name the drills of its baseline.
+- The mutation that ended the recovery time at the last stage instead of `probe-recovery` survived, because the test's recovery had no stage after `probe-recovery`. The test now has a `resume-backups` stage, and the mutation fails two tests.
+- The paths of issue #123 that drills 2 and 3 ran, and the state of issue #122, are recorded above.
+
+Plan only:
+
+- The faster start of the watchdog is a step of [milestone 11](../../plan.md#11-faster-cluster-build).
+- After a failed `wait`, the return can read the run state of an earlier recovery while a late `Recover` run still runs, start the primary VMs, and leave that run to cut over with no return. This is reasoned from the code, not observed; [issue #133](https://github.com/sindredg/k8s-dr/issues/133) tracks it.
