@@ -75,5 +75,6 @@ Each worklog records what was built and the commands and results that passed its
 | [Git rejected the fixture user](troubleshooting/05-git-clone-rejected-fixture-user.md) | A clone that sent the password as the username after a libcurl update. |
 | [The CAA records of the zone were missing](troubleshooting/06-caa-records-missing.md) | CAA records removed from the zone while the daily surface check was disabled. |
 | [The return read the primary worker account as still disabled](troubleshooting/07-service-account-read-lags.md) | An IAM read right after an enable returned the old value and failed the stage. |
+| [The restore failed with status 141 after the digests matched](troubleshooting/08-restore-dump-check-sigpipe.md) | The dump check exited before `age` finished writing, and `pipefail` failed the restore on SIGPIPE. |
 
 Keep credentials, kubeconfigs, Terraform state, database dumps, and unsanitized command output out of these files.

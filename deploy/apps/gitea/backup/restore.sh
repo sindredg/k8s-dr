@@ -113,8 +113,11 @@ done
 log "digests match the manifest"
 
 # Decrypt both archives once before the restore, so that a wrong key or a
-# damaged archive fails while the current data is still in place.
-age --decrypt -i "$KEY" "${STAGING}/postgresql.dump.age" | pg_restore --list >/dev/null
+# damaged archive fails while the current data is still in place. The dump is
+# read from a file: pg_restore --list reads only the table of contents, so
+# from a pipe it leaves age to fail on the rest. See troubleshooting 08.
+age --decrypt -i "$KEY" -o "${STAGING}/postgresql.dump" "${STAGING}/postgresql.dump.age"
+pg_restore --list "${STAGING}/postgresql.dump" >/dev/null
 age --decrypt -i "$KEY" "${STAGING}/gitea-data.tar.gz.age" | tar -tzf - >/dev/null
 log "both archives decrypt and read"
 
@@ -134,8 +137,8 @@ destructive=true
 psql --dbname=postgres -v ON_ERROR_STOP=1 \
   -c "DROP DATABASE IF EXISTS \"${PGDATABASE}\" WITH (FORCE)" \
   -c "CREATE DATABASE \"${PGDATABASE}\" OWNER \"${PGUSER}\""
-age --decrypt -i "$KEY" "${STAGING}/postgresql.dump.age" |
-  pg_restore --dbname="$PGDATABASE" --exit-on-error --single-transaction --no-owner
+pg_restore --dbname="$PGDATABASE" --exit-on-error --single-transaction --no-owner \
+  "${STAGING}/postgresql.dump"
 log "restored the database"
 
 find "$DATA" -mindepth 1 -delete
