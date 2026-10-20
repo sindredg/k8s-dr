@@ -6,7 +6,7 @@ Date: 2026-09-25
 
 ## Goal
 
-Deploy Gitea and PostgreSQL through Flux from the external GitHub repository, expose Gitea at `git.sindrg.com` over HTTPS, and create the recovery fixtures. The same configuration must rebuild in Belgium with no primary-region dependency. The [milestone 3 gate](../../plan.md#3-service-deployment) requires that Git changes reconcile, Gitea works after its pods restart, and all fixture data remains.
+Deploy Gitea and PostgreSQL through Flux from the external GitHub repository, expose Gitea at `git.sindrg.com` over HTTPS, and create the recovery fixtures. The same configuration must rebuild in Belgium with no primary-region dependency. The [milestone 3 gate](../worklogs/03-service-deployment.md) requires that Git changes reconcile, Gitea works after its pods restart, and all fixture data remains.
 
 The project models an organization that must manage Kubernetes at the operating system level, for example for regulatory control of hosts, patching, and data paths. Choices below prefer keeping TLS termination, secrets, and data inside infrastructure the operator controls.
 

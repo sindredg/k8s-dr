@@ -1,6 +1,6 @@
 # Unattended drills
 
-Status: Done. The drill workflow and the dataset are built, and the dataset is loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. Drills 2 and 3 ran on demand the same day and passed, the [gate](#gate) is met, and the [independent review](#independent-review) found no claim that overturns it. This file is the record of [milestone 12](../../plan.md#12-unattended-drills).
+Status: Done. The drill workflow and the dataset are built, and the dataset is loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. Drills 2 and 3 ran on demand the same day and passed, the [gate](#gate) is met, and the [independent review](#independent-review) found no claim that overturns it. This file is the record of milestone 11.
 
 ## Step 1: the drill workflow and the dataset
 
@@ -257,9 +257,9 @@ What the comparison shows:
 
 - **Detection explains most of the longer recovery time.** After its start, the recovery took 17 min 45 s and 21 min 06 s, against 15 min 08 s to 17 min 10 s when attended, while it also restored the 2 GiB dataset and ran the preflight. Detection took 13 min 15 s and 18 min 15 s instead of at most 2 min 07 s. The watchdog needs five minutes of failures from every checker, and on its five-minute schedule the run that started each recovery came 12 min 12 s and 13 min 23 s after the run before it.
 - **The restore grows with the data.** With the dataset, the restore stage took 3 min 18 s and 4 min 11 s, and the restore Job 107 and 130 seconds, against 24 to 28 seconds for the fixtures.
-- **The bootstrap is unchanged.** Its mean in drills 2 and 3 is 8 min 00 s, the baseline of [milestone 11](../../plan.md#11-faster-cluster-build). Drill 1's bootstrap passed in 9 min 14 s; the baseline uses the two gate drills, which ran from one commit.
+- **The bootstrap is unchanged.** Its mean in drills 2 and 3 is 8 min 00 s. Drill 1's bootstrap passed in 9 min 14 s; the mean uses the two gate drills, which ran from one commit.
 - **Data loss.** Each value is one sample. Both stay within the bound that [worklog 07](07-faster-recovery.md#comparison) gives for the 15-minute schedule: up to 15 minutes of backup age plus up to 5 minutes since the last write.
-- **Detection against decision 0015.** [Decision 0015](../decisions/0015-unattended-drills.md#detection-stays-with-the-github-schedule-for-now) revisits the GitHub schedule if detection takes longer than the rest of the recovery. In drill 3 it did: 18 min 15 s against 17 min 45 s. In drill 2 it did not: 13 min 15 s against 21 min 06 s. In drill 1, detection from the isolation took 20 min 43 s before the recovery failed. The condition is met; the choice of a faster start is open.
+- **Detection against decision 0015.** [Decision 0015](../decisions/0015-unattended-drills.md#detection-stays-with-the-github-schedule-for-now) revisits the GitHub schedule if detection takes longer than the rest of the recovery. In drill 3 it did: 18 min 15 s against 17 min 45 s. In drill 2 it did not: 13 min 15 s against 21 min 06 s. In drill 1, detection from the isolation took 20 min 43 s before the recovery failed. The condition is met. The watchdog stays on the GitHub schedule: both drills met the recovery time target with more than three hours to spare, and a faster start would need a GitHub token stored in Google Cloud and a second trigger path to secure.
 
 ## Gate
 
@@ -282,7 +282,7 @@ Result: Verified on 2026-10-19. The run history covers GitHub runs only; the oth
 
 Accepted: the return after a failed recovery or a missed target, the restart of the primary VMs, and the failed start that a passed return clears have run against stubs only. Both drills passed, so they took the `Return` path. Forcing a failure on the live system would need a fault input that the workflows do not have, and one more outage. Each of these branches has a test that fails when the branch is broken. Trigger to check again: the first drill that fails or misses a target, whose issue names the end it took.
 
-[Issue #122](https://github.com/sindredg/k8s-dr/issues/122) belongs to milestone 12 only if a drill's recovery takes longer than two hours. The recoveries took 34 min 21 s and 36 min 00 s, so it stays open for milestone 14.
+[Issue #122](https://github.com/sindredg/k8s-dr/issues/122) applies only if a drill's recovery takes longer than two hours. The recoveries took 34 min 21 s and 36 min 00 s, so it did not apply.
 
 ## Independent review
 
@@ -293,11 +293,11 @@ Fixed in the same change:
 - Stale text: the plan's introduction to this milestone and its header, the runbook's time to the `Recover` run, the misdated sentence in the status of the regional recovery runbook, and the limits and gates of architecture page 10.
 - The runbook keyed a failed return on `The return failed`, which the issue prints only after an earlier failure. It now keys on `The return did not finish`, which the issue prints in both cases.
 - In the comparison, the row to the checks through the public name, the job setup that the README called a runner start, and "most of" for what detection explains. The time between the rehearsal's `429` and drill 2's certificates was wrong and is removed; drill 3's certificates show the limit no longer applies.
-- The plan step named several gigabytes for a 2 GiB dataset, and the gate of milestone 11 did not name the drills of its baseline.
+- The plan step named several gigabytes for a 2 GiB dataset.
 - The mutation that ended the recovery time at the last stage instead of `probe-recovery` survived, because the test's recovery had no stage after `probe-recovery`. The test now has a `resume-backups` stage, and the mutation fails two tests.
 - The paths of issue #123 that drills 2 and 3 ran, and the state of issue #122, are recorded above.
 
 Plan only:
 
-- The faster start of the watchdog is a step of [milestone 11](../../plan.md#11-faster-cluster-build).
+- Whether the watchdog keeps the GitHub schedule after the detection of drill 3. It stays; see the [comparison](#comparison-with-drills-1-to-3).
 - After a failed `wait`, the return can read the run state of an earlier recovery while a late `Recover` run still runs, start the primary VMs, and leave that run to cut over with no return. This is reasoned from the code, not observed; [issue #133](https://github.com/sindredg/k8s-dr/issues/133) tracks it.

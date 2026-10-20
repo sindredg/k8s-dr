@@ -4,7 +4,7 @@ Status: Complete. The milestone gate passed on 2026-09-23.
 
 ## Scope
 
-Provision a primary control-plane VM and worker VM, their private network, restricted administration, offsite backup storage, and remote Terraform state. Recovery credentials must remain available without the primary VMs. See [milestone 1](../../plan.md#1-primary-infrastructure).
+Provision a primary control-plane VM and worker VM, their private network, restricted administration, offsite backup storage, and remote Terraform state. Recovery credentials must remain available without the primary VMs. See milestone 1.
 
 ## Work completed
 

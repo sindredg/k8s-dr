@@ -4,11 +4,11 @@ Status: Complete. The preparation gate passed on 2026-09-25. Implementation star
 
 ## Scope
 
-Bootstrap Flux from the external GitHub repository, deploy Gitea and PostgreSQL with persistent volumes, and create the recovery fixtures. See [milestone 3](../../plan.md#3-service-deployment).
+Bootstrap Flux from the external GitHub repository, deploy Gitea and PostgreSQL with persistent volumes, and create the recovery fixtures. See milestone 3.
 
 ## Preparation
 
-The [pre-milestone 3 steps](../../plan.md#before-milestone-3-recovery-readiness) change the layout and tooling before the worker disk holds service data.
+The [pre-milestone 3 steps](03-service-deployment.md#preparation) change the layout and tooling before the worker disk holds service data.
 
 ### Work completed
 

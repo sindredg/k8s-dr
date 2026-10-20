@@ -1,12 +1,12 @@
 # Rebuild from the runbooks
 
-Status: Complete. The [gate](#gate) passed on 2026-10-16. This file is the record of [milestone 8](../../plan.md#8-rebuild-from-the-runbooks).
+Status: Complete. The [gate](#gate) passed on 2026-10-16. This file is the record of milestone 8.
 
 ## Scope
 
 The environment was removed after milestone 7. Only the Terraform state bucket remained, and the `shared`, `primary`, and `recovery` states were empty. This rebuild follows the runbooks as written and records every step that did not work as documented.
 
-[Milestone 9](../../plan.md#9-backups-without-downtime) changes the worker data disk layout. It is built during this rebuild, before the fixtures exist, so no data has to be migrated.
+[Milestone 9](09-backups-without-downtime.md) changes the worker data disk layout. It is built during this rebuild, before the fixtures exist, so no data has to be migrated.
 
 ## Primary infrastructure
 
@@ -34,7 +34,7 @@ Steps 1 to 4 were skipped: they create the state bucket, which survived the tear
 | # | Step | Documented | Observed | Fix |
 | --- | --- | --- | --- | --- |
 | 1 | 5 | One bucket, two bucket IAM members, three project IAM members | `Plan: 8 to add`: also a third bucket IAM member and the uptime check | Runbook lists all 8 |
-| 2 | 5 | The shared root applies before the primary root | `Error 400: Service account k8sdr-primary-worker@<project>.iam.gserviceaccount.com does not exist.` for the writer and reader grants | Runbook applies the primary root first. [Milestone 10](../../plan.md#10-automated-recovery) moves the node service accounts to the shared root, which removes the dependency |
+| 2 | 5 | The shared root applies before the primary root | `Error 400: Service account k8sdr-primary-worker@<project>.iam.gserviceaccount.com does not exist.` for the writer and reader grants | Runbook applies the primary root first. [Milestone 10](10-automated-recovery.md) moves the node service accounts to the shared root, which removes the dependency |
 | 3 | 6 | VPC, subnet, NAT, two VMs, the data disk, and two grants | `Plan: 20 to add`: also the service accounts, router, three firewall rules, and five load balancer resources | Runbook lists all 20 by group |
 | 4 | 9 | `gcloud auth login` in a separate shell, then list as the recovery reader | The separate shell shares the gcloud configuration, so the login replaced the administrator's, and nothing showed which account signed in. Attempts 2 and 3 ran as the administrator | Runbook uses a temporary `CLOUDSDK_CONFIG`, checks the signed-in account, and replaces the write attempt with a permission test that writes nothing |
 

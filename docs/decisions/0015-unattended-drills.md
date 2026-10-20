@@ -1,6 +1,6 @@
 # 0015: Unattended drills
 
-Status: Accepted on 2026-10-17. Amended on 2026-10-18 with [what a drill does when it cannot finish](#amendment-a-drill-that-cannot-finish-restores-the-service). [Milestone 12](../../plan.md#12-unattended-drills) builds and measures it. Since 2026-10-19, [decision 0016](0016-drills-on-demand.md) starts drills on demand without the certificate limit, ends every drill on the primary, and counts dispatched drills for the gate.
+Status: Accepted on 2026-10-17. Amended on 2026-10-18 with [what a drill does when it cannot finish](#amendment-a-drill-that-cannot-finish-restores-the-service). [Milestone 11](../worklogs/11-unattended-drills.md) builds and measures it. Since 2026-10-19, [decision 0016](0016-drills-on-demand.md) starts drills on demand without the certificate limit, ends every drill on the primary, and counts dispatched drills for the gate.
 
 Date: 2026-10-17
 

@@ -6,7 +6,7 @@ Date: 2026-09-30
 
 ## Goal
 
-Show node, pod, and Kubernetes object metrics as dashboards, and keep them readable after the primary region is lost. The [milestone 6 drill](../../plan.md#6-disaster-drill) then has a visual record of the failure and the recovery. [Production readiness](../production-readiness.md) lists metrics as a gap.
+Show node, pod, and Kubernetes object metrics as dashboards, and keep them readable after the primary region is lost. The [milestone 6 drill](../worklogs/06-disaster-drill.md) then has a visual record of the failure and the recovery. [Production readiness](../production-readiness.md) lists metrics as a gap.
 
 This record covers metrics only. Logs, alerts on metrics, and the external uptime probe that milestone 6 needs are out of scope.
 

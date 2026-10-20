@@ -1,6 +1,6 @@
 # Project documentation
 
-The [project plan](../plan.md) defines each milestone and its validation gate. These documents explain the design, record the evidence, and hold the procedures.
+These documents explain the design, record the evidence of each milestone, and hold the procedures.
 
 ## Start here
 
@@ -25,7 +25,7 @@ The [project plan](../plan.md) defines each milestone and its validation gate. T
 
 ## Worklogs
 
-Each worklog records what was built and the commands and results that passed its gate.
+Each worklog records what a milestone built and the commands and results that passed its gate. Milestone 0, the recovery contract, is [decision 0002](decisions/0002-recovery-contract.md).
 
 | Document | Milestone |
 | --- | --- |
@@ -42,7 +42,8 @@ Each worklog records what was built and the commands and results that passed its
 | [Rebuild from the runbooks](worklogs/08-rebuild-from-runbooks.md) | 8: the rebuild from empty state and every deviation |
 | [Backups without downtime](worklogs/09-backups-without-downtime.md) | 9: the LVM snapshot capture and its validation |
 | [Automated recovery](worklogs/10-automated-recovery.md) | 10: shared node identities, then the recovery pipeline |
-| [Unattended drills](worklogs/12-unattended-drills.md) | 12: the drill workflow, the dataset, and the scheduled drills |
+| [Unattended drills](worklogs/11-unattended-drills.md) | 11: the drill workflow, the dataset, and the scheduled drills |
+| [Project close](worklogs/project-close.md) | The teardown of the environment and what remains outside Google Cloud |
 
 ## Decisions
 

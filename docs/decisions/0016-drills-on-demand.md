@@ -1,6 +1,6 @@
 # 0016: Drills on demand
 
-Status: Accepted on 2026-10-19. It changes parts of [decision 0015](0015-unattended-drills.md), [decision 0013](0013-automated-recovery.md), and [decision 0008](0008-cold-recovery.md), and each of them points here. [Milestone 12](../../plan.md#12-unattended-drills) builds and measures it.
+Status: Accepted on 2026-10-19. It changes parts of [decision 0015](0015-unattended-drills.md), [decision 0013](0013-automated-recovery.md), and [decision 0008](0008-cold-recovery.md), and each of them points here. [Milestone 11](../worklogs/11-unattended-drills.md) builds and measures it.
 
 Date: 2026-10-19
 
@@ -22,7 +22,7 @@ The `Drill` workflow already accepts a manual dispatch:
 gh workflow run drill.yml --ref main
 ```
 
-With the changes below, a dispatched drill spends no budget of the limit for the same set of names, and it ends on the primary whatever the recovery does, so a drill can follow a fix the same day. The schedule stays, and `SCHEDULED_DRILLS` switches both triggers. A dispatched drill runs the same guard and the same steps, and after the dispatch nobody acts until the issue opens. The [milestone 12](../../plan.md#12-unattended-drills) gate therefore counts drills started by a dispatch as well as by the schedule. The [results page](../drills.md) already records which trigger started each drill.
+With the changes below, a dispatched drill spends no budget of the limit for the same set of names, and it ends on the primary whatever the recovery does, so a drill can follow a fix the same day. The schedule stays, and `SCHEDULED_DRILLS` switches both triggers. A dispatched drill runs the same guard and the same steps, and after the dispatch nobody acts until the issue opens. The [milestone 11](../worklogs/11-unattended-drills.md) gate therefore counts drills started by a dispatch as well as by the schedule. The [results page](../drills.md) already records which trigger started each drill.
 
 ### Each recovery run adds one name to its certificates
 

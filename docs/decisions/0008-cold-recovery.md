@@ -6,7 +6,7 @@ Date: 2026-09-30
 
 ## Goal
 
-Build an independent Gitea service in Belgium (`europe-west1`) from code and one verified backup set, with no dependency on primary-region VMs or services. The [milestone 5 gate](../../plan.md#5-cold-recovery) requires the recovered service to pass the fixture checks while the primary is isolated.
+Build an independent Gitea service in Belgium (`europe-west1`) from code and one verified backup set, with no dependency on primary-region VMs or services. The [milestone 5 gate](../worklogs/05-cold-recovery.md) requires the recovered service to pass the fixture checks while the primary is isolated.
 
 Most of the design already exists: the regional Terraform module and root contract ([decision 0003](0003-regional-infrastructure-and-state.md#amendment-shared-root-and-root-owned-data-disk)), per-cluster Flux settings ([decision 0006](0006-service-deployment-architecture.md#amendment-postgresql-and-gitea-implementation)), and per-cluster backup prefixes and fencing ([decision 0007](0007-consistent-backups.md)). This record settles what remains: the hostnames each cluster serves, how operator commands select a cluster, and how the gate isolates the primary.
 
@@ -108,14 +108,14 @@ Since 2026-10-17, the recovery run enables backups through a ConfigMap in the cl
 
 Date: 2026-10-04
 
-[Milestone 6](../../plan.md#6-disaster-drill) runs the drill twice. After the first drill the recovery cluster serves `git.sindrg.com`, backs up to `recovery/`, and the primary is stopped and fenced. The second drill needs the starting state again, and the project does not keep two regions running.
+[Milestone 6](../worklogs/06-disaster-drill.md) runs the drill twice. After the first drill the recovery cluster serves `git.sindrg.com`, backs up to `recovery/`, and the primary is stopped and fenced. The second drill needs the starting state again, and the project does not keep two regions running.
 
 A drill therefore ends by returning to the primary. The stopped primary still holds its data as of the isolation. The return starts it, points `git.sindrg.com` back, restores its backup grant, suspends recovery backups again in Git, and destroys the recovery environment. The [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill) has the steps.
 
 | Option | Trade-off |
 | --- | --- |
 | Return to the stopped primary and discard the recovery copy (selected) | A few commands and no data movement. Writes that the recovery cluster accepted are lost; in a drill these are only write checks. It is not a failback and proves nothing about one. |
-| Fail back: restore the newest `recovery/` set into a rebuilt primary | Keeps the recovery writes and exercises the reverse path. It is a second recovery with its own runbook, checks, and cutover, which the plan does not include. |
+| Fail back: restore the newest `recovery/` set into a rebuilt primary | Keeps the recovery writes and exercises the reverse path. It is a second recovery with its own runbook, checks, and cutover, which the project does not include. |
 | Keep the recovery cluster as the new primary and drill back to Finland | No return step. `infra/recovery` has no `prevent_destroy` and both roots would need to swap roles, which is a redesign. |
 
 After a real loss of the primary there is no return: the recovery cluster stays in service, and going back to Finland is a planned failback that this project does not build.

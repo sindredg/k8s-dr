@@ -1,6 +1,6 @@
 # Backups without downtime
 
-Status: Complete. The gate passed on 2026-10-15; see [Validation](#validation). This file is the record of [milestone 9](../../plan.md#9-backups-without-downtime).
+Status: Complete. The gate passed on 2026-10-15; see [Validation](#validation). This file is the record of milestone 9.
 
 ## What was built
 
