@@ -1,6 +1,6 @@
 # 0001: Use kubeadm for cluster bootstrap
 
-Status: Accepted as the design choice in the [project overview](../../README.md) and [plan](../../plan.md). Implemented and validated in [milestone 2](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
+Status: Accepted as the design choice in the [project overview](../../README.md). Implemented and validated in [milestone 2](../worklogs/02-kubernetes-bootstrap.md) on 2026-09-25.
 
 ## Context
 

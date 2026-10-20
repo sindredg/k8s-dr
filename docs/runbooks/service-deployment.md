@@ -334,7 +334,7 @@ The fixture commit has fixed content, identity, and dates, so its SHA is recorde
 
 ## Milestone gate
 
-The [milestone 3 gate](../../plan.md#3-service-deployment) requires that Git changes reconcile, Gitea works after its pods restart, and all fixture data remains. Run the steps in order and record each result.
+The [milestone 3 gate](../worklogs/03-service-deployment.md) requires that Git changes reconcile, Gitea works after its pods restart, and all fixture data remains. Run the steps in order and record each result.
 
 1. Bootstrap from `main` and validate.
 
@@ -361,7 +361,7 @@ The [milestone 3 gate](../../plan.md#3-service-deployment) requires that Git cha
 
    Expected: both end with `failed=0`. The write check prints the time the push was accepted.
 
-5. Restart the worker VM. This is stronger than the plan requires: it checks that the Local Path volumes on the dedicated disk come back with the node.
+5. Restart the worker VM. This is stronger than the milestone gate requires: it checks that the Local Path volumes on the dedicated disk come back with the node.
 
    ```bash
    gcloud compute ssh "$WORKER_NAME" --project="$PROJECT_ID" --zone="$PRIMARY_ZONE" --tunnel-through-iap --command='sudo systemctl reboot'

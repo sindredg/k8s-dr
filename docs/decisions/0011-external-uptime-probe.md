@@ -6,7 +6,7 @@ Date: 2026-10-03
 
 ## Goal
 
-Measure recovery time from outside the failed region. [Decision 0002](0002-recovery-contract.md#measurement) starts the RTO at the first failed check of an external probe that runs every minute, and requires the probe before the [milestone 6](../../plan.md#6-disaster-drill) drill.
+Measure recovery time from outside the failed region. [Decision 0002](0002-recovery-contract.md#measurement) starts the RTO at the first failed check of an external probe that runs every minute, and requires the probe before the [milestone 6](../worklogs/06-disaster-drill.md) drill.
 
 ## Decision
 

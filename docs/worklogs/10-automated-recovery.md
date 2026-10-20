@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: Complete. The milestone gate passed on the live system on 2026-10-17, and the independent review's findings are fixed or tracked; see [Gate](#gate) and [Review](#review). Steps 1 to 6 are recorded below in order. This file is the record of [milestone 10](../../plan.md#10-automated-recovery).
+Status: Complete. The milestone gate passed on the live system on 2026-10-17, and the independent review's findings are fixed or tracked; see [Gate](#gate) and [Review](#review). Steps 1 to 6 are recorded below in order. This file is the record of milestone 10.
 
 ## Step 1: node identities and backup grants in the shared root
 
@@ -100,7 +100,7 @@ The recovery reader check of [issue #90](https://github.com/sindredg/k8s-dr/issu
 Two choices differ from the manual procedure:
 
 - The fence runs before the cutover, as decision 0013 requires. The drills fenced after the cutover. A primary that still answers now stops the run before `git.sindrg.com` moves.
-- Enabling recovery backups stays a manual step. It needs a Git change today, and [step 4](../../plan.md#10-automated-recovery) replaces it with a value in the cluster. The run ends by naming the step.
+- Enabling recovery backups stays a manual step. It needs a Git change today, and step 4 replaces it with a value in the cluster. The run ends by naming the step.
 
 ### Local checks
 
@@ -342,7 +342,7 @@ The scheduled run started 10 minutes after the merge.
 
 ### A probe failure shorter than the window
 
-Live system, 2026-10-17, from `main` at `3a82ea4`. This is the second condition of the [milestone gate](../../plan.md#10-automated-recovery): with the switch on, a failure shorter than five minutes starts nothing. Expected before the run: the `local` job reports `candidate=true`, because the switch is on and neither name answers, and the `confirm` job starts nothing because results from before the outage passed within the window.
+Live system, 2026-10-17, from `main` at `3a82ea4`. This is the second condition of the milestone gate: with the switch on, a failure shorter than five minutes starts nothing. Expected before the run: the `local` job reports `candidate=true`, because the switch is on and neither name answers, and the `confirm` job starts nothing because results from before the outage passed within the window.
 
 A temporary firewall rule denied tcp:443 to the primary's web tag at priority 100. The load balancer health check uses tcp:80, so the backend stayed healthy and removing the rule restored the service at once. The switch was turned off before the rule was removed, so a failed delete could not lead to a start.
 
@@ -475,7 +475,7 @@ Both run logs were searched for the project ID, the project number, the suffixes
 
 ### Not verified
 
-- The watchdog's automatic start of a recovery. It ran against stubs only. [Milestone 12](../../plan.md#12-unattended-drills) isolates the primary with the switch on.
+- The watchdog's automatic start of a recovery. It ran against stubs only. [Milestone 11](11-unattended-drills.md) isolates the primary with the switch on.
 - A rerun after a failed stage on a new runner.
 - That no action outside the workflow logs happened during run 39036386233. None was taken; the logs show none.
 

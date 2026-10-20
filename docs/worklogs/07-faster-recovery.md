@@ -1,6 +1,6 @@
 # Faster recovery
 
-Status: Complete. Backups run every 15 minutes, and a third drill on 2026-10-04 measured the result. This file is the record of [milestone 7](../../plan.md#7-faster-recovery-optional).
+Status: Complete. Backups run every 15 minutes, and a third drill on 2026-10-04 measured the result. This file is the record of milestone 7.
 
 ## Scope
 

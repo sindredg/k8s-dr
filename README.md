@@ -7,13 +7,13 @@
 
 Recover a stateful service after losing a cloud region, from code and offsite backups.
 
-Gitea and PostgreSQL run on a kubeadm-built Kubernetes cluster on Google Cloud VMs in Finland. When the primary region fails, one GitHub Actions workflow builds a new cluster in Belgium, restores the newest backup, and moves the public name `git.sindrg.com` to it. A scheduled watchdog can start that workflow on its own. The lab models organizations that must run Kubernetes on VMs they control.
+Gitea and PostgreSQL run on a kubeadm-built Kubernetes cluster on Google Cloud VMs in Finland. When the primary region fails, one GitHub Actions workflow builds a new cluster in Belgium, restores the newest backup, and moves the public name `git.sindrg.com` to it. A scheduled watchdog can start that workflow on its own. The lab models organizations that must run Kubernetes on VMs they control. The project is complete and its environment removed; see [Status](#status).
 
 [Results](#results) · [How recovery works](#how-recovery-works) · [Stack](#stack) · [Status](#status) · [Documentation](#documentation)
 
 ## Results
 
-Only automated runs count. In the unattended drills of [milestone 12](plan.md#12-unattended-drills), a workflow stops the primary, the watchdog starts the recovery, and nobody acts. The targets are a recovery time of at most 4 hours and a data loss of at most 2 hours ([decision 0002](docs/decisions/0002-recovery-contract.md#measurement)). Two consecutive drills on 2026-10-19 met both, with a 2 GiB dataset on the primary:
+Only automated runs count. In the unattended drills of [milestone 11](docs/worklogs/11-unattended-drills.md), a workflow stops the primary, the watchdog starts the recovery, and nobody acts. The targets are a recovery time of at most 4 hours and a data loss of at most 2 hours ([decision 0002](docs/decisions/0002-recovery-contract.md#measurement)). Two consecutive drills on 2026-10-19 met both, with a 2 GiB dataset on the primary:
 
 | Drill | Detection | Recovery time | Data loss |
 | --- | --- | --- | --- |
@@ -32,14 +32,14 @@ The recovery time runs from the first failed probe to the checks through the pub
 | Fence and cut over | `fence`, `dns-cutover`, `probe-recovery` | 32 s |
 | Total | | 36 min 00 s |
 
-Detection and building the cluster take most of the time. Detection needs five minutes of failed checks and then a watchdog run, which GitHub schedules every five minutes but started 12 and 13 minutes apart in these drills. [Milestone 11](plan.md#11-faster-cluster-build) shortens the build. The [drill results](docs/drills.md) list every drill, and the [worklog](docs/worklogs/12-unattended-drills.md#comparison-with-drills-1-to-3) compares them with the attended drills.
+Detection and building the cluster take most of the time. Detection needs five minutes of failed checks and then a watchdog run, which GitHub schedules every five minutes but started 12 and 13 minutes apart in these drills. The [drill results](docs/drills.md) list every drill, and the [worklog](docs/worklogs/11-unattended-drills.md#comparison-with-drills-1-to-3) compares them with the attended drills.
 
 ## How recovery works
 
 ![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a GitHub Actions watchdog that reads the probe results and starts a workflow, which builds a recovery cluster in Belgium from the same Git repository, restores it from the bucket, and moves the DNS name.](docs/diagrams/readme-overview.svg)
 
 1. **Back up.** Every 15 minutes the primary captures PostgreSQL and the Gitea repositories from one LVM snapshot while Gitea keeps running, encrypts them with age, and uploads them to a bucket in Belgium. The writer cannot delete or overwrite a backup.
-2. **Detect.** An uptime check probes `git.sindrg.com` from three continents. A scheduled watchdog starts a recovery only when every checker has failed for five minutes, the runner cannot reach the primary either, and the `AUTO_FAILOVER` switch is on. It started the recovery in every unattended drill of [milestone 12](plan.md#12-unattended-drills).
+2. **Detect.** An uptime check probes `git.sindrg.com` from three continents. A scheduled watchdog starts a recovery only when every checker has failed for five minutes, the runner cannot reach the primary either, and the `AUTO_FAILOVER` switch is on. It started the recovery in every unattended drill of [milestone 11](docs/worklogs/11-unattended-drills.md).
 3. **Recover.** The `Recover` workflow signs in to Google Cloud without a stored key and runs these stages in order: preflight, provisioning, bootstrap, Flux reconcile, restore, verification, fence, DNS cutover, checks through the public name, and resuming backups. Each stage ends with a check. A failure stops the run before the cutover, and a rerun resumes at the failed stage.
 4. **Return.** After a drill, the `Return` workflow starts the primary, moves the name back, and removes the recovery environment. It discards the writes that the recovery cluster accepted.
 
@@ -59,7 +59,7 @@ The recovery region runs no VMs until a recovery starts. Terraform state, the de
 
 ## Status
 
-Milestones 0 to 10 and 12 are complete, from the recovery contract to unattended drills. Next is a faster cluster build. The [roadmap](plan.md) gives every milestone, its gate, and the order.
+The project is complete: milestones 0 to 11, from the recovery contract to unattended drills, all passed their gates. The environment was removed after the close, so `git.sindrg.com` no longer answers; the results above link to the workflow runs. The [worklogs](docs/README.md#worklogs) record every milestone and its gate, and the [close](docs/worklogs/project-close.md) records the teardown.
 
 [Production readiness](docs/production-readiness.md) lists what a production deployment adds to this lab.
 

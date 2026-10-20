@@ -1,6 +1,6 @@
 # The restore failed with status 141 after the digests matched
 
-Observed on 2026-10-19 in the `Recover` run 39218739238, which the watchdog started during the first unattended drill of [milestone 12](../../plan.md#12-unattended-drills) (issue #126).
+Observed on 2026-10-19 in the `Recover` run 39218739238, which the watchdog started during the first unattended drill of [milestone 11](../worklogs/11-unattended-drills.md) (issue #126).
 
 ## Symptom
 
@@ -27,7 +27,7 @@ age --decrypt -i "$KEY" "${STAGING}/postgresql.dump.age" | pg_restore --list >/d
 Evidence:
 
 - The failure came in the same second as the digest check. The next check reads the 2.15 GB Gitea archive and cannot finish that fast.
-- The dump grew from 398,088 bytes in set `20261017T230701Z` to 429,443 bytes in set `20261017T232201Z`, the first set after the drill dataset added 200 issues. The failed run restored a set of 429,775 bytes. The last `Recover` run before the drill started at 18:25Z on 2026-10-17, before the [dataset was loaded](../worklogs/12-unattended-drills.md) from 23:01Z, so no recovery had restored a set with the dataset.
+- The dump grew from 398,088 bytes in set `20261017T230701Z` to 429,443 bytes in set `20261017T232201Z`, the first set after the drill dataset added 200 issues. The failed run restored a set of 429,775 bytes. The last `Recover` run before the drill started at 18:25Z on 2026-10-17, before the [dataset was loaded](../worklogs/11-unattended-drills.md) from 23:01Z, so no recovery had restored a set with the dataset.
 - Local reproduction on 2026-10-19 with PostgreSQL 16.15 and age from Ubuntu 24.04. The backup image runs PostgreSQL 18.6, so the versions differ. Two databases had the same schema of 121 tables. A dump with 10 short rows of data (237,877 bytes) passed the line in 3 of 3 runs. A dump with 200 rows of 1,280 characters (385,028 bytes) failed in 3 of 3 runs, with `age` exiting 141 and `pg_restore` exiting 0.
 - The two other pipelines in the script read their input to the end. `age --decrypt | tar -tzf -` passed 3 of 3 runs on a 33.6 MB archive built as `deploy/apps/gitea/backup/backup.sh` builds it. `age --decrypt | pg_restore --dbname` restored the larger dump in 3 of 3 runs with all 200 rows.
 

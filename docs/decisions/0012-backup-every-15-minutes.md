@@ -6,7 +6,7 @@ Date: 2026-10-04
 
 ## Goal
 
-Choose one improvement from the [milestone 6](../../plan.md#6-disaster-drill) measurements, apply it, and repeat the drill, as [milestone 7](../../plan.md#7-faster-recovery-optional) requires.
+Choose one improvement from the [milestone 6](../worklogs/06-disaster-drill.md) measurements, apply it, and repeat the drill, as [milestone 7](../worklogs/07-faster-recovery.md) requires.
 
 ## What the drills measured
 

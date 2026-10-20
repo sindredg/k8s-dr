@@ -1,6 +1,6 @@
 # 0013: Automated recovery
 
-Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), with [the return workflow](#amendment-the-return-workflow), and with [changes after the milestone 10 review](#amendment-changes-after-the-milestone-10-review). [Milestone 10](../../plan.md#10-automated-recovery) builds it and [milestone 12](../../plan.md#12-unattended-drills) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md). Since 2026-10-19, a `Return` run that passed after a failed automatic start clears it ([decision 0016](0016-drills-on-demand.md#a-return-that-passed-clears-a-failed-automatic-start)).
+Status: Accepted on 2026-10-16. Proposed on 2026-10-11. Amended on 2026-10-17 with the [pipeline grants and run state](#amendment-pipeline-grants-and-run-state) with [run settings in the cluster](#amendment-run-settings-in-the-cluster), with [the watchdog workflow](#amendment-the-watchdog-workflow), with [the return workflow](#amendment-the-return-workflow), and with [changes after the milestone 10 review](#amendment-changes-after-the-milestone-10-review). [Milestone 10](../worklogs/10-automated-recovery.md) builds it and [milestone 11](../worklogs/11-unattended-drills.md) measures it. Progress is in the milestone 10 [worklog](../worklogs/10-automated-recovery.md). Since 2026-10-19, a `Return` run that passed after a failed automatic start clears it ([decision 0016](0016-drills-on-demand.md#a-return-that-passed-clears-a-failed-automatic-start)).
 
 Date: 2026-10-11
 
@@ -74,7 +74,7 @@ The run sets a value in the cluster instead, and Flux reads it when it substitut
 
 ### The drill return is a second workflow
 
-Returning to the primary after a drill, and removing the recovery environment, becomes one workflow with the steps of the [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill). It still discards the writes that the recovery cluster accepted. A failback that keeps them is [milestone 13](../../plan.md#13-failback-with-data-optional).
+Returning to the primary after a drill, and removing the recovery environment, becomes one workflow with the steps of the [runbook](../runbooks/regional-recovery.md#return-to-the-primary-after-a-drill). It still discards the writes that the recovery cluster accepted.
 
 ## What a false start costs
 
@@ -97,7 +97,7 @@ If the watchdog starts a recovery while the primary is healthy but unreachable f
 
 ## Amendment: pipeline grants and run state
 
-Date: 2026-10-17. [Step 3](../../plan.md#10-automated-recovery) of milestone 10 builds the workflow. `infra/shared/pipeline.tf` holds everything below.
+Date: 2026-10-17. [Step 3](../worklogs/10-automated-recovery.md) of milestone 10 builds the workflow. `infra/shared/pipeline.tf` holds everything below.
 
 ### Grants
 
@@ -132,7 +132,7 @@ The workflow builds only the recovery cluster. Building the primary from the sam
 
 ## Amendment: run settings in the cluster
 
-Date: 2026-10-17. [Step 4](../../plan.md#10-automated-recovery) of milestone 10 builds it. It specifies [Recovery backups start without a Git change](#recovery-backups-start-without-a-git-change) and replaces two sentences above, as listed under [Replaced text](#replaced-text).
+Date: 2026-10-17. [Step 4](../worklogs/10-automated-recovery.md) of milestone 10 builds it. It specifies [Recovery backups start without a Git change](#recovery-backups-start-without-a-git-change) and replaces two sentences above, as listed under [Replaced text](#replaced-text).
 
 ### Resume backups through an optional ConfigMap
 
@@ -153,7 +153,7 @@ The return after a drill deletes `run-settings` before the primary's backups res
 
 ### Sets from an earlier drill
 
-Sets that the recovery cluster wrote stay under `recovery/` for the 14-day retention period of [decision 0007](0007-consistent-backups.md). The check that `recovery/` is empty would then stop every run for 14 days after a full drill, which the repeated drills of [milestone 12](../../plan.md#12-unattended-drills) cannot accept.
+Sets that the recovery cluster wrote stay under `recovery/` for the 14-day retention period of [decision 0007](0007-consistent-backups.md). The check that `recovery/` is empty would then stop every run for 14 days after a full drill, which the repeated drills of [milestone 11](../worklogs/11-unattended-drills.md) cannot accept.
 
 The check therefore fails only on a set named after the start of the run, or on an object whose name is not a set name. A set named in the future, such as one planted with a forged name, also fails. A set planted with an older name passes, and nothing restores it, because a recovery reads `primary/`.
 
@@ -164,7 +164,7 @@ The check therefore fails only on a set named after the start of the run, or on 
 
 ## Amendment: the watchdog workflow
 
-Date: 2026-10-17. [Step 5](../../plan.md#10-automated-recovery) of milestone 10 builds [A watchdog starts the recovery](#a-watchdog-starts-the-recovery) as `.github/workflows/watchdog.yml` and `scripts/watchdog.py`.
+Date: 2026-10-17. [Step 5](../worklogs/10-automated-recovery.md) of milestone 10 builds [A watchdog starts the recovery](#a-watchdog-starts-the-recovery) as `.github/workflows/watchdog.yml` and `scripts/watchdog.py`.
 
 ### Two jobs
 
@@ -202,7 +202,7 @@ If the newest `Recover` run was started by the watchdog and did not succeed, the
 
 ## Amendment: the return workflow
 
-Date: 2026-10-17. [Step 6](../../plan.md#10-automated-recovery) of milestone 10 builds [The drill return is a second workflow](#the-drill-return-is-a-second-workflow) as `scripts/return_to_primary.py`, `make return-to-primary`, and `.github/workflows/return.yml`.
+Date: 2026-10-17. [Step 6](../worklogs/10-automated-recovery.md) of milestone 10 builds [The drill return is a second workflow](#the-drill-return-is-a-second-workflow) as `scripts/return_to_primary.py`, `make return-to-primary`, and `.github/workflows/return.yml`.
 
 ### Stages
 
@@ -227,7 +227,7 @@ The last stage is the only end-to-end check that the primary writes backups agai
 
 | Guard | Why |
 | --- | --- |
-| The run requires `--discard-recovery-writes`, and the workflow's `discard_recovery_writes` input, which defaults to `false` | Every write that the recovery cluster accepted is lost. After a real loss, a return without those writes is the wrong action; that is [milestone 13](../../plan.md#13-failback-with-data-optional) |
+| The run requires `--discard-recovery-writes`, and the workflow's `discard_recovery_writes` input, which defaults to `false` | Every write that the recovery cluster accepted is lost. After a real loss, a return without those writes is the wrong action |
 | The run requires a recovery run state with `provisioning` passed, and `infra/recovery` reporting the address that the recovery recorded | Without a recovery environment there is nothing to return from, and an unrelated environment must not be destroyed |
 | The workflow shares the `recovery` concurrency group and the lock file with `Recover` | A return and a recovery never run at once |
 
@@ -268,4 +268,4 @@ Date: 2026-10-17. The independent review of milestone 10 checked the decision ag
 
 ### Schedule
 
-GitHub started the first seven scheduled runs 9 to 18 minutes apart, not every five minutes. Detection can therefore take up to about 25 minutes: the five-minute window, up to 18 minutes until the next run, and the delay before uptime results reach Cloud Monitoring. The 5 to 15 minutes in the [options table](#a-watchdog-starts-the-recovery) is too low. [Milestone 12](../../plan.md#12-unattended-drills) measures detection.
+GitHub started the first seven scheduled runs 9 to 18 minutes apart, not every five minutes. Detection can therefore take up to about 25 minutes: the five-minute window, up to 18 minutes until the next run, and the delay before uptime results reach Cloud Monitoring. The 5 to 15 minutes in the [options table](#a-watchdog-starts-the-recovery) is too low. [Milestone 11](../worklogs/11-unattended-drills.md) measures detection.

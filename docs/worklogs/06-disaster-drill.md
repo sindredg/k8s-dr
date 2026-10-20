@@ -1,6 +1,6 @@
 # Disaster drill
 
-Status: Complete. Two drills ran on 2026-10-04 and both met the targets; see the [comparison](#comparison). This file is the record of [milestone 6](../../plan.md#6-disaster-drill).
+Status: Complete. Two drills ran on 2026-10-04 and both met the targets; see the [comparison](#comparison). This file is the record of milestone 6.
 
 ## Scope
 

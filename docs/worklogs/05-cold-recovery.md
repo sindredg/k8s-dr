@@ -4,7 +4,7 @@ Status: Complete. The gate passed on 2026-10-03, and the recovery environment is
 
 ## Scope
 
-Build an independent Gitea service in the recovery region from code and one verified backup set, for [milestone 5](../../plan.md#5-cold-recovery). [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
+Build an independent Gitea service in the recovery region from code and one verified backup set, for milestone 5. [Decision 0008](../decisions/0008-cold-recovery.md) records the design.
 
 ## Work completed
 
@@ -264,7 +264,7 @@ The primary does not hold commit `2bf76c7`, which went to the recovery cluster. 
 
 ### Gate result
 
-The recovered service passed the same fixture and write checks through its own endpoint while both primary VMs were stopped. The [milestone 5](../../plan.md#5-cold-recovery) gate is met.
+The recovered service passed the same fixture and write checks through its own endpoint while both primary VMs were stopped. The milestone 5 gate is met.
 
 | Stage | Duration |
 | --- | --- |
