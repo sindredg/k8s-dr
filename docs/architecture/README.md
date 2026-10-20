@@ -2,15 +2,15 @@
 
 How the parts of this project work and how they connect. Each page covers one part: what it does, what it owns, how it is run, and where its limits are.
 
-The pages describe the final design: a primary cluster in Finland, and a recovery cluster in Belgium that is built from the same code only when it is needed. All of it is built, and three drills exercised the recovery path. For why a design was chosen, follow the links to the [decision records](../README.md).
+The pages describe the final design: a primary cluster in Finland, and a recovery cluster in Belgium that is built from the same code only when it is needed. All of it was built, and the drills of milestones 6, 7, and 11 exercised the recovery path. The environment was removed at the [project close](../worklogs/project-close.md). For why a design was chosen, follow the links to the [decision records](../README.md).
 
 ## The whole system
 
-![Architecture diagram showing the operator machine, GitHub, and Cloudflare DNS driving a primary cluster in Finland and an on-demand recovery cluster in Belgium, with the Terraform state bucket and the backup bucket in Belgium and monitoring held by external services.](../diagrams/arch-system.svg)
+![Architecture diagram showing the operator machine or a GitHub Actions runner, GitHub, and Cloudflare DNS driving a primary cluster in Finland and an on-demand recovery cluster in Belgium, with the Terraform state bucket and the backup bucket in Belgium and monitoring held by external services.](../diagrams/arch-system.svg)
 
-Solid lines exist all the time. Dashed lines exist only while the recovery cluster does.
+Solid lines exist all the time. Dashed lines exist only while the recovery cluster does. The operator machine and a GitHub Actions runner run the same commands; a recovery that the watchdog starts runs on the runner, as the pipeline account and with the keys from Secret Manager.
 
-The idea in one paragraph: everything needed to rebuild the service lives outside Finland. The code is on GitHub, the Terraform state and the backups are in Belgium, the keys are with the operator, and the monitoring is with external services. If Finland disappears, the same Terraform, Ansible, and Flux code builds an identical cluster in Belgium, a restore Job loads the newest backup, and one DNS change sends users there.
+The idea in one paragraph: everything needed to rebuild the service lives outside Finland. The code is on GitHub, the Terraform state and the backups are in Belgium, the keys are with the operator and in Secret Manager outside Finland, and the monitoring is with external services. If Finland disappears, the same Terraform, Ansible, and Flux code builds an identical cluster in Belgium, a restore Job loads the newest backup, and one DNS change sends users there.
 
 ## Who owns what
 
@@ -18,13 +18,13 @@ Every resource has exactly one owner. A change goes through that owner, never ar
 
 | Layer | Owner | Source | How a change is applied |
 | --- | --- | --- | --- |
-| State bucket, backup bucket, project IAM | Terraform | `infra/bootstrap`, `infra/shared` | `terraform apply` from the operator machine |
-| Network, VMs, load balancer, data disk | Terraform | `infra/primary`, `infra/recovery`, `infra/modules/regional_cluster` | `terraform apply` from the operator machine |
+| State bucket, backup bucket, project IAM, the pipeline account | Terraform | `infra/bootstrap`, `infra/shared` | `terraform apply` from the operator machine |
+| Network, VMs, load balancer, data disk | Terraform | `infra/primary`, `infra/recovery`, `infra/modules/regional_cluster` | `terraform apply` from the operator machine. A recovery applies `infra/recovery`, and the return after a drill destroys it, from the operator machine or the `Recover` and `Return` workflows |
 | Node configuration and the Kubernetes cluster | Ansible and kubeadm | `ansible/roles` | `make bootstrap` |
 | Calico, Gateway API CRDs, Traefik, Local Path Provisioner, the Flux install | Ansible, with Helm for Traefik | `ansible/roles/cluster_addons`, `ansible/roles/flux` | `make bootstrap` |
 | cert-manager, certificates, PostgreSQL, Gitea, backups, monitoring, network policies | Flux, with Helm for the charts | `deploy/` | Merge to `main`; Flux applies it within about a minute |
 | Application data | The restore Job | The backup bucket | `make restore` |
-| DNS records for `sindrg.com` | The operator | Cloudflare | `make dns-set` and `make dns-delete`, through the Cloudflare API |
+| DNS records for `sindrg.com` | `scripts/dns_record.sh` | Cloudflare | `make dns-set` and `make dns-delete` through the Cloudflare API, by hand or from a recovery or return |
 
 ## Pages
 

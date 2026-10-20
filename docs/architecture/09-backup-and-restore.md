@@ -50,7 +50,7 @@ The Job gets its token from the metadata server. No service account key exists.
 
 ### Fencing
 
-After a failover, the operator disables the primary worker's service account. A primary that comes back can then no longer write backups, and a restore never has to choose between two clusters' sets under one prefix. `infra/shared` ignores the account's `disabled` flag, so a later apply does not lift the fence.
+Before the cutover, the `fence` stage of a recovery disables the primary worker's service account. A primary that comes back can then no longer write backups, and a restore never has to choose between two clusters' sets under one prefix. `infra/shared` ignores the account's `disabled` flag, so a later apply does not lift the fence.
 
 ## Alerting
 
@@ -64,7 +64,7 @@ Healthchecks.io expects a success ping every hour with one hour of grace. It ale
 
 Everything above the scale-down changes nothing, so a wrong key or a damaged set fails while the current data is intact. After the first destructive step, a failure leaves Gitea stopped so that nothing serves a partial restore.
 
-The backup age private key is sent from the operator machine into a Secret that exists only while the Job runs. The playbook suspends the backup CronJob for the duration and deletes the Secret afterwards, even on failure.
+The backup age private key is sent from the machine that runs the playbook, the operator machine or a workflow runner, into a Secret that exists only while the Job runs. The playbook suspends the backup CronJob for the duration and deletes the Secret afterwards, even on failure.
 
 The namespace has no default. `gitea` replaces a live service; `gitea-restore` is a test copy. A restore reads the `primary/` prefix by default, whichever cluster runs it, which is what a recovery cluster needs.
 

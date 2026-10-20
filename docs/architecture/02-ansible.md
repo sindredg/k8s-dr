@@ -1,6 +1,6 @@
 # 2. Ansible
 
-Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, and runs the operator's routine checks. The same playbook builds the primary and the recovery cluster. It runs on the operator machine. Nothing is installed on the nodes to support it beyond SSH and Python.
+Ansible turns two blank Ubuntu VMs into a Kubernetes cluster with Flux running, and runs the operator's routine checks. The same playbook builds the primary and the recovery cluster. It runs on the operator machine, or on the GitHub Actions runner of the `Recover`, `Return`, and `Drill` workflows. Nothing is installed on the nodes to support it beyond SSH and Python.
 
 ## How it reaches the nodes
 
@@ -69,11 +69,11 @@ Every version is pinned in `ansible/playbooks/group_vars/all.yml`: Kubernetes, c
 
 ## How secrets pass through
 
-The SOPS age key and the backup age key are read on the operator machine and sent to `kubectl apply` on standard input. They are never written to a node's disk, and the tasks set `no_log`.
+The SOPS age key and the backup age key are read on the machine that runs the playbook and sent to `kubectl apply` on standard input. A workflow runner first reads them from Secret Manager. They are never written to a node's disk, and the tasks set `no_log`.
 
 ## Limits
 
-- One operator machine runs everything. There is no shared runner.
+- The primary is built and checked from one operator machine. Only the recovery, return, and drill workflows run on a GitHub Actions runner.
 - `kubectl` is used on the control plane over SSH. There is no kubeconfig on the operator machine.
 - Upgrades are manual: change a pin, rerun the bootstrap.
 

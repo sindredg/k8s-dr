@@ -1,6 +1,6 @@
 # Automated recovery
 
-Status: Complete. The milestone gate passed on the live system on 2026-10-17, and the independent review's findings are fixed or tracked; see [Gate](#gate) and [Review](#review). Steps 1 to 6 are recorded below in order. This file is the record of milestone 10.
+Status: Complete. The milestone gate passed on the live system on 2026-10-17, and the independent review's findings were fixed or recorded as issues; see [Gate](#gate) and [Review](#review). The issues still open at the [project close](project-close.md) were closed without a fix. Steps 1 to 6 are recorded below in order. This file is the record of milestone 10.
 
 ## Step 1: node identities and backup grants in the shared root
 

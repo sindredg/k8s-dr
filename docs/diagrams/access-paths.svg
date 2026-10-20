@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 960 456" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="access-paths-title access-paths-desc" id="access-paths-root">
         <title id="access-paths-title">Ways in</title>
-        <desc id="access-paths-desc">Architecture diagram showing the ways into the system: anyone reaches only Gitea&#x27;s sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies and from which the recovery, return, and watchdog workflows sign in to Google Cloud.</desc>
+        <desc id="access-paths-desc">Architecture diagram showing the ways into the system: anyone reaches only Gitea&#x27;s sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies and from which the recovery, return, drill, and watchdog workflows sign in to Google Cloud.</desc>
         <defs>
       <style>#access-paths-root { --color-paper:   #2d3142;
       --color-ink:     #f5f5f5;

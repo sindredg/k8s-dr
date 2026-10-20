@@ -67,7 +67,7 @@ cert-manager proves control of a name with a DNS-01 challenge. Issuance needs no
 ## Limits
 
 - One Traefik pod on one node. Replacing it is a short outage.
-- The DNS cutover is a command the operator runs, not an automatic failover.
+- The cutover has no approval step. The `Recover` workflow moves the name after its checks pass, and the watchdog can start that workflow on its own.
 - No rate limit or web application firewall, and no `Strict-Transport-Security` header yet.
 - The Cloudflare token in the cluster can edit the whole zone.
 

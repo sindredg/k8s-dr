@@ -11,7 +11,7 @@ A root is a directory with its own state. The split keeps resources that must ou
 | Root | Creates | Lifetime |
 | --- | --- | --- |
 | `infra/bootstrap` | The state bucket and the operator's access to it | Permanent. Starts with local state, then migrates into the bucket it created. |
-| `infra/shared` | The backup bucket, its IAM, the node service accounts of every cluster, the administrator's IAP, OS Login, and instance admin roles, and the uptime check | Permanent. Shared by every region. |
+| `infra/shared` | The backup bucket, its IAM, the node service accounts of every cluster, the administrator's IAP, OS Login, and instance admin roles, the uptime check, and the pipeline account with its workload identity provider, its grants, and the two age key secrets | Permanent. Shared by every region. |
 | `infra/primary` | The Finland cluster through the module, plus the worker data disk | Permanent. The data disk has `prevent_destroy`. |
 | `infra/recovery` | The Belgium cluster through the same module, plus its own data disk | Created for a drill or a disaster, destroyed afterwards. Its disk has no `prevent_destroy`. |
 
@@ -52,7 +52,7 @@ Nothing else reaches the nodes. The Kubernetes API listens on the control plane'
 ## Limits
 
 - One zone and one worker. A zone failure is an outage.
-- Terraform runs from the operator machine with personal credentials. There is no pipeline.
+- The bootstrap, shared, and primary roots run from the operator machine with personal credentials. The recovery root also runs in a pipeline, as the pipeline account of [decision 0013](../decisions/0013-automated-recovery.md).
 - The backup retention policy is unlocked, so a project owner can remove it.
 
 See [decision 0003](../decisions/0003-regional-infrastructure-and-state.md) and the [primary infrastructure runbook](../runbooks/primary-infrastructure.md).

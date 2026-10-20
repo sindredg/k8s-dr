@@ -4,7 +4,7 @@ Status: Complete. The milestone gate passed on 2026-09-25. See [Gate conclusion]
 
 ## Scope
 
-Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible. Initialize the control plane, join the worker, install a CNI, and add only the ingress and storage components required for the service. Automate a rebuild from fresh VMs. See milestone 2.
+Configure Linux, containerd, kubelet, kubeadm, and kubectl with Ansible. Initialize the control plane, join the worker, install a CNI, and add only the ingress and storage components required for the service. Automate a rebuild from fresh VMs.
 
 ## Work completed
 
