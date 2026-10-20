@@ -1,4 +1,4 @@
-# Self-Managed Kubernetes Disaster Recovery
+# Automated Regional Disaster Recovery for Self-Managed Kubernetes
 
 [![Ansible](https://github.com/sindredg/k8s-dr/actions/workflows/ansible.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/ansible.yml)
 [![Docs](https://github.com/sindredg/k8s-dr/actions/workflows/docs.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/docs.yml)
