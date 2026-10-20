@@ -4,7 +4,7 @@ Who can do what, which keys exist, and what each one unlocks.
 
 ## Ways in
 
-![Architecture diagram showing the ways into the system: anyone reaches only Gitea's sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies and from which the recovery, return, and watchdog workflows sign in to Google Cloud.](../diagrams/access-paths.svg)
+![Architecture diagram showing the ways into the system: anyone reaches only Gitea's sign-in over HTTPS, while the operator changes the cluster either through Google Cloud, IAP SSH, and kubectl on the nodes, or through the main branch on GitHub, which Flux applies and from which the recovery, return, drill, and watchdog workflows sign in to Google Cloud.](../diagrams/access-paths.svg)
 
 There are three ways to change the system, and each is one account:
 
@@ -14,7 +14,7 @@ There are three ways to change the system, and each is one account:
 | GitHub account | GitHub sign-in; `main` requires a pull request | Everything Flux deploys, which is the whole application layer. Starting the recovery workflow on `main`, which acts in the project as the pipeline account |
 | Gitea admin account | A random password in a SOPS file | The Gitea instance |
 
-Nothing else has administrative access. The recovery, return, and watchdog workflows sign in as the pipeline account through workload identity federation, with no key. There are no service account keys, no SSH keys in project metadata, and no kubeconfig outside the control-plane node.
+Nothing else has administrative access. The recovery, return, drill, and watchdog workflows sign in as the pipeline account through workload identity federation, with no key. There are no service account keys, no SSH keys in project metadata, and no kubeconfig outside the control-plane node.
 
 ## Machine identities
 
@@ -28,7 +28,8 @@ Nothing else has administrative access. The recovery, return, and watchdog workf
 | Restore Job service account | Scale the `gitea` Deployment and read pods in its namespace | Anything else in the cluster |
 | GitHub Actions, other workflows | Read the repository; publish the backup image from `main` | Reach the cluster or the project |
 | Watchdog workflow | Read the repository and its workflow runs; when the primary is down, sign in as the pipeline account to read the uptime results, and start the recovery workflow | Reach the cluster. During the second job it holds the pipeline account's access, but runs only `scripts/watchdog.py` from `main` |
-| Pipeline service account, used by the recovery, return, and watchdog workflows | Create, change, and delete any VM, network, or firewall rule in the project, the primary ones included; attach only the recovery node accounts to a VM; sign in to the recovery nodes through IAP and OS Login; read the backup bucket and every Terraform state; write state under `recovery/` and `pipeline/`; read both age key secrets; disable and enable the primary worker service account; read every resource and IAM policy in the project (`roles/viewer`, `roles/iam.securityReviewer`); change the IAM policy of compute objects such as disks and subnetworks, which the compute roles include | Change the IAM policy of the project, a service account, a bucket, or a secret; delete or overwrite a backup; act as a primary node account or sign in to a primary node |
+| Drill workflow | Read the repository; start the `Return` workflow and open an issue; sign in as the pipeline account to stop and start the primary VMs, read both age keys for its write checks, and keep its results in the state bucket | Connect to the nodes or the cluster |
+| Pipeline service account, used by the recovery, return, drill, and watchdog workflows | Create, change, and delete any VM, network, or firewall rule in the project, the primary ones included; attach only the recovery node accounts to a VM; sign in to the recovery nodes through IAP and OS Login; read the backup bucket and every Terraform state; write state under `recovery/` and `pipeline/`; read both age key secrets; disable and enable the primary worker service account; read every resource and IAM policy in the project (`roles/viewer`, `roles/iam.securityReviewer`); change the IAM policy of compute objects such as disks and subnetworks, which the compute roles include | Change the IAM policy of the project, a service account, a bucket, or a secret; delete or overwrite a backup; act as a primary node account or sign in to a primary node |
 
 ## Keys and secrets
 
@@ -41,7 +42,7 @@ Nothing else has administrative access. The recovery, return, and watchdog workf
 | Grafana Cloud token | SOPS file, decrypted into `monitoring` | Writing metrics |
 | Healthchecks.io ping URL | SOPS file, decrypted into `gitea` | Sending heartbeats |
 | Database and Gitea admin passwords | SOPS files, decrypted into `postgresql` and `gitea` | The database; the Gitea instance |
-| Fixture user password | SOPS file under `recovery/`, decrypted only on the operator machine | The fixture account |
+| Fixture user password | SOPS file under `recovery/`, decrypted on the operator machine or on the runner of a recovery, return, or drill | The fixture account |
 | Cluster admin kubeconfig | `/etc/kubernetes/admin.conf` on the control plane, root only | The cluster |
 | Terraform state | State bucket | Resource details; treated as sensitive |
 

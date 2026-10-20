@@ -22,8 +22,8 @@ The targets are a recovery time of at most 4 hours and a data loss of at most 2 
 | [20261019T185625Z](https://github.com/sindredg/k8s-dr/actions/runs/39306669248) | dispatch | passed | 0h 18m 15s | 0h 36m 00s | 0h 05m 09s | 1 | 0h 07m 10s | 0h 03m 18s |
 <!-- end of drill results -->
 
-`make drill-results` rewrites the table from the result files in the Terraform state bucket. Each drill also opens an issue labelled [`drill`](https://github.com/sindredg/k8s-dr/issues?q=label%3Adrill) with its full report and stage timeline.
+`make drill-results` generated the table from the result files in the Terraform state bucket. Each drill also opened an issue labelled [`drill`](https://github.com/sindredg/k8s-dr/issues?q=label%3Adrill) with its full report and stage timeline.
 
 Drills 1 to 3 on 2026-10-04 were attended and are not in this table; see the [comparison](worklogs/07-faster-recovery.md#comparison).
 
-No drill ran after 2026-10-19. The `Drill` workflow was disabled and the environment removed at the [project close](worklogs/project-close.md).
+No drill ran after 2026-10-19. The `Drill` workflow was disabled and the environment removed at the [project close](worklogs/project-close.md), including the state bucket, so the table is final.

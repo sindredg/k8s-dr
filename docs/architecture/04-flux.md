@@ -51,7 +51,7 @@ Secrets are committed to the public repository, encrypted with SOPS and age. Onl
 
 ![Architecture diagram showing secrets encrypted with an age public key on the operator machine, committed to the public repository, and decrypted in the cluster by the kustomize controller with the age private key that Ansible sends once at bootstrap.](../diagrams/flux-secrets.svg)
 
-The private key reaches the cluster once, from the operator machine, during the bootstrap. It also lives in the operator's credential store, because a recovery cluster needs it.
+The private key reaches the cluster once, during the bootstrap, from the machine that runs it: the operator machine, or the runner of the `Recover` workflow, which reads the key from Secret Manager. The operator's credential store and Secret Manager keep a copy, because a recovery cluster needs it.
 
 ## Pruning
 

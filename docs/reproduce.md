@@ -22,6 +22,7 @@ Two VMs, a load balancer, a NAT gateway, and the buckets bill for as long as the
 | --- | --- |
 | The domain `sindrg.com` | `deploy/clusters/*/cluster-settings.yaml`, `Makefile`, `scripts/preflight.sh`, `scripts/dns_record.sh`, `scripts/check-public-surface.sh`, `infra/primary/outputs.tf`, `infra/recovery/outputs.tf`, `infra/shared/variables.tf`, and the tests that pin it |
 | The repository URL | `flux_git_url` in `ansible/playbooks/group_vars/all.yml` |
+| The repository whose workflows may sign in as the pipeline account | `github_repository_id` in `infra/shared/variables.tf`, and the `--repository` default of `scripts/pipeline.py` |
 | The age recipients | `.sops.yaml` and `deploy/apps/gitea/backup/recipients.txt` |
 | Project, bucket names, and members | The ignored `terraform.tfvars` and `backend.hcl` of each root, from the tracked `.example` files |
 | The backup image | `ghcr.io/sindredg/k8s-dr-backup` is public and pinned by digest. Reuse it, or build `backup-image` and update the digest in `deploy/apps/gitea/backup.yaml`. |

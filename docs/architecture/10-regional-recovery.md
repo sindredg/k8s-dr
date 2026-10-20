@@ -24,11 +24,11 @@ Belgium has no VMs until they are needed. That is the cheapest design and the sl
 | Terraform, Ansible, and Flux code | GitHub |
 | Terraform state | State bucket, Belgium |
 | Backup sets | Backup bucket, Belgium |
-| SOPS age key and backup age key | Operator credential store |
+| SOPS age key and backup age key | Operator credential store, and Secret Manager in `europe-west1` and `europe-west4` |
 | DNS control | Cloudflare |
 | Pinned packages, charts, and images | Public repositories, checked weekly by the pin check |
 
-Nothing on the list is in Finland. Drill 1 recovered with both primary VMs stopped and used nothing else there.
+Nothing on the list is in Finland. The first drill of milestone 6 recovered with both primary VMs stopped and used nothing else there.
 
 ## The procedure
 
@@ -60,7 +60,7 @@ The recovery cluster is tested through `git-dr.sindrg.com` before any user reach
 
 | Risk | Control |
 | --- | --- |
-| A returning primary writes backups that look newer than the recovery cluster's | Each cluster writes under its own prefix, and the primary worker's service account is disabled after failover |
+| A returning primary writes backups that look newer than the recovery cluster's | Each cluster writes under its own prefix, and the primary worker's service account is disabled before the cutover |
 | A command meant for recovery runs against the primary | `CLUSTER` selects a separate inventory per cluster |
 | The recovery cluster serves stale or empty data to users | It is checked through `git-dr.sindrg.com` before the cutover |
 | Both clusters serve `git.sindrg.com` | DNS points to one address at a time |

@@ -3,7 +3,6 @@
 [![Ansible](https://github.com/sindredg/k8s-dr/actions/workflows/ansible.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/ansible.yml)
 [![Docs](https://github.com/sindredg/k8s-dr/actions/workflows/docs.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/docs.yml)
 [![Pins](https://github.com/sindredg/k8s-dr/actions/workflows/pins.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/pins.yml)
-[![Public surface](https://github.com/sindredg/k8s-dr/actions/workflows/surface.yml/badge.svg)](https://github.com/sindredg/k8s-dr/actions/workflows/surface.yml)
 
 Recover a stateful service after losing a cloud region, from code and offsite backups.
 

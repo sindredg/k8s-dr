@@ -1,6 +1,6 @@
 # Unattended drills
 
-Status: Done. The drill workflow and the dataset are built, and the dataset is loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. Drills 2 and 3 ran on demand the same day and passed, the [gate](#gate) is met, and the [independent review](#independent-review) found no claim that overturns it. This file is the record of milestone 11.
+Status: Complete. The drill workflow and the dataset were built, and the dataset was loaded on the primary. Drill 1 ran from the schedule on 2026-10-19 and failed in the restore. Drills 2 and 3 ran on demand the same day and passed, the [gate](#gate) is met, and the [independent review](#independent-review) found no claim that overturns it. This file is the record of milestone 11.
 
 ## Step 1: the drill workflow and the dataset
 
@@ -72,7 +72,7 @@ An independent review read the drill code against decision 0015 and against the 
 
 [Decision 0015](../decisions/0015-unattended-drills.md#amendment-a-drill-that-cannot-finish-restores-the-service) records the first two as an amendment.
 
-### Plan only
+### Not fixed
 
 - The job's worst case exceeds its timeout: [issue #122](https://github.com/sindredg/k8s-dr/issues/122).
 - The tests stub out the runner wiring and the real API responses: [issue #123](https://github.com/sindredg/k8s-dr/issues/123).
@@ -297,7 +297,7 @@ Fixed in the same change:
 - The mutation that ended the recovery time at the last stage instead of `probe-recovery` survived, because the test's recovery had no stage after `probe-recovery`. The test now has a `resume-backups` stage, and the mutation fails two tests.
 - The paths of issue #123 that drills 2 and 3 ran, and the state of issue #122, are recorded above.
 
-Plan only:
+Not changed:
 
 - Whether the watchdog keeps the GitHub schedule after the detection of drill 3. It stays; see the [comparison](#comparison-with-drills-1-to-3).
-- After a failed `wait`, the return can read the run state of an earlier recovery while a late `Recover` run still runs, start the primary VMs, and leave that run to cut over with no return. This is reasoned from the code, not observed; [issue #133](https://github.com/sindredg/k8s-dr/issues/133) tracks it.
+- After a failed `wait`, the return can read the run state of an earlier recovery while a late `Recover` run still runs, start the primary VMs, and leave that run to cut over with no return. This is reasoned from the code, not observed; [issue #133](https://github.com/sindredg/k8s-dr/issues/133) records it.
