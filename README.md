@@ -36,7 +36,7 @@ Detection and building the cluster take most of the time. Detection needs five m
 
 ## How recovery works
 
-![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a GitHub Actions watchdog that reads the probe results and starts a workflow, which builds a recovery cluster in Belgium from the same Git repository, restores it from the bucket, and moves the DNS name.](docs/diagrams/readme-overview.svg)
+![Architecture diagram showing users reaching the primary cluster in Finland through one DNS name, encrypted backups leaving for a bucket in Belgium every 15 minutes, and a GitHub Actions watchdog that reads the probe results and starts a workflow, which builds a recovery cluster in Belgium from the same Git repository, restores it from the bucket, and moves the DNS name. A step strip names the sequence: back up, the primary fails, detect, and recover; where motion is allowed, the figure plays it in a loop.](docs/diagrams/readme-overview.svg)
 
 1. **Back up.** Every 15 minutes the primary captures PostgreSQL and the Gitea repositories from one LVM snapshot while Gitea keeps running, encrypts them with age, and uploads them to a bucket in Belgium. The writer cannot delete or overwrite a backup.
 2. **Detect.** An uptime check probes `git.sindrg.com` from three continents. A scheduled watchdog starts a recovery only when every checker has failed for five minutes, the runner cannot reach the primary either, and the `AUTO_FAILOVER` switch is on. It started the recovery in every unattended drill of [milestone 11](docs/worklogs/11-unattended-drills.md).

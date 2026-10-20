@@ -24,3 +24,9 @@ The figures follow the [diagram-design](https://github.com/cathrynlavery/diagram
 
    `--system-fonts` leaves out the web font import, because GitHub blocks remote fonts in images.
 3. Open the SVG in a browser and confirm it reads correctly before committing both files.
+
+## Motion
+
+`readme-overview` animates in the README. Its motion is CSS in a `<style>` inside the `<svg>`, so the exported SVG plays as an image, with no script. The rules apply only under `prefers-reduced-motion: no-preference`. Without a running animation the figure is the static one: the overlays stay at opacity 0, and the static caption stays visible.
+
+The closing tag of that block is written `</style >`, with a space. `export_svg.py` copies every `<style>` rule into the exported SVG without its `@media` block, which would play the motion for readers who asked for reduced motion. The space keeps the export from reading the block. Keep it when editing the file.
